@@ -1,15 +1,14 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { Stack, Redirect, useSegments } from 'expo-router';
+import { DarkTheme, DefaultTheme, Redirect, Stack, ThemeProvider, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
 import { useState } from 'react';
+import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [currentUser, setCurrentUser] = useState<boolean>(false);
+  const [currentUser] = useState<boolean>(false);
 
   const segments = useSegments();
   const inAuth = segments[0] === 'auth';
