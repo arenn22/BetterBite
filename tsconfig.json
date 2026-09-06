@@ -9,7 +9,13 @@
       "@/assets/*": [
         "./assets/*"
       ]
-    }
+    },
+
+    //Linting
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": [
     "**/*.ts",
