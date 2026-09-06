@@ -1,3 +1,1 @@
-export default function signup() {
-    
-}
+export default function signup() {}
