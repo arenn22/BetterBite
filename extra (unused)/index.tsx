@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { supabase } from "../lib/supabase";
+import { supabase } from "../src/lib/supabase";
 
 type Instrument = {
 	id: number;
