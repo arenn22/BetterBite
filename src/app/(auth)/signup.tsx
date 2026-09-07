@@ -1,11 +1,4 @@
-import {
-	KeyboardAvoidingView,
-	Pressable,
-	StyleSheet,
-	Text,
-	TextInput,
-	View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function Signup() {
 	return (
@@ -14,16 +7,14 @@ export default function Signup() {
 				<Text>BetterBite</Text>
 				<Text>Cook smarter. Waste less.</Text>
 			</View>
-			<KeyboardAvoidingView>
-				<View>
-					<TextInput placeholder="Email Address"></TextInput>
-					<TextInput placeholder="Username"></TextInput>
-					<TextInput
-						placeholder="Password"
-						secureTextEntry
-					></TextInput>
-				</View>
-			</KeyboardAvoidingView>
+			<View>
+				<TextInput placeholder="Email Address" />
+				<TextInput placeholder="Username" />
+				<TextInput placeholder="Password" secureTextEntry />
+			</View>
+			<Pressable>
+				<Text>Sign Up</Text>
+			</Pressable>
 			<View>
 				<Pressable>
 					<Text>Sign up with Google</Text>
@@ -36,7 +27,10 @@ export default function Signup() {
 				<Text>or</Text>
 			</View>
 			<View>
-				<Text>Already have an account? Log in</Text>
+				<Text>
+					Already have an account? {""}
+					<Text>Log in</Text>
+				</Text>
 			</View>
 		</View>
 	);

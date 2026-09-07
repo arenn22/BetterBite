@@ -1,10 +1,13 @@
 import { Stack } from "expo-router";
+import { KeyboardAvoidingView } from "react-native";
 
 export default function AuthLayout() {
 	return (
-		<Stack screenOptions={{ headerShown: false }}>
-			<Stack.Screen name="login" />
-			<Stack.Screen name="signup" />
-		</Stack>
+		<KeyboardAvoidingView>
+			<Stack screenOptions={{ headerShown: false }}>
+				<Stack.Screen name="login" />
+				<Stack.Screen name="signup" />
+			</Stack>
+		</KeyboardAvoidingView>
 	);
 }
