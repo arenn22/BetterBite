@@ -4,3 +4,8 @@ export interface Profile {
 	email : string;
 	date_joined : Date;
 }
+
+export interface AuthResult {
+	profile : Profile | null;
+	error : string | null;
+}

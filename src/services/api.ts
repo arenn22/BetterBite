@@ -1,11 +1,11 @@
 import { supabase } from "../lib/supabase";
-import type { Profile } from "../types/auth";
+import type { AuthResult, Profile } from "../types/auth";
 
 async function handleSignUp(
   username: string,
   email: string,
   password: string
-): Promise<Profile | null> {
+): Promise<AuthResult> {
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -13,13 +13,13 @@ async function handleSignUp(
 
   if (authError) {
     console.error(authError.message);
-    return null;
+    return {profile: null, error: authError.message};
   }
 
   if (!authData.user) {
-    return null;
+    return {profile: null, error: "Failed to create user"};
   }
-
+  
   const profile: Profile = {
     id: authData.user.id,
     username,
@@ -31,10 +31,10 @@ async function handleSignUp(
 
   if (profileError) {
     console.error("Profile error:", profileError.message);
-    return null;
+    return {profile: null, error: profileError.message};
   }
 
-  return profile;
+  return {profile, error: null};
 }
 
 async function handleSignInEmail(email: string, password: string) {
@@ -44,7 +44,20 @@ async function handleSignInEmail(email: string, password: string) {
   });
   
   if (error) console.log(error.message);
-  else console.log('User signed in:', data.session);
+  else {
+    const date = await getDateJoinedByID(data.user.id);
+    const authProfile: AuthResult = {
+      profile: {
+        id: data.user.id,
+        username: data.user.user_metadata.username || "",
+        email: data.user.email || "",
+        date_joined: date,
+      },
+      error: null,
+    };
+    console.log("Signed in user profile:", authProfile);
+    return authProfile;
+  }
 }
 
 async function handleSignInUsername(username: string, password: string) {
@@ -55,6 +68,19 @@ async function handleSignInUsername(username: string, password: string) {
     else {
         console.error('No email found for chosen username:', username);
     }
+}
+
+async function getDateJoinedByID(userId:string): Promise<Date | null>  {
+  const { data, error } = await supabase.rpc('get_dateJoined_by_id', {
+    idVal: userId
+  });
+
+  if (error) {
+    console.error('Error fetching date joined:', error.message);
+    return null;
+  }
+
+  return data.date_joined ? new Date(data.date_joined) : null;
 }
 
 async function getEmailWithUsername(username: string) {
