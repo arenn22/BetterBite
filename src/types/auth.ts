@@ -1,6 +1,6 @@
-export interface User {
-	id: number;
-	username: string;
-	dateJoined: Date;
+export interface Profile {
+	id : string;
+	username : string;
+	email : string;
+	date_joined : Date;
 }
-
