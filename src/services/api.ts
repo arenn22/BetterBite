@@ -1,7 +1,7 @@
 import { supabase } from "../lib/supabase";
 import type { AuthResult, Profile } from "../types/auth";
 
-async function handleSignUp(
+export async function handleSignUp(
   username: string,
   email: string,
   password: string
@@ -20,14 +20,19 @@ async function handleSignUp(
     return {profile: null, error: "Failed to create user"};
   }
   
+  const dateJoined = new Date().toISOString().slice(0, 10);
+
   const profile: Profile = {
     id: authData.user.id,
     username,
     email,
-    date_joined: new Date(),
+    date_joined: new Date(dateJoined),
   };
 
-  const { error: profileError } = await supabase.from("profiles").insert(profile);
+  const { error: profileError } = await supabase.from("profiles").insert({
+    ...profile,
+    date_joined: dateJoined,
+  });
 
   if (profileError) {
     console.error("Profile error:", profileError.message);
@@ -60,7 +65,7 @@ async function handleSignInEmail(email: string, password: string) {
   }
 }
 
-async function handleSignInUsername(username: string, password: string) {
+export async function handleSignInUsername(username: string, password: string) {
     const email = await getEmailWithUsername(username);
     if (email) {
         await handleSignInEmail(email, password);
