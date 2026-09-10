@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
 	KeyboardAvoidingView,
@@ -15,13 +16,18 @@ import AuthInput from "@/components/auth/auth-input";
 import { useAuthContext } from "@/lib/auth/auth-context";
 
 export default function Signup() {
+	const router = useRouter();
 	const [usernameInput, setUsernameInput] = useState("");
 	const [emailInput, setEmailInput] = useState("");
 	const [passwordInput, setPasswordInput] = useState("");
 	const { error, loading, signup } = useAuthContext();
 
 	const onSignUp = async () => {
-		await signup(usernameInput, emailInput, passwordInput);
+		const success = await signup(usernameInput, emailInput, passwordInput);
+
+		if (success) {
+			router.replace("/(tabs)/home");
+		}
 	};
 
 	return (
