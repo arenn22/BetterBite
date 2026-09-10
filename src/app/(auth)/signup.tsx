@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -11,8 +12,24 @@ import {
 import AuthButton from "@/components/auth/auth-button";
 import AuthHeader from "@/components/auth/auth-header";
 import AuthInput from "@/components/auth/auth-input";
+import { handleSignUp } from "@/services/api";
 
 export default function Signup() {
+	const [username, setUsername] = useState("");
+	const [email, setEmail] = useState("");
+	const [password, setPassword] = useState("");
+
+	const onSignUp = async () => {
+		const result = await handleSignUp(username, email, password);
+
+		if (result.error) {
+			console.error(result.error);
+			return;
+		}
+
+		console.log("Signed up successfully", result.profile);
+	};
+
 	return (
 		<KeyboardAvoidingView
 			style={styles.keyboard}
@@ -26,14 +43,32 @@ export default function Signup() {
 					<AuthHeader />
 
 					<View style={styles.form}>
-						<AuthInput placeholder="Username" />
+						<AuthInput
+							placeholder="Username"
+							value={username}
+							onChangeText={setUsername}
+						/>
 
-						<AuthInput placeholder="Email Address" />
+						<AuthInput
+							placeholder="Email Address"
+							value={email}
+							onChangeText={setEmail}
+							autoCapitalize="none"
+							autoCorrect={false}
+							keyboardType="email-address"
+						/>
 
-						<AuthInput placeholder="Password" secureTextEntry />
+						<AuthInput
+							placeholder="Password"
+							secureTextEntry
+							value={password}
+							onChangeText={setPassword}
+							autoCapitalize="none"
+							autoCorrect={false}
+						/>
 
 						<View style={styles.authButton}>
-							<AuthButton title="Sign Up" />
+							<AuthButton title="Sign Up" onPress={onSignUp} />
 						</View>
 					</View>
 
