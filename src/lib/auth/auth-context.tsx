@@ -1,8 +1,8 @@
-import { User } from "@/types/auth";
+import { Profile, User } from "@/types/auth";
 import { createContext, useContext, useState } from "react";
-
 interface AuthContextType {
 	currentUser: User | null;
+	currentProfile: Profile | null;
 	login: (user: User) => void;
 	logout: () => void;
 	signup: (user: User) => void;
@@ -10,6 +10,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
 	currentUser: null,
+	currentProfile: null,
 	login: () => {},
 	logout: () => {},
 	signup: () => {},

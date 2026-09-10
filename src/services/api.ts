@@ -6,6 +6,9 @@ export async function handleSignUp(
   email: string,
   password: string
 ): Promise<AuthResult> {
+  if(username.length < 4) {
+    return {profile: null, error: "Username must be at least 4 characters long"};
+  }
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
