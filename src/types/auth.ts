@@ -2,7 +2,7 @@ export interface Profile {
 	id : string;
 	username : string;
 	email : string;
-	date_joined : Date;
+	date_joined : Date | string | null;
 }
 
 export interface AuthResult {
