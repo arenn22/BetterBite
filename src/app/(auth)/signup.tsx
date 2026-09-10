@@ -12,22 +12,16 @@ import {
 import AuthButton from "@/components/auth/auth-button";
 import AuthHeader from "@/components/auth/auth-header";
 import AuthInput from "@/components/auth/auth-input";
-import { handleSignUp } from "@/services/api";
+import { useAuthContext } from "@/lib/auth/auth-context";
 
 export default function Signup() {
 	const [usernameInput, setUsernameInput] = useState("");
 	const [emailInput, setEmailInput] = useState("");
 	const [passwordInput, setPasswordInput] = useState("");
+	const { error, loading, signup } = useAuthContext();
 
 	const onSignUp = async () => {
-		const result = await handleSignUp(usernameInput, emailInput, passwordInput);
-
-		if (result.error) {
-			console.error(result.error);
-			return;
-		}
-
-		console.log("Signed up successfully", result.profile);
+		await signup(usernameInput, emailInput, passwordInput);
 	};
 
 	return (
@@ -68,8 +62,14 @@ export default function Signup() {
 						/>
 
 						<View style={styles.authButton}>
-							<AuthButton title="Sign Up" onPress={onSignUp} />
+							<AuthButton
+								title={loading ? "Signing Up..." : "Sign Up"}
+								onPress={onSignUp}
+								disabled={loading}
+							/>
 						</View>
+
+						{error ? <Text style={styles.errorText}>{error}</Text> : null}
 					</View>
 
 					<View style={styles.bottomLink}>
@@ -112,6 +112,12 @@ const styles = StyleSheet.create({
 	authButton: {
 		marginTop: 16,
 		marginBottom: 20,
+	},
+
+	errorText: {
+		color: "#B42318",
+		fontSize: 14,
+		textAlign: "center",
 	},
 
 	bottomLink: {

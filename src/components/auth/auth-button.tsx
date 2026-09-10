@@ -3,11 +3,16 @@ import { Pressable, StyleSheet, Text } from "react-native";
 interface AuthButtonProps {
 	title: string;
 	onPress?: () => void;
+	disabled?: boolean;
 }
 
-export default function AuthButton({ title, onPress }: AuthButtonProps) {
+export default function AuthButton({
+	title,
+	onPress,
+	disabled,
+}: AuthButtonProps) {
 	return (
-		<Pressable style={styles.button} onPress={onPress}>
+		<Pressable style={styles.button} onPress={onPress} disabled={disabled}>
 			<Text style={styles.text}>{title}</Text>
 		</Pressable>
 	);

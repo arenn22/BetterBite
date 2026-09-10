@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -11,8 +12,17 @@ import {
 import AuthButton from "@/components/auth/auth-button";
 import AuthHeader from "@/components/auth/auth-header";
 import AuthInput from "@/components/auth/auth-input";
+import { useAuthContext } from "@/lib/auth/auth-context";
 
 export default function Login() {
+	const [usernameInput, setUsernameInput] = useState("");
+	const [passwordInput, setPasswordInput] = useState("");
+	const { error, loading, loginWithUsername } = useAuthContext();
+
+	const onLogin = async () => {
+		await loginWithUsername(usernameInput, passwordInput);
+	};
+
 	return (
 		<KeyboardAvoidingView
 			style={styles.keyboard}
@@ -26,9 +36,20 @@ export default function Login() {
 					<AuthHeader />
 
 					<View style={styles.form}>
-						<AuthInput placeholder="Username" />
+						<AuthInput
+							placeholder="Username"
+							value={usernameInput}
+							onChangeText={setUsernameInput}
+						/>
 
-						<AuthInput placeholder="Password" secureTextEntry />
+						<AuthInput
+							placeholder="Password"
+							secureTextEntry
+							value={passwordInput}
+							onChangeText={setPasswordInput}
+							autoCapitalize="none"
+							autoCorrect={false}
+						/>
 
 						<Pressable style={styles.forgotPassword}>
 							<Text style={styles.forgotPasswordText}>
@@ -37,8 +58,14 @@ export default function Login() {
 						</Pressable>
 
 						<View style={styles.authButton}>
-							<AuthButton title="Log In" />
+							<AuthButton
+								title={loading ? "Logging In..." : "Log In"}
+								onPress={onLogin}
+								disabled={loading}
+							/>
 						</View>
+
+						{error ? <Text style={styles.errorText}>{error}</Text> : null}
 					</View>
 
 					<View style={styles.bottomLink}>
@@ -87,6 +114,12 @@ const styles = StyleSheet.create({
 	forgotPasswordText: {
 		fontSize: 14,
 		color: "#687B5D",
+	},
+
+	errorText: {
+		color: "#B42318",
+		fontSize: 14,
+		textAlign: "center",
 	},
 
 	authButton: {
