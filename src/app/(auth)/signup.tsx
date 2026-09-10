@@ -15,12 +15,12 @@ import AuthInput from "@/components/auth/auth-input";
 import { handleSignUp } from "@/services/api";
 
 export default function Signup() {
-	const [username, setUsername] = useState("");
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
+	const [usernameInput, setUsernameInput] = useState("");
+	const [emailInput, setEmailInput] = useState("");
+	const [passwordInput, setPasswordInput] = useState("");
 
 	const onSignUp = async () => {
-		const result = await handleSignUp(username, email, password);
+		const result = await handleSignUp(usernameInput, emailInput, passwordInput);
 
 		if (result.error) {
 			console.error(result.error);
@@ -45,14 +45,14 @@ export default function Signup() {
 					<View style={styles.form}>
 						<AuthInput
 							placeholder="Username"
-							value={username}
-							onChangeText={setUsername}
+							value={usernameInput}
+							onChangeText={setUsernameInput}
 						/>
 
 						<AuthInput
 							placeholder="Email Address"
-							value={email}
-							onChangeText={setEmail}
+							value={emailInput}
+							onChangeText={setEmailInput}
 							autoCapitalize="none"
 							autoCorrect={false}
 							keyboardType="email-address"
@@ -61,8 +61,8 @@ export default function Signup() {
 						<AuthInput
 							placeholder="Password"
 							secureTextEntry
-							value={password}
-							onChangeText={setPassword}
+							value={passwordInput}
+							onChangeText={setPasswordInput}
 							autoCapitalize="none"
 							autoCorrect={false}
 						/>

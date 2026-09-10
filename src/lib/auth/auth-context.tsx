@@ -1,39 +1,106 @@
-import { Profile, User } from "@/types/auth";
+import {
+	handleSignInEmail,
+	handleSignInUsername,
+	handleSignUp,
+} from "@/services/api";
+import { Profile } from "@/types/auth";
 import { createContext, useContext, useState } from "react";
 interface AuthContextType {
-	currentUser: User | null;
-	currentProfile: Profile | null;
-	login: (user: User) => void;
+	currentUser: Profile | null;
+	loading: boolean;
+	error: string | null;
+	signup: (username: string, email: string, password: string) => Promise<boolean>;
+	login: (email: string, password: string) => Promise<boolean>;
+	loginWithUsername: (username: string, password: string) => Promise<boolean>;
 	logout: () => void;
-	signup: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
 	currentUser: null,
-	currentProfile: null,
-	login: () => {},
+	loading: false,
+	error: null,
+	signup: async () => false,
+	login: async () => false,
+	loginWithUsername: async () => false,
 	logout: () => {},
-	signup: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-	const [currentUser, setCurrentUser] = useState<User | null>(null);
+	const [currentUser, setCurrentUser] = useState<Profile | null>(null);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
-	function login(user: User) {
-		setCurrentUser(user);
+	async function signup(username: string, email: string, password: string) {
+		setLoading(true);
+		setError(null);
+
+		const { profile, error: signUpError } = await handleSignUp(
+			username,
+			email,
+			password
+		);
+
+		setLoading(false);
+
+		if (signUpError || !profile) {
+			setError(signUpError ?? "Something went wrong. Please try again.");
+			return false;
+		}
+
+		setCurrentUser(profile);
+		return true;
+	}
+
+	async function login(email: string, password: string) {
+		setLoading(true);
+		setError(null);
+
+		const { profile, error: signInError } = await handleSignInEmail(
+			email,
+			password
+		);
+
+		setLoading(false);
+
+		if (signInError) {
+			setError(signInError);
+			return false;
+		}
+
+		setCurrentUser(profile);
+		return true;
+	}
+
+	async function loginWithUsername(username: string, password: string) {
+		setLoading(true);
+		setError(null);
+
+		const { profile, error: signInError } = await handleSignInUsername(
+			username,
+			password
+		);
+
+		setLoading(false);
+
+		if (signInError) {
+			setError(signInError);
+			return false;
+		}
+
+		setCurrentUser(profile);
+		return true;
 	}
 
 	function logout() {
 		setCurrentUser(null);
 	}
 
-	function signup(user: User) {
-		setCurrentUser(user);
-	}
-
 	const value = {
 		currentUser,
+		loading,
+		error,
 		login,
+		loginWithUsername,
 		logout,
 		signup,
 	};
