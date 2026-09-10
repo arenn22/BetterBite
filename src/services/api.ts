@@ -45,37 +45,43 @@ export async function handleSignUp(
   return {profile, error: null};
 }
 
-export async function handleSignInEmail(email: string, password: string) {
+export async function handleSignInEmail(
+  email: string,
+  password: string
+): Promise<AuthResult> {
   const { data, error } = await supabase.auth.signInWithPassword({
     email: email,
     password: password,
   });
   
-  if (error) console.log(error.message);
-  else {
-    const date = await getDateJoinedByID(data.user.id);
-    const authProfile: AuthResult = {
-      profile: {
-        id: data.user.id,
-        username: data.user.user_metadata.username || "",
-        email: data.user.email || "",
-        date_joined: date,
-      },
-      error: null,
-    };
-    console.log("Signed in user profile:", authProfile);
-    return authProfile;
+  if (error || !data.user) {
+    return { profile: null, error: error?.message ?? "Failed to sign in" };
   }
+
+  const date = await getDateJoinedByID(data.user.id);
+  const authProfile: AuthResult = {
+    profile: {
+      id: data.user.id,
+      username: data.user.user_metadata.username || "",
+      email: data.user.email || "",
+      date_joined: date,
+    },
+    error: null,
+  };
+  console.log("Signed in user profile:", authProfile);
+  return authProfile;
 }
 
-export async function handleSignInUsername(username: string, password: string) {
+export async function handleSignInUsername(
+  username: string,
+  password: string
+): Promise<AuthResult> {
     const email = await getEmailWithUsername(username);
-    if (email) {
-        await handleSignInEmail(email, password);
+    if (!email) {
+        return { profile: null, error: "No account found for that username" };
     }
-    else {
-        console.error('No email found for chosen username:', username);
-    }
+
+    return handleSignInEmail(email, password);
 }
 
 async function getDateJoinedByID(userId:string): Promise<Date | null>  {
