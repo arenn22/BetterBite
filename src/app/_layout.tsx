@@ -9,11 +9,15 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
 	return (
 		<AuthProvider>
-			<AnimatedSplashOverlay />
-			<Stack screenOptions={{ headerShown: false }}>
-				<Stack.Screen name="(auth)" />
-				<Stack.Screen name="(tabs)" />
-			</Stack>
+			<>
+				<AnimatedSplashOverlay />
+
+				<Stack screenOptions={{ headerShown: false }}>
+					<Stack.Screen name="index" />
+					<Stack.Screen name="(auth)" />
+					<Stack.Screen name="(tabs)" />
+				</Stack>
+			</>
 		</AuthProvider>
 	);
 }
