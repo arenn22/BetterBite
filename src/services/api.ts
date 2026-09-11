@@ -58,12 +58,22 @@ export async function handleSignInEmail(
     return { profile: null, error: error?.message ?? "Failed to sign in" };
   }
 
-  const date = await getDateJoinedByID(data.user.id);
+  const { data: profileData, error: profileError } = await supabase
+    .from("profiles")
+    .select("username, date_joined")
+    .eq("id", data.user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error("Profile lookup error:", profileError.message);
+  }
+
+  const date = profileData?.date_joined ? new Date(profileData.date_joined) : null;
   const authProfile: AuthResult = {
     profile: {
       id: data.user.id,
-      username: data.user.user_metadata.username || "",
-      email: data.user.email || "",
+      username: profileData?.username || data.user.user_metadata?.username || "",
+      email: data.user.email || email,
       date_joined: date,
     },
     error: null,
@@ -84,22 +94,9 @@ export async function handleSignInUsername(
     return handleSignInEmail(email, password);
 }
 
-async function getDateJoinedByID(userId:string): Promise<Date | null>  {
-  const { data, error } = await supabase.rpc('get_dateJoined_by_id', {
-    idVal: userId
-  });
-
-  if (error) {
-    console.error('Error fetching date joined:', error.message);
-    return null;
-  }
-
-  return data.date_joined ? new Date(data.date_joined) : null;
-}
-
 async function getEmailWithUsername(username: string) {
     const {data, error} = await supabase.rpc('get_email_with_username', {
-        username: username,
+        usernameval: username,
     })
 
     if(error) {
@@ -108,6 +105,7 @@ async function getEmailWithUsername(username: string) {
     }
 
     if(data && data.length > 0) {
+        console.log('Fetched email:', data[0].email);
         return data[0].email;
     }
     return null;
