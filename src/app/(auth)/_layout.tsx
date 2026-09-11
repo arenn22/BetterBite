@@ -1,8 +1,15 @@
-import { Slot } from "expo-router";
+import { Redirect, Slot } from "expo-router";
 import { ImageBackground, StyleSheet, useWindowDimensions } from "react-native";
 
+import { useAuthContext } from "@/lib/auth/auth-context";
+
 export default function AuthLayout() {
+	const { currentUser } = useAuthContext();
 	const { width } = useWindowDimensions();
+
+	if (currentUser) {
+		return <Redirect href="/home" />;
+	}
 
 	const background =
 		width >= 768
@@ -25,6 +32,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		width: "100%",
 		height: "100%",
-		minHeight: "100vh" as any, // web only, ignored on native
+		minHeight: "100vh" as any,
 	},
 });
