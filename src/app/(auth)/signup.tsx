@@ -75,7 +75,9 @@ export default function Signup() {
 							/>
 						</View>
 
-						{error ? <Text style={styles.errorText}>{error}</Text> : null}
+						{error ? (
+							<Text style={styles.errorText}>{error}</Text>
+						) : null}
 					</View>
 
 					<View style={styles.bottomLink}>
@@ -83,7 +85,7 @@ export default function Signup() {
 							Already have an account?{" "}
 						</Text>
 
-						<Pressable>
+						<Pressable onPress={() => router.push("/(auth)/login")}>
 							<Text style={styles.bottomLinkText}>Log In</Text>
 						</Pressable>
 					</View>

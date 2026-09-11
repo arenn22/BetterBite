@@ -71,7 +71,9 @@ export default function Login() {
 							/>
 						</View>
 
-						{error ? <Text style={styles.errorText}>{error}</Text> : null}
+						{error ? (
+							<Text style={styles.errorText}>{error}</Text>
+						) : null}
 					</View>
 
 					<View style={styles.bottomLink}>
@@ -79,7 +81,9 @@ export default function Login() {
 							Don't have an account?{" "}
 						</Text>
 
-						<Pressable>
+						<Pressable
+							onPress={() => router.push("/(auth)/signup")}
+						>
 							<Text style={styles.bottomLinkText}>Sign Up</Text>
 						</Pressable>
 					</View>
