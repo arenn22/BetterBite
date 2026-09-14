@@ -159,4 +159,31 @@ export async function createPost(payload: CreatePostPayload): Promise<string> {
   return newPostId;
 }
 
+/**
+ * Fetches all available dietary restrictions from the database.
+ */
+export async function fetchDietaryRestrictions() {
+  const { data, error } = await supabase
+    .from('dietary_restrictions')
+    .select('id, name')
+    .order('name', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Fetches all available cuisine options from the database.
+ */
+export async function fetchCuisines() {
+  const { data, error } = await supabase
+    .from('cuisines') // Verify if your table name is 'cuisines' or 'cuisine_options'
+    .select('id, name')
+    .order('name', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+
 
