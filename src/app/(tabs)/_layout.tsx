@@ -7,7 +7,7 @@ export default function TabsLayout() {
 	const { currentUser } = useAuthContext();
 
 	if (!currentUser) {
-		return <Redirect href="/login" />;
+		return <Redirect href="/signup" />;
 	}
 
 	return <AppTabs />;
