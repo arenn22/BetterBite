@@ -1,5 +1,5 @@
 import { useAuthContext } from "@/lib/auth/auth-context";
-import { createRecipePost } from "@/services/api";
+import { createPost } from "@/services/api";
 import { useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -37,7 +37,7 @@ export default function HomeScreen() {
 
 
 		try {
-			const newPostUuid = await createRecipePost(mockPostData);
+			const newPostUuid = await createPost(mockPostData);
 			Alert.alert("Success 🎉", `Post created into Supabase!\n\nID: ${newPostUuid}`);
 		} catch (error: any) {
 			Alert.alert("Insert Failed ❌", error.message || "Something went wrong.");

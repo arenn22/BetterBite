@@ -133,7 +133,7 @@ export interface CreatePostPayload {
  * @param payload The clean post data from your application state
  * @returns The newly created post UUID string
  */
-export async function createRecipePost(payload: CreatePostPayload): Promise<string> {
+export async function createPost(payload: CreatePostPayload): Promise<string> {
   // Call the database function via Remote Procedure Call (RPC)
   const { data: newPostId, error } = await supabase.rpc('create_recipe_post', {
     p_title: payload.title,
