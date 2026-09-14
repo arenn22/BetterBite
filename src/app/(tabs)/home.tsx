@@ -1,12 +1,50 @@
 import { useAuthContext } from "@/lib/auth/auth-context";
-import { StyleSheet, Text, View } from "react-native";
+import { createRecipePost } from "@/services/api";
+import { useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function HomeScreen() {
 	const { currentUser } = useAuthContext();
+	const [loading, setLoading] = useState(false); // 2. Add loading state for testing
 
 	const joinedDate = currentUser?.date_joined
 		? new Date(currentUser.date_joined).toLocaleDateString()
 		: "N/A";
+
+	// 3. Test wrapper function
+	const handleTestCreatePost = async () => {
+		if (!currentUser) {
+			Alert.alert("Error", "You must be logged in to create a post.");
+			return;
+		}
+
+		setLoading(true);
+
+		const mockPostData = {
+			title: "Test Avocado Toast",
+			description: "A quick test recipe to check database function and RLS.",
+			difficulty: 1,
+			imageUrl: "https://unsplash.com",
+			authorUsername: currentUser.username || "anonymous", 
+			recipeJson: {
+				prep_time: "5m",
+				cook_time: "0m",
+				ingredients: ["1 slice of bread", "1 avocado", "salt", "pepper"],
+			},
+			restrictionIds: [1, 2], // Fix: Passing actual test numeric IDs
+			cuisineIds: [1, 2],        // Fix: Passing actual test numeric IDs
+		};
+
+
+		try {
+			const newPostUuid = await createRecipePost(mockPostData);
+			Alert.alert("Success 🎉", `Post created into Supabase!\n\nID: ${newPostUuid}`);
+		} catch (error: any) {
+			Alert.alert("Insert Failed ❌", error.message || "Something went wrong.");
+		} finally {
+			setLoading(false);
+		}
+	};
 
 	return (
 		<View style={styles.container}>
@@ -25,6 +63,19 @@ export default function HomeScreen() {
 
 					<Text style={styles.label}>Date Joined</Text>
 					<Text style={styles.value}>{joinedDate}</Text>
+
+					{/* 4. Interactive Test Button */}
+					<TouchableOpacity 
+						style={[styles.button, loading && styles.buttonDisabled]} 
+						onPress={handleTestCreatePost}
+						disabled={loading}
+					>
+						{loading ? (
+							<ActivityIndicator color="#ffffff" />
+						) : (
+							<Text style={styles.buttonText}>Test Create Recipe Post</Text>
+						)}
+					</TouchableOpacity>
 				</View>
 			) : (
 				<Text style={styles.empty}>No profile loaded.</Text>
@@ -69,5 +120,22 @@ const styles = StyleSheet.create({
 	empty: {
 		fontSize: 18,
 		color: "#555",
+	},
+	// 5. Stylings added for the test button to match your theme
+	button: {
+		backgroundColor: "#687B5D",
+		paddingVertical: 14,
+		borderRadius: 12,
+		marginTop: 24,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	buttonDisabled: {
+		backgroundColor: "#a3b29a",
+	},
+	buttonText: {
+		color: "#ffffff",
+		fontSize: 16,
+		fontWeight: "600",
 	},
 });
