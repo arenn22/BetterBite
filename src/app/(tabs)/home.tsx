@@ -1,7 +1,16 @@
 import DifficultySlider from "@/components/difficulty-slider";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { supabase } from "@/lib/supabase";
-import { createPost, fetchCuisines, fetchDietaryRestrictions } from "@/services/api";
+import {
+	createPost,
+	fetchCuisines,
+	fetchDietaryRestrictions,
+	fetchFriends,
+	fetchUserProfile,
+	respondToFriendRequest,
+	searchUsers,
+	sendFriendRequest,
+} from "@/services/api";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import {
@@ -41,6 +50,13 @@ export default function HomeScreen() {
 	const [selectedRestrictions, setSelectedRestrictions] = useState<number[]>([]);
 	const [selectedCuisines, setSelectedCuisines] = useState<number[]>([]);
 
+	const [profile, setProfile] = useState<Awaited<ReturnType<typeof fetchUserProfile>>>(null);
+	const [friendSearch, setFriendSearch] = useState("");
+	const [userResults, setUserResults] = useState<any[]>([]);
+	const [friends, setFriends] = useState<any[]>([]);
+	const [requestId, setRequestId] = useState("");
+	const [communityLoading, setCommunityLoading] = useState(false);
+
 	// 1. Fetch tags from the database on component mount
 	useEffect(() => {
 		async function loadOptions() {
@@ -61,6 +77,31 @@ export default function HomeScreen() {
 		loadOptions();
 	}, []);
 
+	useEffect(() => {
+		if (!currentUser) {
+			setProfile(null);
+			setFriends([]);
+			return;
+		}
+
+		const userId = currentUser.id;
+
+		async function loadUserData() {
+			try {
+				const [currentProfile, currentFriends] = await Promise.all([
+					fetchUserProfile(userId),
+					fetchFriends(),
+				]);
+				setProfile(currentProfile);
+				setFriends(currentFriends || []);
+			} catch (error: any) {
+				Alert.alert("Community Error", error.message || "Could not load your community data.");
+			}
+		}
+
+		loadUserData();
+	}, [currentUser]);
+
 	// Toggle item inclusions within selected arrays
 	const toggleRestriction = (id: number) => {
 		setSelectedRestrictions(prev =>
@@ -72,6 +113,64 @@ export default function HomeScreen() {
 		setSelectedCuisines(prev =>
 			prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
 		);
+	};
+
+	const searchForUsers = async () => {
+		if (!friendSearch.trim()) {
+			setUserResults([]);
+			return;
+		}
+
+		setCommunityLoading(true);
+		try {
+			setUserResults(await searchUsers(friendSearch.trim()));
+		} catch (error: any) {
+			Alert.alert("Search Failed", error.message || "Could not search for users.");
+		} finally {
+			setCommunityLoading(false);
+		}
+	};
+
+	const sendRequestToUser = async (receiverId: string) => {
+		setCommunityLoading(true);
+		try {
+			await sendFriendRequest(receiverId);
+			Alert.alert("Request Sent", "Your friend request was sent.");
+		} catch (error: any) {
+			Alert.alert("Request Failed", error.message || "Could not send the friend request.");
+		} finally {
+			setCommunityLoading(false);
+		}
+	};
+
+	const refreshFriends = async () => {
+		setCommunityLoading(true);
+		try {
+			setFriends((await fetchFriends()) || []);
+		} catch (error: any) {
+			Alert.alert("Refresh Failed", error.message || "Could not load your friends.");
+		} finally {
+			setCommunityLoading(false);
+		}
+	};
+
+	const respondToRequest = async (accept: boolean) => {
+		if (!requestId.trim()) {
+			Alert.alert("Request ID Required", "Enter the friend request ID first.");
+			return;
+		}
+
+		setCommunityLoading(true);
+		try {
+			await respondToFriendRequest(requestId.trim(), accept);
+			setRequestId("");
+			await refreshFriends();
+			Alert.alert("Request Updated", accept ? "Friend request accepted." : "Friend request declined.");
+		} catch (error: any) {
+			Alert.alert("Request Failed", error.message || "Could not update the friend request.");
+		} finally {
+			setCommunityLoading(false);
+		}
 	};
 
 	const parseNumberedList = (value: string): string[] => {
@@ -308,6 +407,75 @@ export default function HomeScreen() {
 					)}
 				</TouchableOpacity>
 			</View>
+
+			<View style={styles.card}>
+				<Text style={styles.sectionTitle}>Community</Text>
+				{currentUser ? (
+					<>
+						<Text style={styles.communityText}>
+							Signed in as {profile?.username || currentUser.username}
+						</Text>
+
+						<Text style={styles.label}>Find Users</Text>
+						<View style={styles.actionRow}>
+							<TextInput
+								style={[styles.input, styles.actionInput]}
+								value={friendSearch}
+								onChangeText={setFriendSearch}
+								placeholder="Search by username"
+								placeholderTextColor="#9ca3af"
+								onSubmitEditing={searchForUsers}
+							/>
+							<TouchableOpacity style={styles.smallButton} onPress={searchForUsers} disabled={communityLoading}>
+								<Text style={styles.buttonText}>Search</Text>
+							</TouchableOpacity>
+						</View>
+
+						{userResults.map((user) => (
+							<View style={styles.resultRow} key={user.id}>
+								<View>
+									<Text style={styles.resultName}>{user.display_name || user.username}</Text>
+									<Text style={styles.resultMeta}>{user.username} · {user.id}</Text>
+								</View>
+								<TouchableOpacity style={styles.smallButton} onPress={() => sendRequestToUser(user.id)} disabled={communityLoading}>
+									<Text style={styles.buttonText}>Add</Text>
+								</TouchableOpacity>
+							</View>
+						))}
+
+						<Text style={styles.label}>Friend Request ID</Text>
+						<TextInput
+							style={styles.input}
+							value={requestId}
+							onChangeText={setRequestId}
+							placeholder="Paste a pending request ID"
+							placeholderTextColor="#9ca3af"
+						/>
+						<View style={styles.actionRow}>
+							<TouchableOpacity style={styles.smallButton} onPress={() => respondToRequest(true)} disabled={communityLoading}>
+								<Text style={styles.buttonText}>Accept</Text>
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.secondaryButton} onPress={() => respondToRequest(false)} disabled={communityLoading}>
+								<Text style={styles.secondaryButtonText}>Decline</Text>
+							</TouchableOpacity>
+						</View>
+
+						<View style={styles.friendsHeader}>
+							<Text style={styles.label}>Friends ({friends.length})</Text>
+							<TouchableOpacity onPress={refreshFriends} disabled={communityLoading}>
+								<Text style={styles.refreshText}>Refresh</Text>
+							</TouchableOpacity>
+						</View>
+						{friends.length > 0 ? friends.map((friend, index) => (
+							<Text style={styles.communityText} key={friend.id || friend.friend_id || index}>
+								{friend.username || friend.display_name || friend.friend_username || friend.id || "Friend"}
+							</Text>
+						)) : <Text style={styles.emptyText}>No friends found yet.</Text>}
+					</>
+				) : (
+					<Text style={styles.emptyText}>Sign in to search for users and manage friends.</Text>
+				)}
+			</View>
 		</ScrollView>
 	);
 }
@@ -316,6 +484,18 @@ const styles = StyleSheet.create({
 	container: { padding: 24, backgroundColor: "#f7f7f5" },
 	title: { fontSize: 32, fontWeight: "700", marginBottom: 24, marginTop: 40, color: "#1f2a1f" },
 	card: { backgroundColor: "#ffffff", borderRadius: 16, padding: 20, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
+	sectionTitle: { fontSize: 24, fontWeight: "700", color: "#1f2a1f" },
+	communityText: { color: "#4b5563", fontSize: 14, marginTop: 6 },
+	actionRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+	actionInput: { flex: 1 },
+	smallButton: { backgroundColor: "#687B5D", paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, alignItems: "center" },
+	secondaryButton: { backgroundColor: "#f3f4f6", paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, alignItems: "center" },
+	secondaryButtonText: { color: "#4b5563", fontWeight: "600" },
+	resultRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
+	resultName: { color: "#1f2a1f", fontWeight: "600" },
+	resultMeta: { color: "#9ca3af", fontSize: 12, marginTop: 2 },
+	friendsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+	refreshText: { color: "#687B5D", fontWeight: "600" },
 	imagePlaceholder: { height: 180, backgroundColor: "#f3f4f6", borderRadius: 12, justifyContent: "center", alignItems: "center", overflow: "hidden", borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "dashed", marginBottom: 8 },
 	previewImage: { width: "100%", height: "100%" },
 	placeholderText: { color: "#687B5D", fontSize: 14, fontWeight: "600" },

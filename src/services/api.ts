@@ -201,10 +201,10 @@ export async function fetchUserProfile(userId: string): Promise<Profile | null> 
   }
 } 
 
-export async function searchUsers(searchQuery: string) {
+export async function searchUsers(searchQuery: string): Promise<Pick<Profile, 'id' | 'username'>[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url, display_name') // Only fetch public info
+    .select('id, username')
     .ilike('username', `%${searchQuery}%`); // Matches partial names (e.g., "joh" matches "john")
 
   if (error) {
@@ -212,7 +212,7 @@ export async function searchUsers(searchQuery: string) {
     return [];
   }
 
-  return data; // Returns an array of matching user objects containing their public ID
+  return (data || []) as Pick<Profile, 'id' | 'username'>[];
 }
 
 
