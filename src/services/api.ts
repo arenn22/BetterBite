@@ -185,5 +185,79 @@ export async function fetchCuisines() {
   return data || [];
 }
 
+export async function fetchUserProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  
+  if (error) {
+    console.error('Error fetching user profile:', error.message);
+    return null;
+  }
+  else {
+    return data as Profile | null;
+  }
+} 
+
+export async function searchUsers(searchQuery: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url, display_name') // Only fetch public info
+    .ilike('username', `%${searchQuery}%`); // Matches partial names (e.g., "joh" matches "john")
+
+  if (error) {
+    console.error('Error searching users:', error);
+    return [];
+  }
+
+  return data; // Returns an array of matching user objects containing their public ID
+}
+
+
+export async function sendFriendRequest(receiverId: string): Promise<void> {
+  const {data, error} = await supabase.rpc('send_friend_request', {
+    p_receiver_id: receiverId,
+  });
+  if(error) {
+    console.error('Error sending friend request:', error.message);
+    throw new Error('Failed to send friend request.');
+  }
+  else {
+    console.log('Friend request sent successfully:', data);
+    return data;
+  }
+}
+
+export async function respondToFriendRequest(requestId: string, accept: boolean): Promise<void> {
+  const {data, error} = await supabase.rpc('respond_to_friend_request', {
+    p_request_id: requestId,
+    p_accept: accept,
+  });
+
+  if(error) {
+    console.error('Error responding to friend request:', error.message);
+    throw new Error('Failed to respond to friend request.');
+  }
+  else {
+    console.log('Friend request response processed successfully:', data);
+    return data;
+  }
+}
+
+export async function fetchFriends() {
+  const { data, error } = await supabase.rpc("get_my_friends", {
+  })
+
+  if (error) {
+    console.error("Error fetching friends:", error.message);
+    return [];
+  }
+  else {
+    return data || [];
+  }
+}
+
 
 
