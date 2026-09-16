@@ -17,12 +17,12 @@ import { useAuthContext } from "@/lib/auth/auth-context";
 
 export default function Login() {
 	const router = useRouter();
-	const [emailInput, setEmailInput] = useState("");
+	const [identifierInput, setIdentifierInput] = useState("");
 	const [passwordInput, setPasswordInput] = useState("");
 	const { error, loading, login } = useAuthContext();
 
 	const onLogin = async () => {
-		const success = await login(emailInput, passwordInput);
+		const success = await login(identifierInput, passwordInput);
 
 		if (success) {
 			router.replace("/(tabs)/home");
@@ -43,9 +43,11 @@ export default function Login() {
 
 					<View style={styles.form}>
 						<AuthInput
-							placeholder="Email"
-							value={emailInput}
-							onChangeText={setEmailInput}
+							placeholder="Email or Username"
+							value={identifierInput}
+							onChangeText={setIdentifierInput}
+							autoCapitalize="none"
+							autoCorrect={false}
 						/>
 
 						<AuthInput
