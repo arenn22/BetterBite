@@ -15,13 +15,13 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/home" asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="explore" asChild>
+          <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>Explore</TabButton>
           </TabTrigger>
-          <TabTrigger name="profile" asChild>
+          <TabTrigger name="profile" href="/profile" asChild>
             <TabButton>Profile</TabButton>
           </TabTrigger>
-          <TabTrigger name="create" asChild>
+          <TabTrigger name="create" href="/create" asChild>
             <CreateButton>+</CreateButton>
           </TabTrigger>
         </CustomTabList>
@@ -67,6 +67,9 @@ export function CustomTabList(props: TabListProps) {
 const styles = StyleSheet.create({
   tabListContainer: {
     position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     width: "100%",
     padding: Spacing.three,
     justifyContent: "center",
@@ -79,7 +82,7 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.five,
     flexDirection: "row",
     alignItems: "center",
-    flexGrow: 1,
+    justifyContent: "center",
     gap: Spacing.two,
     maxWidth: MaxContentWidth,
   },
