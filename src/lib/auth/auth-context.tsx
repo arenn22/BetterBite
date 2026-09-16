@@ -1,7 +1,7 @@
 import {
-	handleSignInEmail,
-	handleSignInUsername,
-	handleSignUp,
+    handleSignInEmail,
+    handleSignInUsername,
+    handleSignUp,
 } from "@/services/api";
 import { Profile } from "@/types/auth";
 import { createContext, useContext, useState } from "react";
@@ -51,14 +51,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		return true;
 	}
 
-	async function login(email: string, password: string) {
+	async function login(identifier: string, password: string) {
 		setLoading(true);
 		setError(null);
 
-		const { profile, error: signInError } = await handleSignInEmail(
-			email,
-			password
-		);
+		const normalizedIdentifier = identifier.trim();
+		const { profile, error: signInError } = normalizedIdentifier.includes("@")
+			? await handleSignInEmail(normalizedIdentifier, password)
+			: await handleSignInUsername(normalizedIdentifier, password);
 
 		setLoading(false);
 

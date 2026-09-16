@@ -5,6 +5,7 @@ import {
 	createPost,
 	fetchCuisines,
 	fetchDietaryRestrictions,
+	fetchFriendRequests,
 	fetchFriends,
 	fetchUserProfile,
 	respondToFriendRequest,
@@ -54,7 +55,7 @@ export default function HomeScreen() {
 	const [friendSearch, setFriendSearch] = useState("");
 	const [userResults, setUserResults] = useState<any[]>([]);
 	const [friends, setFriends] = useState<any[]>([]);
-	const [requestId, setRequestId] = useState("");
+	const [friendRequests, setFriendRequests] = useState<any[]>([]);
 	const [communityLoading, setCommunityLoading] = useState(false);
 
 	// 1. Fetch tags from the database on component mount
@@ -81,6 +82,7 @@ export default function HomeScreen() {
 		if (!currentUser) {
 			setProfile(null);
 			setFriends([]);
+			setFriendRequests([]);
 			return;
 		}
 
@@ -88,12 +90,14 @@ export default function HomeScreen() {
 
 		async function loadUserData() {
 			try {
-				const [currentProfile, currentFriends] = await Promise.all([
+				const [currentProfile, currentFriends, currentFriendRequests] = await Promise.all([
 					fetchUserProfile(userId),
 					fetchFriends(),
+					fetchFriendRequests(),
 				]);
 				setProfile(currentProfile);
 				setFriends(currentFriends || []);
+				setFriendRequests(currentFriendRequests || []);
 			} catch (error: any) {
 				Alert.alert("Community Error", error.message || "Could not load your community data.");
 			}
@@ -154,17 +158,12 @@ export default function HomeScreen() {
 		}
 	};
 
-	const respondToRequest = async (accept: boolean) => {
-		if (!requestId.trim()) {
-			Alert.alert("Request ID Required", "Enter the friend request ID first.");
-			return;
-		}
-
+	const respondToRequest = async (requestId: string, accept: boolean) => {
 		setCommunityLoading(true);
 		try {
-			await respondToFriendRequest(requestId.trim(), accept);
-			setRequestId("");
-			await refreshFriends();
+			await respondToFriendRequest(requestId, accept);
+			setFriendRequests((requests) => requests.filter((request) => (request.request_id || request.id) !== requestId));
+			setFriends((await fetchFriends()) || []);
 			Alert.alert("Request Updated", accept ? "Friend request accepted." : "Friend request declined.");
 		} catch (error: any) {
 			Alert.alert("Request Failed", error.message || "Could not update the friend request.");
@@ -443,22 +442,25 @@ export default function HomeScreen() {
 							</View>
 						))}
 
-						<Text style={styles.label}>Friend Request ID</Text>
-						<TextInput
-							style={styles.input}
-							value={requestId}
-							onChangeText={setRequestId}
-							placeholder="Paste a pending request ID"
-							placeholderTextColor="#9ca3af"
-						/>
-						<View style={styles.actionRow}>
-							<TouchableOpacity style={styles.smallButton} onPress={() => respondToRequest(true)} disabled={communityLoading}>
-								<Text style={styles.buttonText}>Accept</Text>
-							</TouchableOpacity>
-							<TouchableOpacity style={styles.secondaryButton} onPress={() => respondToRequest(false)} disabled={communityLoading}>
-								<Text style={styles.secondaryButtonText}>Decline</Text>
-							</TouchableOpacity>
-						</View>
+						<Text style={styles.label}>Pending Friend Requests ({friendRequests.length})</Text>
+						{friendRequests.length > 0 ? friendRequests.map((request, index) => {
+							const pendingRequestId = request.request_id || request.id;
+							const senderName = request.sender_username || request.username || request.display_name || request.sender_id || "Someone";
+
+							return (
+								<View style={styles.resultRow} key={pendingRequestId || index}>
+									<Text style={styles.resultName}>{senderName} sent you a friend request</Text>
+									<View style={styles.actionRow}>
+										<TouchableOpacity style={styles.smallButton} onPress={() => respondToRequest(pendingRequestId, true)} disabled={communityLoading}>
+											<Text style={styles.buttonText}>Accept</Text>
+										</TouchableOpacity>
+										<TouchableOpacity style={styles.secondaryButton} onPress={() => respondToRequest(pendingRequestId, false)} disabled={communityLoading}>
+											<Text style={styles.secondaryButtonText}>Decline</Text>
+										</TouchableOpacity>
+									</View>
+								</View>
+							);
+						}) : <Text style={styles.emptyText}>No pending friend requests.</Text>}
 
 						<View style={styles.friendsHeader}>
 							<Text style={styles.label}>Friends ({friends.length})</Text>

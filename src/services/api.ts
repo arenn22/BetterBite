@@ -259,5 +259,14 @@ export async function fetchFriends() {
   }
 }
 
+export async function fetchFriendRequests() {
+  const { data, error } = await supabase.rpc('get_pending_friend_requests')
 
-
+  if (error) {
+    console.error("Error fetching friend requests:", error.message);
+    return [];
+  }
+  else {
+    return data || [];
+  }
+}
