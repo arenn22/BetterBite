@@ -158,11 +158,11 @@ export default function HomeScreen() {
 		}
 	};
 
-	const respondToRequest = async (requestId: string, accept: boolean) => {
+	const respondToRequest = async (requestId: number, accept: boolean) => {
 		setCommunityLoading(true);
 		try {
 			await respondToFriendRequest(requestId, accept);
-			setFriendRequests((requests) => requests.filter((request) => (request.request_id || request.id) !== requestId));
+			setFriendRequests((requests) => requests.filter((request) => request.id !== requestId));
 			setFriends((await fetchFriends()) || []);
 			Alert.alert("Request Updated", accept ? "Friend request accepted." : "Friend request declined.");
 		} catch (error: any) {
@@ -444,17 +444,16 @@ export default function HomeScreen() {
 
 						<Text style={styles.label}>Pending Friend Requests ({friendRequests.length})</Text>
 						{friendRequests.length > 0 ? friendRequests.map((request, index) => {
-							const pendingRequestId = request.request_id || request.id;
 							const senderName = request.sender_username || request.username || request.display_name || request.sender_id || "Someone";
 
 							return (
-								<View style={styles.resultRow} key={pendingRequestId || index}>
+								<View style={styles.resultRow} key={request.id || index}>
 									<Text style={styles.resultName}>{senderName} sent you a friend request</Text>
 									<View style={styles.actionRow}>
-										<TouchableOpacity style={styles.smallButton} onPress={() => respondToRequest(pendingRequestId, true)} disabled={communityLoading}>
+										<TouchableOpacity style={styles.smallButton} onPress={() => respondToRequest(request.id, true)} disabled={communityLoading}>
 											<Text style={styles.buttonText}>Accept</Text>
 										</TouchableOpacity>
-										<TouchableOpacity style={styles.secondaryButton} onPress={() => respondToRequest(pendingRequestId, false)} disabled={communityLoading}>
+										<TouchableOpacity style={styles.secondaryButton} onPress={() => respondToRequest(request.id, false)} disabled={communityLoading}>
 											<Text style={styles.secondaryButtonText}>Decline</Text>
 										</TouchableOpacity>
 									</View>

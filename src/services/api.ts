@@ -230,7 +230,7 @@ export async function sendFriendRequest(receiverId: string): Promise<void> {
   }
 }
 
-export async function respondToFriendRequest(requestId: string, accept: boolean): Promise<void> {
+export async function respondToFriendRequest(requestId: number, accept: boolean): Promise<void> {
   const {data, error} = await supabase.rpc('respond_to_friend_request', {
     p_request_id: requestId,
     p_accept: accept,
@@ -259,7 +259,15 @@ export async function fetchFriends() {
   }
 }
 
-export async function fetchFriendRequests() {
+export interface PendingFriendRequest {
+  id: number;
+  sender_username?: string;
+  username?: string;
+  display_name?: string;
+  sender_id?: string;
+}
+
+export async function fetchFriendRequests(): Promise<PendingFriendRequest[]> {
   const { data, error } = await supabase.rpc('get_pending_friend_requests')
 
   if (error) {
@@ -267,6 +275,17 @@ export async function fetchFriendRequests() {
     return [];
   }
   else {
-    return data || [];
+    return (data || []).flatMap((request: Record<string, unknown>) => {
+      const friendshipId = request.friendship_id ?? request.id ?? request.request_id;
+      if (friendshipId === null || friendshipId === undefined) {
+        console.error('Pending friend request did not include a friendship ID:', request);
+        return [];
+      }
+
+      return [{
+        ...request,
+        id: Number(friendshipId),
+      } as PendingFriendRequest];
+    });
   }
 }
