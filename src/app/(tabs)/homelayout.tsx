@@ -1,15 +1,17 @@
 import { ChallengeCard } from "@/components/cards/challenge-card";
 import { PostCard } from "@/components/cards/post-card";
 import { StreakCard } from "@/components/cards/streak-card";
+import { SectionHeading } from "@/components/section-heading";
+import { UserAvatar } from "@/components/user-avatar";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { useMemo } from "react";
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -57,19 +59,17 @@ export default function HomeLayout() {
 						<Text style={styles.greeting}>Hey, {firstName}.</Text>
 						<Text style={styles.subtitle}>A little progress tastes good.</Text>
 					</View>
-					<View style={styles.profileCircle}>
-						<Text style={styles.profileInitial}>{firstName.charAt(0).toUpperCase()}</Text>
-					</View>
+					<UserAvatar initial={firstName.charAt(0).toUpperCase()} tone="green" />
 				</View>
 
 				<StreakCard days={6} note="You are building a habit." />
 
 				<View style={styles.sectionHeader}>
-					<View>
-						<Text style={styles.sectionTitle}>This week</Text>
-						<Text style={styles.sectionSubtitle}>Small goals, real momentum.</Text>
-					</View>
-					<Pressable><Text style={styles.seeAll}>See all</Text></Pressable>
+					<SectionHeading
+						title="This week"
+						subtitle="Small goals, real momentum."
+						rightContent={<Pressable><Text style={styles.seeAll}>See all</Text></Pressable>}
+					/>
 				</View>
 
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.challengeList}>
@@ -77,11 +77,11 @@ export default function HomeLayout() {
 				</ScrollView>
 
 				<View style={[styles.sectionHeader, styles.postsHeader]}>
-					<View>
-						<Text style={styles.sectionTitle}>From your circle</Text>
-						<Text style={styles.sectionSubtitle}>A little inspiration from friends.</Text>
-					</View>
-					<Pressable><Text style={styles.seeAll}>Explore</Text></Pressable>
+					<SectionHeading
+						title="From your circle"
+						subtitle="A little inspiration from friends."
+						rightContent={<Pressable><Text style={styles.seeAll}>Explore</Text></Pressable>}
+					/>
 				</View>
 
 				<View style={styles.postsList}>
@@ -99,11 +99,7 @@ const styles = StyleSheet.create({
 	eyebrow: { color: "#7D9F68", fontSize: 11, fontWeight: "800", letterSpacing: 1.4 },
 	greeting: { color: "#203429", fontSize: 32, fontWeight: "800", marginTop: 5, letterSpacing: -0.5 },
 	subtitle: { color: "#738078", fontSize: 14, marginTop: 4 },
-	profileCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#DDE8D8", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#F2F6EE" },
-	profileInitial: { color: "#55735A", fontSize: 17, fontWeight: "800" },
 	sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 30, marginBottom: 15 },
-	sectionTitle: { color: "#25372B", fontSize: 22, fontWeight: "800" },
-	sectionSubtitle: { color: "#829087", fontSize: 12, marginTop: 4 },
 	seeAll: { color: "#688A5E", fontSize: 13, fontWeight: "800", paddingBottom: 2 },
 	challengeList: { gap: 12, paddingRight: 20 },
 	postsHeader: { marginTop: 32 },
