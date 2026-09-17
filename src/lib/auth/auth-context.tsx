@@ -1,9 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import {
-    fetchUserProfile,
-    handleSignInEmail,
-    handleSignInUsername,
-    handleSignUp,
+	fetchUserProfile,
+	handleSignInEmail,
+	handleSignInUsername,
+	handleSignUp,
+	logoutFromSupabase,
 } from "@/services/api";
 import { Profile } from "@/types/auth";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -173,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	}
 
 	async function logout() {
-		await supabase.auth.signOut();
+		await logoutFromSupabase();
 		setCurrentUser(null);
 	}
 

@@ -4,6 +4,14 @@ import type { AuthResult, Profile } from "../types/auth";
 export const DEFAULT_PROFILE_IMAGE =
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80";
 
+export async function logoutFromSupabase(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function handleSignUp(
   username: string,
   email: string,

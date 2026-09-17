@@ -34,8 +34,9 @@ interface LookupOption {
 }
 
 export default function HomeScreen() {
-	const { currentUser, refreshCurrentUser } = useAuthContext();
+	const { currentUser, logout, refreshCurrentUser } = useAuthContext();
 	const [loading, setLoading] = useState(false);
+	const [loggingOut, setLoggingOut] = useState(false);
 	const [profileImageUploading, setProfileImageUploading] = useState(false);
 	const [fetchingOptions, setFetchingOptions] = useState(true);
 
@@ -171,6 +172,17 @@ export default function HomeScreen() {
 			Alert.alert("Request Failed", error.message || "Could not update the friend request.");
 		} finally {
 			setCommunityLoading(false);
+		}
+	};
+
+	const handleLogout = async () => {
+		setLoggingOut(true);
+		try {
+			await logout();
+		} catch (error: any) {
+			Alert.alert("Log out failed", error.message || "Could not log you out.");
+		} finally {
+			setLoggingOut(false);
 		}
 	};
 
@@ -584,6 +596,16 @@ export default function HomeScreen() {
 								{friend.username || friend.display_name || friend.friend_username || friend.id || "Friend"}
 							</Text>
 						)) : <Text style={styles.emptyText}>No friends found yet.</Text>}
+
+						<TouchableOpacity
+							style={[styles.logoutButton, loggingOut && styles.buttonDisabled]}
+							onPress={handleLogout}
+							disabled={loggingOut}
+						>
+							<Text style={styles.logoutButtonText}>
+								{loggingOut ? "Logging out..." : "Log out"}
+							</Text>
+						</TouchableOpacity>
 					</>
 				) : (
 					<Text style={styles.emptyText}>Sign in to search for users and manage friends.</Text>
@@ -628,5 +650,7 @@ const styles = StyleSheet.create({
 	button: { backgroundColor: "#687B5D", paddingVertical: 14, borderRadius: 12, marginTop: 28, alignItems: "center", justifyContent: "center" },
 	buttonDisabled: { backgroundColor: "#a3b29a" },
 	buttonText: { color: "#ffffff", fontSize: 16, fontWeight: "600" },
+	logoutButton: { backgroundColor: "#fff1ed", paddingVertical: 13, borderRadius: 12, marginTop: 24, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#f3c8bb" },
+	logoutButtonText: { color: "#b45e42", fontSize: 16, fontWeight: "700" },
 	emptyText: { color: "#9ca3af", fontSize: 14, fontStyle: "italic", marginTop: 4 }
 });
