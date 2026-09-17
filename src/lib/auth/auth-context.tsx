@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		login,
 		loginWithUsername,
 		refreshCurrentUser,
-		 signOut,
+			signOut,
 		signup,
 	};
 
