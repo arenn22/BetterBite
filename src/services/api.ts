@@ -294,3 +294,27 @@ export async function fetchFriendRequests(): Promise<PendingFriendRequest[]> {
     });
   }
 }
+
+export async function fetchPostsByDietaryRestrictions(dietaryRestrictions: string[]): Promise<Post[]> {
+  const { data, error } = await supabase.rpc("get_posts_by_dietary_restrictions", {
+    p_dietary_restrictions: dietaryRestrictions
+  });
+
+  if (error) {
+    console.error("Error fetching posts by dietary restrictions:", error.message);
+    return [];
+  }
+
+  return (data || []) as Post[];
+}
+
+export async function fetchPostByCuisines(cuisines: string[]): Promise<Post[]> {
+  const { data, error } = await supabase.rpc("get_posts_by_cuisines", {
+    p_cuisines: cuisines
+  });
+  if(error) {
+    console.error("Error fetching posts by cuisines:", error.message);
+    return [];
+  }
+  return (data || []) as Post[];
+}
