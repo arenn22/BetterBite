@@ -4,8 +4,12 @@ import { ImageBackground, StyleSheet, useWindowDimensions } from "react-native";
 import { useAuthContext } from "@/lib/auth/auth-context";
 
 export default function AuthLayout() {
-	const { currentUser } = useAuthContext();
+	const { currentUser, loading } = useAuthContext();
 	const { width } = useWindowDimensions();
+
+	if (loading) {
+		return null;
+	}
 
 	if (currentUser) {
 		return <Redirect href="/home" />;
