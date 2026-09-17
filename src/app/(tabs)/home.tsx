@@ -3,6 +3,7 @@ import { useAuthContext } from "@/lib/auth/auth-context";
 import { supabase } from "@/lib/supabase";
 import {
 	createPost,
+	DEFAULT_PROFILE_IMAGE,
 	fetchCuisines,
 	fetchDietaryRestrictions,
 	fetchFriendRequests,
@@ -33,8 +34,9 @@ interface LookupOption {
 }
 
 export default function HomeScreen() {
-	const { currentUser } = useAuthContext();
+	const { currentUser, refreshCurrentUser } = useAuthContext();
 	const [loading, setLoading] = useState(false);
+	const [profileImageUploading, setProfileImageUploading] = useState(false);
 	const [fetchingOptions, setFetchingOptions] = useState(true);
 
 	// Lists populated dynamically from the database
@@ -178,6 +180,100 @@ export default function HomeScreen() {
 			.map((line) => line.trim())
 			.map((line) => line.replace(/^\d+[.)-]\s*/, "").trim())
 			.filter(Boolean);
+	};
+
+	const activeProfileImage = profile?.pfp_url || currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE;
+	const normalizedProfileImage = activeProfileImage && activeProfileImage.trim() ? activeProfileImage : DEFAULT_PROFILE_IMAGE;
+
+	const handleProfileImageError = () => {
+		setProfile((previousProfile) =>
+			previousProfile
+				? { ...previousProfile, pfp_url: DEFAULT_PROFILE_IMAGE }
+				: previousProfile
+		);
+	};
+
+	const pickProfileImage = async () => {
+		if (!currentUser) {
+			Alert.alert("Sign In Required", "You need to be logged in to upload a profile picture.");
+			return;
+		}
+
+		const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+		if (!permissionResult.granted) {
+			Alert.alert("Permission Required", "Please allow access to your photo library so you can upload a profile picture.");
+			return;
+		}
+
+		const result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			allowsEditing: true,
+			aspect: [1, 1],
+			quality: 0.8,
+		});
+
+		if (result.canceled || !result.assets?.[0]?.uri) return;
+
+		setProfileImageUploading(true);
+		try {
+			const fileUri = result.assets[0].uri;
+			const filename = fileUri.split("/").pop() || `${Date.now()}.jpg`;
+			const fileExt = filename.includes(".") ? filename.split(".").pop() || "jpg" : "jpg";
+			const filePath = `${currentUser.id}/profile-${Date.now()}.${fileExt}`;
+			const mimeType =
+				result.assets[0].mimeType ||
+				(fileExt === "png"
+					? "image/png"
+					: fileExt === "webp"
+						? "image/webp"
+						: fileExt === "gif"
+							? "image/gif"
+							: "image/jpeg");
+
+			const response = await fetch(fileUri);
+			const blob = await response.blob();
+
+			const { error: uploadError } = await supabase.storage
+				.from("pfps")
+				.upload(filePath, blob, {
+					contentType: mimeType,
+					upsert: true,
+				});
+
+			if (uploadError) throw uploadError;
+
+			let finalProfileUrl: string | null = supabase.storage.from("pfps").getPublicUrl(filePath).data?.publicUrl ?? null;
+			if (!finalProfileUrl) {
+				const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+					.from("pfps")
+					.createSignedUrl(filePath, 60 * 60 * 24 * 365);
+				if (signedUrlError) throw signedUrlError;
+				finalProfileUrl = signedUrlData?.signedUrl ?? null;
+			}
+
+			if (!finalProfileUrl) {
+				throw new Error("Could not generate a valid URL for your profile picture.");
+			}
+
+			const { error: updateError } = await supabase
+				.from("profiles")
+				.update({ pfp_url: finalProfileUrl })
+				.eq("id", currentUser.id);
+
+			if (updateError) throw updateError;
+
+			setProfile((previousProfile) =>
+				previousProfile
+					? { ...previousProfile, pfp_url: finalProfileUrl }
+					: previousProfile
+			);
+			await refreshCurrentUser();
+			Alert.alert("Updated", "Your profile photo has been saved.");
+		} catch (error: any) {
+			Alert.alert("Upload Failed", error.message || "Your profile picture could not be uploaded.");
+		} finally {
+			setProfileImageUploading(false);
+		}
 	};
 
 	// Launch Expo gallery picker
@@ -411,9 +507,25 @@ export default function HomeScreen() {
 				<Text style={styles.sectionTitle}>Community</Text>
 				{currentUser ? (
 					<>
-						<Text style={styles.communityText}>
-							Signed in as {profile?.username || currentUser.username}
-						</Text>
+						<View style={styles.profileHeaderRow}>
+							<TouchableOpacity onPress={pickProfileImage} disabled={profileImageUploading}>
+								<Image
+									source={{ uri: normalizedProfileImage }}
+									style={styles.profileAvatar}
+									onError={handleProfileImageError}
+								/>
+							</TouchableOpacity>
+							<View style={styles.profileHeaderText}>
+								<Text style={styles.communityText}>
+									Signed in as {profile?.username || currentUser.username}
+								</Text>
+								<TouchableOpacity onPress={pickProfileImage} disabled={profileImageUploading}>
+									<Text style={styles.profileUploadText}>
+										{profileImageUploading ? "Uploading..." : "Upload profile photo"}
+									</Text>
+								</TouchableOpacity>
+							</View>
+						</View>
 
 						<Text style={styles.label}>Find Users</Text>
 						<View style={styles.actionRow}>
@@ -487,6 +599,10 @@ const styles = StyleSheet.create({
 	card: { backgroundColor: "#ffffff", borderRadius: 16, padding: 20, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
 	sectionTitle: { fontSize: 24, fontWeight: "700", color: "#1f2a1f" },
 	communityText: { color: "#4b5563", fontSize: 14, marginTop: 6 },
+	profileHeaderRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 8, marginBottom: 4 },
+	profileHeaderText: { flex: 1 },
+	profileAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: "#e5e7eb", borderWidth: 2, borderColor: "#d1d5db" },
+	profileUploadText: { color: "#687B5D", fontSize: 13, fontWeight: "600", marginTop: 6 },
 	actionRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
 	actionInput: { flex: 1 },
 	smallButton: { backgroundColor: "#687B5D", paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, alignItems: "center" },

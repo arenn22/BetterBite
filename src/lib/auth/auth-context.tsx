@@ -1,7 +1,8 @@
 import {
-    handleSignInEmail,
-    handleSignInUsername,
-    handleSignUp,
+	fetchUserProfile,
+	handleSignInEmail,
+	handleSignInUsername,
+	handleSignUp,
 } from "@/services/api";
 import { Profile } from "@/types/auth";
 import { createContext, useContext, useState } from "react";
@@ -12,6 +13,7 @@ interface AuthContextType {
 	signup: (username: string, email: string, password: string) => Promise<boolean>;
 	login: (email: string, password: string) => Promise<boolean>;
 	loginWithUsername: (username: string, password: string) => Promise<boolean>;
+	refreshCurrentUser: () => Promise<void>;
 	logout: () => void;
 }
 
@@ -22,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
 	signup: async () => false,
 	login: async () => false,
 	loginWithUsername: async () => false,
+	refreshCurrentUser: async () => {},
 	logout: () => {},
 });
 
@@ -91,6 +94,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		return true;
 	}
 
+	async function refreshCurrentUser() {
+		if (!currentUser) return;
+
+		const refreshedProfile = await fetchUserProfile(currentUser.id);
+		if (refreshedProfile) {
+			setCurrentUser(refreshedProfile);
+		}
+	}
+
 	function logout() {
 		setCurrentUser(null);
 	}
@@ -101,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		error,
 		login,
 		loginWithUsername,
+		refreshCurrentUser,
 		logout,
 		signup,
 	};

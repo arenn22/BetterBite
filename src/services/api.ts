@@ -1,6 +1,9 @@
 import { supabase } from "../lib/supabase";
 import type { AuthResult, Profile } from "../types/auth";
 
+export const DEFAULT_PROFILE_IMAGE =
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80";
+
 export async function handleSignUp(
   username: string,
   email: string,
@@ -30,6 +33,7 @@ export async function handleSignUp(
     username,
     email,
     date_joined: new Date(dateJoined),
+    pfp_url: DEFAULT_PROFILE_IMAGE,
   };
 
   const { error: profileError } = await supabase.from("profiles").insert({
@@ -60,7 +64,7 @@ export async function handleSignInEmail(
 
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
-    .select("username, date_joined")
+    .select("username, date_joined, pfp_url")
     .eq("id", data.user.id)
     .maybeSingle();
 
@@ -75,6 +79,7 @@ export async function handleSignInEmail(
       username: profileData?.username || data.user.user_metadata?.username || "",
       email: data.user.email || email,
       date_joined: date,
+      pfp_url: profileData?.pfp_url || DEFAULT_PROFILE_IMAGE,
     },
     error: null,
   };

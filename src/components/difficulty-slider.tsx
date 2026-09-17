@@ -1,4 +1,4 @@
-import Slider from "@react-native-community/slider";
+const Slider = require("@react-native-community/slider") as React.ComponentType<any>;
 import { StyleSheet, Text, View } from "react-native";
 
 interface DifficultySliderProps {

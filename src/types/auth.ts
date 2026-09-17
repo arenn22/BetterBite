@@ -3,6 +3,7 @@ export interface Profile {
 	username : string;
 	email : string;
 	date_joined : Date | string | null;
+	pfp_url? : string | null;
 }
 
 export interface AuthResult {
