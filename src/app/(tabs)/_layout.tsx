@@ -4,7 +4,11 @@ import AppTabs from "@/components/app-tabs";
 import { useAuthContext } from "@/lib/auth/auth-context";
 
 export default function TabsLayout() {
-	const { currentUser } = useAuthContext();
+	const { currentUser, loading } = useAuthContext();
+
+	if (loading) {
+		return null;
+	}
 
 	if (!currentUser) {
 		return <Redirect href="/signup" />;

@@ -1,11 +1,13 @@
+import { supabase } from "@/lib/supabase";
 import {
-	fetchUserProfile,
-	handleSignInEmail,
-	handleSignInUsername,
-	handleSignUp,
+    fetchUserProfile,
+    handleSignInEmail,
+    handleSignInUsername,
+    handleSignUp,
 } from "@/services/api";
 import { Profile } from "@/types/auth";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+
 interface AuthContextType {
 	currentUser: Profile | null;
 	loading: boolean;
@@ -14,7 +16,7 @@ interface AuthContextType {
 	login: (email: string, password: string) => Promise<boolean>;
 	loginWithUsername: (username: string, password: string) => Promise<boolean>;
 	refreshCurrentUser: () => Promise<void>;
-	logout: () => void;
+	logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,13 +27,80 @@ const AuthContext = createContext<AuthContextType>({
 	login: async () => false,
 	loginWithUsername: async () => false,
 	refreshCurrentUser: async () => {},
-	logout: () => {},
+	logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [currentUser, setCurrentUser] = useState<Profile | null>(null);
-	const [loading, setLoading] = useState(false);
+	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		let isActive = true;
+
+		async function restoreProfile(session: NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>>["data"]["session"]) {
+			if (!session) {
+				if (isActive) {
+					setCurrentUser(null);
+				}
+				return;
+			}
+
+			const profile = await fetchUserProfile(session.user.id);
+			if (!isActive) return;
+
+			setCurrentUser(
+				profile ?? {
+					id: session.user.id,
+					username:
+						session.user.user_metadata?.username ??
+						session.user.email?.split("@")[0] ??
+						"User",
+					email: session.user.email ?? "",
+					date_joined: session.user.created_at
+						? new Date(session.user.created_at)
+						: null,
+					pfp_url: session.user.user_metadata?.pfp_url ?? null,
+				},
+			);
+		}
+
+		async function restoreSession() {
+			setLoading(true);
+			const { data, error: sessionError } = await supabase.auth.getSession();
+
+			if (sessionError) {
+				if (isActive) {
+					setError(sessionError.message);
+					setLoading(false);
+				}
+				return;
+			}
+
+			await restoreProfile(data.session);
+			if (isActive) {
+				setLoading(false);
+			}
+		}
+
+		void restoreSession();
+
+		const { data } = supabase.auth.onAuthStateChange((event, session) => {
+			if (event === "SIGNED_OUT") {
+				setCurrentUser(null);
+				return;
+			}
+
+			if (session) {
+				void restoreProfile(session);
+			}
+		});
+
+		return () => {
+			isActive = false;
+			data.subscription.unsubscribe();
+		};
+	}, []);
 
 	async function signup(username: string, email: string, password: string) {
 		setLoading(true);
@@ -103,7 +172,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	}
 
-	function logout() {
+	async function logout() {
+		await supabase.auth.signOut();
 		setCurrentUser(null);
 	}
 
