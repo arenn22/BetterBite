@@ -4,7 +4,7 @@ import {
 	handleSignInEmail,
 	handleSignInUsername,
 	handleSignUp,
-	logoutFromSupabase,
+	signOut as signOutFromSupabase,
 } from "@/services/api";
 import { Profile } from "@/types/auth";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -17,7 +17,7 @@ interface AuthContextType {
 	login: (email: string, password: string) => Promise<boolean>;
 	loginWithUsername: (username: string, password: string) => Promise<boolean>;
 	refreshCurrentUser: () => Promise<void>;
-	logout: () => Promise<void>;
+	signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,7 +28,7 @@ const AuthContext = createContext<AuthContextType>({
 	login: async () => false,
 	loginWithUsername: async () => false,
 	refreshCurrentUser: async () => {},
-	logout: async () => {},
+	signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -173,8 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	}
 
-	async function logout() {
-		await logoutFromSupabase();
+	async function signOut() {
+		await signOutFromSupabase();
 		setCurrentUser(null);
 	}
 
@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		login,
 		loginWithUsername,
 		refreshCurrentUser,
-		logout,
+		 signOut,
 		signup,
 	};
 
