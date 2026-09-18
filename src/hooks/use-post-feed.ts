@@ -27,7 +27,33 @@ export function usePostFeed(
 			if (authorId) query = query.eq("profile_id", authorId);
 			const result = await query;
 			if (!active) return;
-			if (!result.error) setPosts((result.data || []) as Post[]);
+			if (!result.error) {
+				const postRows = (result.data || []) as Post[];
+				const profileIds = [
+					...new Set(postRows.map((post) => post.profile_id)),
+				];
+				const profilesResult = profileIds.length
+					? await supabase
+							.from("profiles")
+							.select("id, username, pfp_url")
+							.in("id", profileIds)
+					: { data: [], error: null };
+				if (!active) return;
+				const profiles = new Map(
+					(profilesResult.data || []).map((profile) => [profile.id, profile]),
+				);
+				setPosts(
+					postRows.map((post) => {
+						const profile = profiles.get(post.profile_id);
+						return {
+							...post,
+							author_username:
+								profile?.username || post.author_username,
+							author_pfp_url: profile?.pfp_url || null,
+						};
+					}),
+				);
+			}
 			setLoading(false);
 		}
 		void loadPosts();

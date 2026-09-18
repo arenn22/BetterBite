@@ -17,6 +17,7 @@ export interface Post {
   difficulty: number;
   image_url: string;
   author_username: string;
+  author_pfp_url?: string | null;
   recipe: Record<string, any>;
   restrictionIds: number[];
   cuisineIds: number[];

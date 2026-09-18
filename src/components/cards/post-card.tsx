@@ -7,6 +7,7 @@ import { BaseCard } from "./base-card";
 export type PostCardProps = {
 	username: string;
 	initials: string;
+	profilePictureUrl?: string | null;
 	meal: string;
 	description: string;
 	imageUrl: string;
@@ -18,6 +19,7 @@ export type PostCardProps = {
 export function PostCard({
 	username,
 	initials,
+	profilePictureUrl,
 	meal,
 	description,
 	imageUrl,
@@ -35,9 +37,17 @@ export function PostCard({
 				style={[styles.postContent, compact && styles.compactContent]}
 			>
 				<View style={styles.authorRow}>
-					<View style={styles.avatar}>
-						<Text style={styles.avatarText}>{initials}</Text>
-					</View>
+					{profilePictureUrl ? (
+						<Image
+							accessibilityLabel={`${username}'s profile picture`}
+							source={{ uri: profilePictureUrl }}
+							style={styles.avatar}
+						/>
+					) : (
+						<View style={styles.avatar}>
+							<Text style={styles.avatarText}>{initials}</Text>
+						</View>
+					)}
 					<View style={styles.authorDetails}>
 						<Text style={styles.username}>{username}</Text>
 						<Text style={styles.time}>{timeAgo}</Text>
@@ -111,6 +121,10 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		paddingHorizontal: 9,
 		paddingVertical: 5,
+	},
+	compactTag: {
+		paddingHorizontal: 7,
+		paddingVertical: 4,
 	},
 	tagText: {
 		color: AppTheme.accent,

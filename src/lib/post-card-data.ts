@@ -20,6 +20,7 @@ export function toPostCardProps(post: Post): PostCardProps {
 	return {
 		username,
 		initials: username.slice(0, 2).toUpperCase(),
+		profilePictureUrl: post.author_pfp_url,
 		meal: post.title || "Untitled recipe",
 		description:
 			post.description ||
