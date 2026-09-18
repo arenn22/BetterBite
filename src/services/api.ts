@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase";
 import type { AuthResult, Profile } from "../types/auth";
-
+import type { CreatePostPayload, PendingFriendRequest, Post } from "../types/models";
 export const DEFAULT_PROFILE_IMAGE =
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80";
 
@@ -127,25 +127,7 @@ async function getEmailWithUsername(username: string) {
 
 
 
-// Type definitions matching your Postgres schema fields
-export interface CreatePostPayload {
-  title: string;
-  description: string;
-  difficulty: number;
-  imageUrl: string;
-  authorUsername: string;
-  recipeJson: Record<string, any>; // For your jsonb recipe data structure
-  restrictionIds: number[];       // Array of IDs for post_restrictions
-  cuisineIds: number[];           // Array of IDs for post_cuisines
-}
 
-/**
- * Creates a recipe post along with its junction table attachments (cuisines & dietary restrictions)
- * in a single atomic database operation.
- * 
- * @param payload The clean post data from your application state
- * @returns The newly created post UUID string
- */
 export async function createPost(payload: CreatePostPayload): Promise<string> {
   // Call the database function via Remote Procedure Call (RPC)
   const { data: newPostId, error } = await supabase.rpc('create_recipe_post', {
@@ -272,13 +254,7 @@ export async function fetchFriends() {
   }
 }
 
-export interface PendingFriendRequest {
-  id: number;
-  sender_username?: string;
-  username?: string;
-  display_name?: string;
-  sender_id?: string;
-}
+
 
 export async function fetchFriendRequests(): Promise<PendingFriendRequest[]> {
   const { data, error } = await supabase.rpc('get_pending_friend_requests')
@@ -303,26 +279,106 @@ export async function fetchFriendRequests(): Promise<PendingFriendRequest[]> {
   }
 }
 
-export async function fetchPostsByDietaryRestrictions(dietaryRestrictions: string[]): Promise<Post[]> {
-  const { data, error } = await supabase.rpc("get_posts_by_dietary_restrictions", {
-    p_dietary_restrictions: dietaryRestrictions
-  });
 
-  if (error) {
-    console.error("Error fetching posts by dietary restrictions:", error.message);
+
+export async function fetchPostsByDietaryRestrictions(dietaryRestrictions: number[]): Promise<Post[]> {
+  if (!dietaryRestrictions.length) {
     return [];
   }
 
-  return (data || []) as Post[];
+  const tableCandidates = ["post_restrictions", "post_dietary_restrictions", "recipe_post_restrictions"];
+  const columnCandidates = ["restriction_id", "dietary_restriction_id", "restriction", "id"];
+  const lastErrors: string[] = [];
+
+  for (const tableName of tableCandidates) {
+    for (const columnName of columnCandidates) {
+      const { data: restrictionRows, error: restrictionError } = await supabase
+        .from(tableName)
+        .select("post_id")
+        .in(columnName, dietaryRestrictions);
+
+      if (restrictionError) {
+        const message = restrictionError.message || "unknown DB error";
+        if (!/does not exist|column .* does not exist|not found/i.test(message)) {
+          lastErrors.push(`${tableName}.${columnName}: ${message}`);
+        }
+        continue;
+      }
+
+      const postIds = [...new Set((restrictionRows || []).map((row) => row.post_id).filter(Boolean))];
+
+      if (!postIds.length) {
+        return [];
+      }
+
+      const { data: posts, error } = await supabase
+        .from("posts")
+        .select("*")
+        .in("id", postIds);
+
+      if (error) {
+        console.error("Error fetching posts by dietary restrictions:", error.message);
+        return [];
+      }
+
+      return (posts || []) as Post[];
+    }
+  }
+
+  if (lastErrors.length) {
+    console.warn("No dietary restriction join table matched the schema. Last errors:", lastErrors);
+  }
+
+  return [];
 }
 
-export async function fetchPostByCuisines(cuisines: string[]): Promise<Post[]> {
-  const { data, error } = await supabase.rpc("get_posts_by_cuisines", {
-    p_cuisines: cuisines
-  });
-  if(error) {
-    console.error("Error fetching posts by cuisines:", error.message);
+export async function fetchPostByCuisines(cuisines: number[]): Promise<Post[]> {
+  if (!cuisines.length) {
     return [];
   }
-  return (data || []) as Post[];
+
+  const tableCandidates = ["post_cuisines", "post_cuisine", "recipe_post_cuisines"];
+  const columnCandidates = ["cuisine_id", "cuisine", "id"];
+  const lastErrors: string[] = [];
+
+  for (const tableName of tableCandidates) {
+    for (const columnName of columnCandidates) {
+      const { data: cuisineRows, error: cuisineRowsError } = await supabase
+        .from(tableName)
+        .select("post_id")
+        .in(columnName, cuisines);
+
+      if (cuisineRowsError) {
+        const message = cuisineRowsError.message || "unknown DB error";
+        if (!/does not exist|column .* does not exist|not found/i.test(message)) {
+          lastErrors.push(`${tableName}.${columnName}: ${message}`);
+        }
+        continue;
+      }
+
+      const postIds = [...new Set((cuisineRows || []).map((row) => row.post_id).filter(Boolean))];
+
+      if (!postIds.length) {
+        return [];
+      }
+
+      const { data: posts, error } = await supabase
+        .from("posts")
+        .select("*")
+        .in("id", postIds);
+
+      if (error) {
+        console.error("Error fetching posts by cuisines:", error.message);
+        return [];
+      }
+
+      return (posts || []) as Post[];
+    }
+  }
+
+  if (lastErrors.length) {
+    console.warn("No cuisine join table matched the schema. Last errors:", lastErrors);
+  }
+
+  return [];
 }
