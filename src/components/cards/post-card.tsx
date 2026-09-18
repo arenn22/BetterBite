@@ -1,5 +1,7 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 
+import { AppTheme } from "@/constants/app-theme";
+
 import { BaseCard } from "./base-card";
 
 export type PostCardProps = {
@@ -10,6 +12,7 @@ export type PostCardProps = {
 	imageUrl: string;
 	timeAgo: string;
 	tag: string;
+	compact?: boolean;
 };
 
 export function PostCard({
@@ -20,11 +23,17 @@ export function PostCard({
 	imageUrl,
 	timeAgo,
 	tag,
+	compact = false,
 }: PostCardProps) {
 	return (
-		<BaseCard>
-			<Image source={{ uri: imageUrl }} style={styles.image} />
-			<View style={styles.postContent}>
+		<BaseCard style={styles.card}>
+			<Image
+				source={{ uri: imageUrl }}
+				style={[styles.image, compact && styles.compactImage]}
+			/>
+			<View
+				style={[styles.postContent, compact && styles.compactContent]}
+			>
 				<View style={styles.authorRow}>
 					<View style={styles.avatar}>
 						<Text style={styles.avatarText}>{initials}</Text>
@@ -33,11 +42,16 @@ export function PostCard({
 						<Text style={styles.username}>{username}</Text>
 						<Text style={styles.time}>{timeAgo}</Text>
 					</View>
-					<View style={styles.tag}>
+					<View style={[styles.tag, compact && styles.compactTag]}>
 						<Text style={styles.tagText}>{tag}</Text>
 					</View>
 				</View>
-				<Text style={styles.meal}>{meal}</Text>
+				<Text
+					style={[styles.meal, compact && styles.compactMeal]}
+					numberOfLines={2}
+				>
+					{meal}
+				</Text>
 				<Text style={styles.description} numberOfLines={2}>
 					{description}
 				</Text>
@@ -47,14 +61,20 @@ export function PostCard({
 }
 
 const styles = StyleSheet.create({
+	card: {
+		width: "100%",
+		maxWidth: 540,
+	},
 	image: {
 		width: "100%",
 		height: 154,
-		backgroundColor: "#DDE8D8",
+		backgroundColor: AppTheme.accentSoft,
 	},
+	compactImage: { height: 104 },
 	postContent: {
 		padding: 16,
 	},
+	compactContent: { padding: 12 },
 	authorRow: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -65,10 +85,10 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "#E1B866",
+		backgroundColor: AppTheme.warmSoft,
 	},
 	avatarText: {
-		color: "#3B3424",
+		color: AppTheme.warm,
 		fontSize: 11,
 		fontWeight: "800",
 	},
@@ -77,34 +97,35 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	username: {
-		color: "#25372B",
+		color: AppTheme.text,
 		fontSize: 13,
 		fontWeight: "700",
 	},
 	time: {
-		color: "#849087",
+		color: AppTheme.muted,
 		fontSize: 11,
 		marginTop: 2,
 	},
 	tag: {
-		backgroundColor: "#EEF4EC",
+		backgroundColor: AppTheme.accentSoft,
 		borderRadius: 8,
 		paddingHorizontal: 9,
 		paddingVertical: 5,
 	},
 	tagText: {
-		color: "#55735A",
+		color: AppTheme.accent,
 		fontSize: 10,
 		fontWeight: "700",
 	},
 	meal: {
-		color: "#1D3025",
+		color: AppTheme.text,
 		fontSize: 18,
-		fontWeight: "800",
+		fontWeight: "600",
 		marginTop: 14,
 	},
+	compactMeal: { fontSize: 15, marginTop: 10 },
 	description: {
-		color: "#68766C",
+		color: AppTheme.muted,
 		fontSize: 13,
 		lineHeight: 19,
 		marginTop: 5,

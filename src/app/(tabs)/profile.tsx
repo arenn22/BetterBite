@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
 	Image,
@@ -7,149 +6,234 @@ import {
 	Text,
 	View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import { PostGrid } from "@/components/cards/post-grid";
+import { SectionHeading } from "@/components/section-heading";
+import { TabHeader } from "@/components/tab-header";
+import { AppTheme } from "@/constants/app-theme";
+import { usePostFeed } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
-import { DEFAULT_PROFILE_IMAGE, fetchUserProfile } from "@/services/api";
+import {
+	DEFAULT_PROFILE_IMAGE,
+	fetchFriends,
+	fetchUserProfile,
+} from "@/services/api";
+import { useEffect, useState } from "react";
 
-function formatJoinedDate(value: Date | string | null | undefined) {
-	if (!value) return "Not provided";
-
-	const date = value instanceof Date ? value : new Date(value);
-	return Number.isNaN(date.getTime())
-		? "Not provided"
-		: date.toLocaleDateString(undefined, {
-				month: "long",
-				year: "numeric",
-		  });
-}
+type Friend = Record<string, unknown>;
 
 export default function ProfileScreen() {
 	const { currentUser } = useAuthContext();
-	const [profile, setProfile] = useState<Awaited<ReturnType<typeof fetchUserProfile>>>(null);
-	const [loading, setLoading] = useState(false);
+	const { posts, loading } = usePostFeed({
+		authorId: currentUser?.id,
+		enabled: Boolean(currentUser),
+	});
+	const [profile, setProfile] = useState(currentUser);
+	const [friends, setFriends] = useState<Friend[]>([]);
 
 	useEffect(() => {
-		if (!currentUser) {
-			setProfile(null);
-			return;
-		}
-
-		let isActive = true;
-		setLoading(true);
-
-		fetchUserProfile(currentUser.id)
-			.then(fetchedProfile => {
-				if (isActive) {
-					setProfile(fetchedProfile);
-				}
-			})
-			.finally(() => {
-				if (isActive) {
-					setLoading(false);
-				}
-			});
-
+		if (!currentUser) return;
+		let active = true;
+		Promise.allSettled([
+			fetchUserProfile(currentUser.id),
+			fetchFriends(),
+		]).then(([profileResult, friendsResult]) => {
+			if (!active) return;
+			if (profileResult.status === "fulfilled")
+				setProfile(profileResult.value || currentUser);
+			if (friendsResult.status === "fulfilled")
+				setFriends((friendsResult.value || []) as Friend[]);
+		});
 		return () => {
-			isActive = false;
+			active = false;
 		};
 	}, [currentUser]);
 
-	const publicProfile = profile ?? currentUser;
-	const profileImage = publicProfile?.pfp_url?.trim() || DEFAULT_PROFILE_IMAGE;
+	if (!currentUser)
+		return (
+			<SafeAreaView style={styles.safeArea}>
+				<Text style={styles.empty}>Sign in to view your profile.</Text>
+			</SafeAreaView>
+		);
+	const publicProfile = profile || currentUser;
+	const streak = Number(
+		publicProfile.streakCount ?? publicProfile.streakcount ?? 0,
+	);
+	const firstName = publicProfile.username.charAt(0).toUpperCase();
 
 	return (
-		<ScrollView
-			contentContainerStyle={styles.container}
-			showsVerticalScrollIndicator={false}
-		>
-			<View style={styles.heading}>
-				<Text style={styles.eyebrow}>YOUR ACCOUNT</Text>
-				<Text style={styles.title}>Profile</Text>
-				<Text style={styles.subtitle}>A little about you in the BetterBite community.</Text>
-			</View>
-			{loading ? (
-				<ActivityIndicator color="#203429" style={styles.loading} />
-			) : publicProfile ? (
-				<View style={styles.profileContent}>
-					<View style={styles.profileHeader}>
-						<Image
-							accessibilityLabel={`${publicProfile.username}'s profile picture`}
-							source={{ uri: profileImage }}
-							style={styles.avatar}
-						/>
-						<View style={styles.identity}>
-							<Text style={styles.displayName}>{publicProfile.username}</Text>
-							<Text style={styles.handle}>@{publicProfile.username}</Text>
+		<SafeAreaView style={styles.safeArea} edges={["top"]}>
+			<ScrollView
+				contentContainerStyle={styles.content}
+				showsVerticalScrollIndicator={false}
+			>
+				<TabHeader
+					eyebrow="Your account"
+					title="Profile"
+					subtitle="Your food, friends, and progress in one place."
+					initial={firstName}
+				/>
+				<View style={styles.profileCard}>
+					<Image
+						accessibilityLabel={`${publicProfile.username}'s profile picture`}
+						source={{
+							uri:
+								publicProfile.pfp_url?.trim() ||
+								DEFAULT_PROFILE_IMAGE,
+						}}
+						style={styles.avatar}
+					/>
+					<Text style={styles.displayName}>
+						{publicProfile.username}
+					</Text>
+					<Text style={styles.email}>{publicProfile.email}</Text>
+					<View style={styles.stats}>
+						<View style={styles.stat}>
+							<Text style={styles.statValue}>{posts.length}</Text>
+							<Text style={styles.statLabel}>Recipes</Text>
 						</View>
-					</View>
-
-					<View style={styles.details}>
-						<View style={styles.row}>
-							<Text style={styles.label}>USERNAME</Text>
-							<Text style={styles.value}>{publicProfile.username}</Text>
-						</View>
-						<View style={styles.row}>
-							<Text style={styles.label}>MEMBER SINCE</Text>
-							<Text style={styles.value}>
-								{formatJoinedDate(publicProfile.date_joined)}
+						<View style={styles.stat}>
+							<Text style={styles.statValue}>
+								{friends.length}
 							</Text>
+							<Text style={styles.statLabel}>Friends</Text>
+						</View>
+						<View style={styles.stat}>
+							<Text style={styles.statValue}>{streak}</Text>
+							<Text style={styles.statLabel}>Streak</Text>
 						</View>
 					</View>
 				</View>
-			) : (
-				<Text style={styles.message}>
-					{currentUser ? "No profile data found." : "Sign in to view your profile."}
-				</Text>
-			)}
-		</ScrollView>
+				<View style={styles.section}>
+					<SectionHeading
+						title="Your friends"
+						subtitle="People you share the table with."
+					/>
+					{friends.length ? (
+						<View style={styles.friendList}>
+							{friends.slice(0, 12).map((friend, index) => {
+								const name = String(
+									friend.username ||
+										friend.display_name ||
+										friend.friend_username ||
+										"Friend",
+								);
+								return (
+									<View
+										style={styles.friend}
+										key={String(
+											friend.id ||
+												friend.friend_id ||
+												index,
+										)}
+									>
+										<View style={styles.friendAvatar}>
+											<Text style={styles.friendInitial}>
+												{name.charAt(0).toUpperCase()}
+											</Text>
+										</View>
+										<Text
+											style={styles.friendName}
+											numberOfLines={1}
+										>
+											{name}
+										</Text>
+									</View>
+								);
+							})}
+						</View>
+					) : (
+						<Text style={styles.empty}>
+							Connect with friends to see them here.
+						</Text>
+					)}
+				</View>
+				<View style={styles.section}>
+					<SectionHeading
+						title="Your recipes"
+						subtitle="The dishes you have shared."
+					/>
+					{loading ? (
+						<ActivityIndicator
+							color={AppTheme.accent}
+							style={styles.loading}
+						/>
+					) : posts.length ? (
+						<PostGrid posts={posts} />
+					) : (
+						<Text style={styles.empty}>
+							Your published recipes will appear here.
+						</Text>
+					)}
+				</View>
+			</ScrollView>
+		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flexGrow: 1,
-		padding: 24,
-		backgroundColor: "#FFF8F3",
+	safeArea: { flex: 1, backgroundColor: AppTheme.background },
+	content: { paddingHorizontal: 20, paddingBottom: 40 },
+	profileCard: {
+		backgroundColor: AppTheme.surface,
+		borderRadius: 12,
+		alignItems: "center",
+		padding: 22,
+		borderWidth: 1,
+		borderColor: AppTheme.border,
 	},
-	heading: { marginBottom: 26 },
-	eyebrow: {
-		color: "#B45E42",
-		fontSize: 11,
-		fontWeight: "800",
-		letterSpacing: 1.5,
-	},
-	title: { color: "#203429", fontSize: 34, fontWeight: "800", marginTop: 6 },
-	subtitle: { color: "#738078", fontSize: 15, lineHeight: 22, marginTop: 8 },
-	loading: { marginTop: 24 },
-	profileContent: {
-		backgroundColor: "#FFFFFF",
-		borderRadius: 20,
-		padding: 20,
-		shadowColor: "#18352A",
-		shadowOffset: { width: 0, height: 6 },
-		shadowOpacity: 0.08,
-		shadowRadius: 14,
-		elevation: 3,
-	},
-	profileHeader: { alignItems: "center", paddingVertical: 8 },
 	avatar: {
-		width: 112,
-		height: 112,
-		borderRadius: 56,
-		backgroundColor: "#F5DFD2",
-		borderColor: "#FFF0E8",
-		borderWidth: 5,
+		width: 88,
+		height: 88,
+		borderRadius: 44,
+		backgroundColor: AppTheme.warmSoft,
+		borderColor: AppTheme.card,
+		borderWidth: 4,
 	},
-	identity: { alignItems: "center", marginTop: 14 },
-	displayName: { color: "#203429", fontSize: 24, fontWeight: "800" },
-	handle: { color: "#738078", fontSize: 14, marginTop: 4 },
-	details: { marginTop: 24 },
-	row: {
-		borderBottomColor: "#e4e9e5",
-		borderBottomWidth: 1,
-		paddingVertical: 16,
+	displayName: {
+		color: AppTheme.text,
+		fontSize: 22,
+		fontWeight: "600",
+		marginTop: 13,
 	},
-	label: { color: "#738078", fontSize: 11, fontWeight: "800", letterSpacing: 1.2 },
-	value: { color: "#203429", fontSize: 16, marginTop: 7 },
-	message: { color: "#738078", fontSize: 15, marginTop: 16 },
+	email: { color: AppTheme.muted, fontSize: 13, marginTop: 4 },
+	stats: {
+		flexDirection: "row",
+		width: "100%",
+		justifyContent: "space-around",
+		marginTop: 22,
+		paddingTop: 18,
+		borderTopWidth: 1,
+		borderTopColor: AppTheme.border,
+	},
+	stat: { alignItems: "center" },
+	statValue: { color: AppTheme.accent, fontSize: 21, fontWeight: "600" },
+	statLabel: { color: AppTheme.muted, fontSize: 12, marginTop: 4 },
+	section: { marginTop: 28 },
+	friendList: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 14,
+		marginTop: 14,
+	},
+	friend: { alignItems: "center", width: 64 },
+	friendAvatar: {
+		width: 42,
+		height: 42,
+		borderRadius: 21,
+		backgroundColor: AppTheme.accentSoft,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	friendInitial: { color: AppTheme.accent, fontSize: 15, fontWeight: "600" },
+	friendName: {
+		color: AppTheme.muted,
+		fontSize: 11,
+		marginTop: 6,
+		maxWidth: 64,
+		textAlign: "center",
+	},
+	loading: { marginTop: 20 },
+	empty: { color: AppTheme.muted, fontSize: 14, lineHeight: 21 },
 });

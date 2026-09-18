@@ -1,13 +1,19 @@
 import { type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { AppTheme } from "@/constants/app-theme";
+
 export type SectionHeadingProps = {
 	title: string;
 	subtitle: string;
 	rightContent?: ReactNode;
 };
 
-export function SectionHeading({ title, subtitle, rightContent }: SectionHeadingProps) {
+export function SectionHeading({
+	title,
+	subtitle,
+	rightContent,
+}: SectionHeadingProps) {
 	return (
 		<View style={styles.container}>
 			<View>
@@ -26,12 +32,12 @@ const styles = StyleSheet.create({
 		alignItems: "flex-end",
 	},
 	title: {
-		color: "#25372B",
+		color: AppTheme.text,
 		fontSize: 22,
-		fontWeight: "800",
+		fontWeight: "600",
 	},
 	subtitle: {
-		color: "#829087",
+		color: AppTheme.muted,
 		fontSize: 12,
 		marginTop: 4,
 	},

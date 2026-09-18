@@ -1,195 +1,205 @@
-import { PostCard } from "@/components/cards/post-card";
-import { SectionHeading } from "@/components/section-heading";
-import { UserAvatar } from "@/components/user-avatar";
-import { useTheme } from "@/hooks/use-theme";
-import { useAuthContext } from "@/lib/auth/auth-context";
 import {
+	ActivityIndicator,
 	Pressable,
 	ScrollView,
 	StyleSheet,
 	Text,
+	TextInput,
 	View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const categories = ["For you", "Friends", "Quick meals", "Vegetarian", "Gluten free"];
+import { PostGrid } from "@/components/cards/post-grid";
+import { SectionHeading } from "@/components/section-heading";
+import { TabHeader } from "@/components/tab-header";
+import { AppTheme } from "@/constants/app-theme";
+import { usePostFeed } from "@/hooks/use-post-feed";
+import { useAuthContext } from "@/lib/auth/auth-context";
+import {
+	fetchCuisines,
+	fetchDietaryRestrictions,
+	fetchFriends,
+} from "@/services/api";
+import { useEffect, useMemo, useState } from "react";
 
-const friendPosts = [
-	{
-		username: "maya.cooks",
-		initials: "MC",
-		meal: "Crispy chickpea bowl",
-		description: "A bright, crunchy dinner with tahini lemon sauce.",
-		imageUrl: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=900&q=85",
-		timeAgo: "12 min ago",
-		tag: "Vegetarian",
-	},
-	{
-		username: "jonahbites",
-		initials: "JB",
-		meal: "Weeknight tomato pasta",
-		description: "Simple ingredients, big comfort, and ready in 25 minutes.",
-		imageUrl: "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=900&q=85",
-		timeAgo: "38 min ago",
-		tag: "Quick meal",
-	},
-	{
-		username: "lenaeats",
-		initials: "LE",
-		meal: "Golden breakfast tacos",
-		description: "Soft eggs, avocado, and a little hot sauce to start the day.",
-		imageUrl: "https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=900&q=85",
-		timeAgo: "1 hr ago",
-		tag: "Breakfast",
-	},
-];
+type Option = { id: number; name: string };
+type Friend = Record<string, unknown>;
 
 export default function ExploreScreen() {
-	const theme = useTheme();
 	const { currentUser } = useAuthContext();
+	const { posts, loading } = usePostFeed({ limit: 30 });
+	const [friends, setFriends] = useState<Friend[]>([]);
+	const [categories, setCategories] = useState<string[]>([]);
+	const [query, setQuery] = useState("");
+	const [selectedCategory, setSelectedCategory] = useState("All");
+
+	useEffect(() => {
+		let active = true;
+		Promise.allSettled([
+			fetchCuisines(),
+			fetchDietaryRestrictions(),
+			fetchFriends(),
+		]).then(([cuisines, restrictions, friendsResult]) => {
+			if (!active) return;
+			const options: Option[] = [];
+			if (cuisines.status === "fulfilled")
+				options.push(...cuisines.value);
+			if (restrictions.status === "fulfilled")
+				options.push(...restrictions.value);
+			setCategories([...new Set(options.map((option) => option.name))]);
+			if (friendsResult.status === "fulfilled")
+				setFriends((friendsResult.value || []) as Friend[]);
+		});
+		return () => {
+			active = false;
+		};
+	}, [currentUser]);
+
+	const visiblePosts = useMemo(() => {
+		const search = query.trim().toLowerCase();
+		const friendNames = new Set(
+			friends.map((friend) =>
+				String(
+					friend.username ||
+						friend.display_name ||
+						friend.friend_username ||
+						"",
+				).toLowerCase(),
+			),
+		);
+		return posts.filter((post) => {
+			const searchable = [
+				post.title,
+				post.description,
+				post.author_username,
+			]
+				.filter(Boolean)
+				.join(" ")
+				.toLowerCase();
+			const matchesSearch = !search || searchable.includes(search);
+			if (selectedCategory === "Friends")
+				return (
+					matchesSearch &&
+					friendNames.has((post.author_username || "").toLowerCase())
+				);
+			return (
+				matchesSearch &&
+				(selectedCategory === "All" ||
+					searchable.includes(selectedCategory.toLowerCase()))
+			);
+		});
+	}, [friends, posts, query, selectedCategory]);
 	const firstName = currentUser?.username?.split(/[._-]/)[0] || "friend";
+	const filters = ["All", "Friends", ...categories];
 
 	return (
-		<SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]} edges={["top"]}>
+		<SafeAreaView style={styles.safeArea} edges={["top"]}>
 			<ScrollView
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={styles.content}
 				showsVerticalScrollIndicator={false}
 			>
-				<View style={styles.header}>
-					<View>
-						<Text style={styles.eyebrow}>THE COMMUNITY TABLE</Text>
-						<Text style={styles.title}>Explore</Text>
-						<Text style={styles.subtitle}>See what your friends are cooking.</Text>
-					</View>
-					<UserAvatar initial={firstName.charAt(0).toUpperCase()} />
-				</View>
-
-				<View style={styles.searchBar}>
-					<Text style={styles.searchIcon}>⌕</Text>
-					<Text style={styles.searchPlaceholder}>Search dishes, cuisines, or friends</Text>
-				</View>
-
+				<TabHeader
+					eyebrow="The community table"
+					title="Explore"
+					subtitle="Real recipes from your BetterBite community."
+					initial={firstName.charAt(0).toUpperCase()}
+				/>
+				<TextInput
+					value={query}
+					onChangeText={setQuery}
+					placeholder="Search dishes, cuisines, or friends"
+					placeholderTextColor={AppTheme.muted}
+					style={styles.search}
+				/>
 				<ScrollView
 					horizontal
 					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={styles.categoryList}
+					contentContainerStyle={styles.filters}
 				>
-					{categories.map((category, index) => (
-						<Pressable key={category} style={[styles.category, index === 0 && styles.activeCategory]}>
-							<Text style={[styles.categoryText, index === 0 && styles.activeCategoryText]}>{category}</Text>
+					{filters.map((category) => (
+						<Pressable
+							key={category}
+							onPress={() => setSelectedCategory(category)}
+							style={[
+								styles.filter,
+								selectedCategory === category &&
+									styles.selectedFilter,
+							]}
+						>
+							<Text
+								style={[
+									styles.filterText,
+									selectedCategory === category &&
+										styles.selectedFilterText,
+								]}
+							>
+								{category}
+							</Text>
 						</Pressable>
 					))}
 				</ScrollView>
-
-				<View style={styles.feedHeader}>
+				<View style={styles.heading}>
 					<SectionHeading
-						title="From your friends"
-						subtitle="Fresh ideas from people you follow."
-						rightContent={<Text style={styles.feedCount}>{friendPosts.length} posts</Text>}
+						title={
+							selectedCategory === "Friends"
+								? "From your friends"
+								: "Community recipes"
+						}
+						subtitle={`${visiblePosts.length} recipe${visiblePosts.length === 1 ? "" : "s"} found.`}
+						rightContent={
+							<Text style={styles.count}>
+								{visiblePosts.length}
+							</Text>
+						}
 					/>
 				</View>
-
-				<View style={styles.feed}>
-					{friendPosts.map((post) => (
-						<PostCard key={post.meal} {...post} />
-					))}
-				</View>
+				{loading ? (
+					<ActivityIndicator
+						color={AppTheme.accent}
+						style={styles.loading}
+					/>
+				) : visiblePosts.length ? (
+					<PostGrid posts={visiblePosts} />
+				) : (
+					<Text style={styles.empty}>
+						No recipes match this search yet.
+					</Text>
+				)}
 			</ScrollView>
 		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-	},
-	scrollContent: {
-		paddingHorizontal: 20,
-		paddingBottom: 36,
-	},
-	header: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingTop: 14,
-		paddingBottom: 22,
-	},
-	eyebrow: {
-		color: "#D17A58",
-		fontSize: 11,
-		fontWeight: "800",
-		letterSpacing: 1.4,
-	},
-	title: {
-		color: "#203429",
-		fontSize: 34,
-		fontWeight: "800",
-		marginTop: 5,
-	},
-	subtitle: {
-		color: "#738078",
-		fontSize: 14,
-		marginTop: 4,
-	},
-	searchBar: {
+	safeArea: { flex: 1, backgroundColor: AppTheme.background },
+	content: { paddingHorizontal: 20, paddingBottom: 36 },
+	search: {
 		height: 50,
-		borderRadius: 16,
-		backgroundColor: "#FFFFFF",
+		borderRadius: 9,
 		borderWidth: 1,
-		borderColor: "#E9EDE7",
-		flexDirection: "row",
-		alignItems: "center",
+		borderColor: AppTheme.border,
+		backgroundColor: AppTheme.surface,
+		color: AppTheme.text,
 		paddingHorizontal: 15,
+		fontSize: 15,
 	},
-	searchIcon: {
-		color: "#688A5E",
-		fontSize: 27,
-		lineHeight: 27,
-		marginRight: 9,
-	},
-	searchPlaceholder: {
-		color: "#98A29B",
-		fontSize: 13,
-	},
-	categoryList: {
-		gap: 9,
-		paddingVertical: 20,
-		paddingRight: 20,
-	},
-	category: {
-		borderRadius: 13,
-		backgroundColor: "#FFFFFF",
+	filters: { gap: 8, paddingVertical: 18, paddingRight: 20 },
+	filter: {
+		borderRadius: 9,
+		backgroundColor: AppTheme.surface,
 		borderWidth: 1,
-		borderColor: "#E7ECE4",
-		paddingHorizontal: 14,
+		borderColor: AppTheme.border,
+		paddingHorizontal: 13,
 		paddingVertical: 9,
 	},
-	activeCategory: {
-		backgroundColor: "#254C3A",
-		borderColor: "#254C3A",
+	selectedFilter: {
+		backgroundColor: AppTheme.accent,
+		borderColor: AppTheme.accent,
 	},
-	categoryText: {
-		color: "#718078",
-		fontSize: 12,
-		fontWeight: "700",
-	},
-	activeCategoryText: {
-		color: "#FFFFFF",
-	},
-	feedHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "flex-end",
-		marginTop: 4,
-		marginBottom: 15,
-	},
-	feedCount: {
-		color: "#688A5E",
-		fontSize: 12,
-		fontWeight: "800",
-		paddingBottom: 2,
-	},
-	feed: {
-		gap: 16,
-	},
+	filterText: { color: AppTheme.muted, fontSize: 13 },
+	selectedFilterText: { color: "#FFFFFF" },
+	heading: { marginBottom: 14 },
+	count: { color: AppTheme.accent, fontSize: 14, fontWeight: "600" },
+	loading: { marginTop: 24 },
+	empty: { color: AppTheme.muted, fontSize: 14, lineHeight: 21 },
 });
