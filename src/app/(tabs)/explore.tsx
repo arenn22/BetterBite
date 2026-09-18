@@ -24,14 +24,21 @@ import { useEffect, useMemo, useState } from "react";
 
 type Option = { id: number; name: string };
 type Friend = Record<string, unknown>;
+type FilterOption = {
+	key: string;
+	label: string;
+	kind: "friends" | "category";
+	id?: number;
+	field?: "cuisineIds" | "restrictionIds";
+};
 
 export default function ExploreScreen() {
 	const { currentUser } = useAuthContext();
 	const { posts, loading } = usePostFeed({ limit: 30 });
 	const [friends, setFriends] = useState<Friend[]>([]);
-	const [categories, setCategories] = useState<string[]>([]);
+	const [categories, setCategories] = useState<FilterOption[]>([]);
 	const [query, setQuery] = useState("");
-	const [selectedCategory, setSelectedCategory] = useState("All");
+	const [selectedFilters, setSelectedFilters] = useState(["all"]);
 
 	useEffect(() => {
 		let active = true;
@@ -41,12 +48,30 @@ export default function ExploreScreen() {
 			fetchFriends(),
 		]).then(([cuisines, restrictions, friendsResult]) => {
 			if (!active) return;
-			const options: Option[] = [];
-			if (cuisines.status === "fulfilled")
-				options.push(...cuisines.value);
-			if (restrictions.status === "fulfilled")
-				options.push(...restrictions.value);
-			setCategories([...new Set(options.map((option) => option.name))]);
+			const options = new Map<string, FilterOption>();
+			if (cuisines.status === "fulfilled") {
+				cuisines.value.forEach((option: Option) => {
+					options.set(`cuisine-${option.id}`, {
+						key: `cuisine-${option.id}`,
+						label: option.name,
+						kind: "category",
+						id: option.id,
+						field: "cuisineIds",
+					});
+				});
+			}
+			if (restrictions.status === "fulfilled") {
+				restrictions.value.forEach((option: Option) => {
+					options.set(`restriction-${option.id}`, {
+						key: `restriction-${option.id}`,
+						label: option.name,
+						kind: "category",
+						id: option.id,
+						field: "restrictionIds",
+					});
+				});
+			}
+			setCategories([...options.values()]);
 			if (friendsResult.status === "fulfilled")
 				setFriends((friendsResult.value || []) as Friend[]);
 		});
@@ -54,6 +79,12 @@ export default function ExploreScreen() {
 			active = false;
 		};
 	}, [currentUser]);
+	const firstName = currentUser?.username?.split(/[._-]/)[0] || "friend";
+	const filters: FilterOption[] = [
+		{ key: "all", label: "All", kind: "category" },
+		{ key: "friends", label: "Friends", kind: "friends" },
+		...categories,
+	];
 
 	const visiblePosts = useMemo(() => {
 		const search = query.trim().toLowerCase();
@@ -67,6 +98,10 @@ export default function ExploreScreen() {
 				).toLowerCase(),
 			),
 		);
+		const activeFilters = filters.filter((filter) =>
+			selectedFilters.includes(filter.key),
+		);
+		const showAll = selectedFilters.includes("all");
 		return posts.filter((post) => {
 			const searchable = [
 				post.title,
@@ -77,20 +112,33 @@ export default function ExploreScreen() {
 				.join(" ")
 				.toLowerCase();
 			const matchesSearch = !search || searchable.includes(search);
-			if (selectedCategory === "Friends")
+			const matchesFilters = activeFilters.some((filter) => {
+				if (filter.kind === "friends") {
+					return friendNames.has((post.author_username || "").toLowerCase());
+				}
+				const ids = filter.field ? post[filter.field] || [] : [];
 				return (
-					matchesSearch &&
-					friendNames.has((post.author_username || "").toLowerCase())
+					(filter.id !== undefined && ids.includes(filter.id)) ||
+					searchable.includes(filter.label.toLowerCase())
 				);
-			return (
-				matchesSearch &&
-				(selectedCategory === "All" ||
-					searchable.includes(selectedCategory.toLowerCase()))
-			);
+			});
+			return matchesSearch && (showAll || matchesFilters);
 		});
-	}, [friends, posts, query, selectedCategory]);
-	const firstName = currentUser?.username?.split(/[._-]/)[0] || "friend";
-	const filters = ["All", "Friends", ...categories];
+	}, [filters, friends, posts, query, selectedFilters]);
+
+	function toggleFilter(key: string) {
+		if (key === "all") {
+			setSelectedFilters(["all"]);
+			return;
+		}
+		setSelectedFilters((current) => {
+			const withoutAll = current.filter((item) => item !== "all");
+			const next = withoutAll.includes(key)
+				? withoutAll.filter((item) => item !== key)
+				: [...withoutAll, key];
+			return next.length ? next : ["all"];
+		});
+	}
 
 	return (
 		<SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -116,35 +164,31 @@ export default function ExploreScreen() {
 					showsHorizontalScrollIndicator={false}
 					contentContainerStyle={styles.filters}
 				>
-					{filters.map((category) => (
+					{filters.map((filter) => (
 						<Pressable
-							key={category}
-							onPress={() => setSelectedCategory(category)}
+							key={filter.key}
+							onPress={() => toggleFilter(filter.key)}
 							style={[
 								styles.filter,
-								selectedCategory === category &&
+								selectedFilters.includes(filter.key) &&
 									styles.selectedFilter,
 							]}
 						>
 							<Text
 								style={[
 									styles.filterText,
-									selectedCategory === category &&
+									selectedFilters.includes(filter.key) &&
 										styles.selectedFilterText,
 								]}
 							>
-								{category}
+								{filter.label}
 							</Text>
 						</Pressable>
 					))}
 				</ScrollView>
 				<View style={styles.heading}>
 					<SectionHeading
-						title={
-							selectedCategory === "Friends"
-								? "From your friends"
-								: "Community recipes"
-						}
+						title={selectedFilters.includes("friends") ? "From your friends" : "Community recipes"}
 						subtitle={`${visiblePosts.length} recipe${visiblePosts.length === 1 ? "" : "s"} found.`}
 						rightContent={
 							<Text style={styles.count}>
@@ -172,7 +216,13 @@ export default function ExploreScreen() {
 
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: AppTheme.background },
-	content: { paddingHorizontal: 20, paddingBottom: 36 },
+	content: {
+		width: "100%",
+		maxWidth: 640,
+		alignSelf: "center",
+		paddingHorizontal: 20,
+		paddingBottom: 36,
+	},
 	search: {
 		height: 50,
 		borderRadius: 9,

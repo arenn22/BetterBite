@@ -1,10 +1,10 @@
 import {
-	ActivityIndicator,
-	Image,
-	ScrollView,
-	StyleSheet,
-	Text,
-	View,
+    ActivityIndicator,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -15,9 +15,9 @@ import { AppTheme } from "@/constants/app-theme";
 import { usePostFeed } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import {
-	DEFAULT_PROFILE_IMAGE,
-	fetchFriends,
-	fetchUserProfile,
+    DEFAULT_PROFILE_IMAGE,
+    fetchFriends,
+    fetchUserProfile,
 } from "@/services/api";
 import { useEffect, useState } from "react";
 
@@ -174,7 +174,13 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: AppTheme.background },
-	content: { paddingHorizontal: 20, paddingBottom: 40 },
+	content: {
+		width: "100%",
+		maxWidth: 640,
+		alignSelf: "center",
+		paddingHorizontal: 20,
+		paddingBottom: 40,
+	},
 	profileCard: {
 		backgroundColor: AppTheme.surface,
 		borderRadius: 12,

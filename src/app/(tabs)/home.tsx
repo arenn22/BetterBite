@@ -29,9 +29,10 @@ export default function HomeScreen() {
 	useEffect(() => {
 		if (!currentUser) return;
 		let active = true;
+		const userId = currentUser.id;
 		async function loadCommunity() {
 			const [profileResult, friendsResult] = await Promise.allSettled([
-				fetchUserProfile(currentUser.id),
+				fetchUserProfile(userId),
 				fetchFriends(),
 			]);
 			if (!active) return;
@@ -148,7 +149,13 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: AppTheme.background },
-	content: { paddingHorizontal: 20, paddingBottom: 36 },
+	content: {
+		width: "100%",
+		maxWidth: 640,
+		alignSelf: "center",
+		paddingHorizontal: 20,
+		paddingBottom: 36,
+	},
 	section: { marginTop: 28, marginBottom: 14 },
 	recipeSection: { marginTop: 32 },
 	count: { color: AppTheme.accent, fontSize: 14, fontWeight: "600" },

@@ -1,6 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Image, StyleSheet, Text, View } from "react-native";
 
 import { AppTheme } from "@/constants/app-theme";
+import { useAuthContext } from "@/lib/auth/auth-context";
 
 export type TabHeaderProps = {
 	eyebrow: string;
@@ -15,6 +17,11 @@ export function TabHeader({
 	subtitle,
 	initial,
 }: TabHeaderProps) {
+	const { currentUser } = useAuthContext();
+	const [imageFailed, setImageFailed] = useState(false);
+	const profilePictureUrl = currentUser?.pfp_url?.trim();
+	const showProfilePicture = Boolean(profilePictureUrl) && !imageFailed;
+
 	return (
 		<View style={styles.container}>
 			<View style={styles.copy}>
@@ -23,9 +30,18 @@ export function TabHeader({
 				<Text style={styles.subtitle}>{subtitle}</Text>
 			</View>
 			{initial ? (
-				<View style={styles.avatar}>
-					<Text style={styles.avatarText}>{initial}</Text>
-				</View>
+				showProfilePicture ? (
+					<Image
+						accessibilityLabel="Your profile picture"
+						source={{ uri: profilePictureUrl }}
+						style={styles.avatar}
+						onError={() => setImageFailed(true)}
+					/>
+				) : (
+					<View style={styles.avatar}>
+						<Text style={styles.avatarText}>{initial}</Text>
+					</View>
+				)
 			) : null}
 		</View>
 	);

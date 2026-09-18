@@ -155,6 +155,7 @@ export default function CreateScreen() {
 					eyebrow="Share the table"
 					title="Create a recipe"
 					subtitle="Turn something you love to cook into the next community favorite."
+					initial={currentUser?.username?.charAt(0).toUpperCase() || "B"}
 				/>
 				<TouchableOpacity style={styles.imageBox} onPress={chooseImage}>
 					{imageUri ? (
@@ -283,7 +284,14 @@ export default function CreateScreen() {
 
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: AppTheme.background },
-	container: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 48 },
+	container: {
+		width: "100%",
+		maxWidth: 640,
+		alignSelf: "center",
+		paddingHorizontal: 20,
+		paddingTop: 18,
+		paddingBottom: 48,
+	},
 	imageBox: {
 		height: 190,
 		borderRadius: 18,

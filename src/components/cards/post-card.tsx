@@ -1,4 +1,13 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import {
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
 
 import { AppTheme } from "@/constants/app-theme";
 
@@ -13,7 +22,8 @@ export type PostCardProps = {
 	imageUrl: string;
 	timeAgo: string;
 	tag: string;
-	compact?: boolean;
+	difficulty?: number;
+	recipe?: Record<string, unknown>;
 };
 
 export function PostCard({
@@ -25,23 +35,43 @@ export function PostCard({
 	imageUrl,
 	timeAgo,
 	tag,
-	compact = false,
+	difficulty = 1,
+	recipe,
 }: PostCardProps) {
+	const [detailsVisible, setDetailsVisible] = useState(false);
+	const [imageFailed, setImageFailed] = useState(false);
+	const [authorImageFailed, setAuthorImageFailed] = useState(false);
+	const ingredients = getRecipeList(recipe?.ingredients);
+	const steps = getRecipeList(recipe?.steps);
+	const hasImage = Boolean(imageUrl?.trim()) && !imageFailed;
+	const hasAuthorImage = Boolean(profilePictureUrl?.trim()) && !authorImageFailed;
+
 	return (
-		<BaseCard style={styles.card}>
-			<Image
-				source={{ uri: imageUrl }}
-				style={[styles.image, compact && styles.compactImage]}
-			/>
-			<View
-				style={[styles.postContent, compact && styles.compactContent]}
-			>
+		<>
+			<Pressable onPress={() => setDetailsVisible(true)}>
+				<BaseCard style={styles.card}>
+					{hasImage ? (
+						<Image
+							source={{ uri: imageUrl }}
+							style={styles.image}
+								resizeMode="cover"
+								onError={() => setImageFailed(true)}
+						/>
+					) : (
+						<View style={styles.imageFallback}>
+							<Text style={styles.imageFallbackMark}>BB</Text>
+							<Text style={styles.imageFallbackText}>Recipe image unavailable</Text>
+						</View>
+					)}
+					<View style={styles.postContent}>
 				<View style={styles.authorRow}>
-					{profilePictureUrl ? (
+					{hasAuthorImage ? (
 						<Image
 							accessibilityLabel={`${username}'s profile picture`}
 							source={{ uri: profilePictureUrl }}
 							style={styles.avatar}
+							resizeMode="cover"
+							onError={() => setAuthorImageFailed(true)}
 						/>
 					) : (
 						<View style={styles.avatar}>
@@ -52,39 +82,84 @@ export function PostCard({
 						<Text style={styles.username}>{username}</Text>
 						<Text style={styles.time}>{timeAgo}</Text>
 					</View>
-					<View style={[styles.tag, compact && styles.compactTag]}>
+					<View style={styles.tag}>
 						<Text style={styles.tagText}>{tag}</Text>
 					</View>
 				</View>
-				<Text
-					style={[styles.meal, compact && styles.compactMeal]}
-					numberOfLines={2}
-				>
+				<Text style={styles.meal} numberOfLines={2}>
 					{meal}
 				</Text>
 				<Text style={styles.description} numberOfLines={2}>
 					{description}
 				</Text>
-			</View>
-		</BaseCard>
+					</View>
+				</BaseCard>
+			</Pressable>
+			<Modal
+				visible={detailsVisible}
+				animationType="slide"
+				onRequestClose={() => setDetailsVisible(false)}
+			>
+				<View style={styles.modalBackdrop}>
+					<View style={styles.modalCard}>
+						<ScrollView showsVerticalScrollIndicator={false}>
+							<Pressable
+								style={styles.closeButton}
+								onPress={() => setDetailsVisible(false)}
+							>
+								<Text style={styles.closeText}>Close</Text>
+							</Pressable>
+							<Text style={styles.modalTitle}>{meal}</Text>
+							<Text style={styles.modalMeta}>
+								{username}  |  Difficulty {difficulty}/5
+							</Text>
+							<Text style={styles.modalDescription}>{description}</Text>
+							<Text style={styles.detailHeading}>Ingredients</Text>
+							{ingredients.length ? ingredients.map((item, index) => (
+								<Text style={styles.detailItem} key={`${item}-${index}`}>
+									- {item}
+								</Text>
+							)) : <Text style={styles.detailEmpty}>No ingredients listed.</Text>}
+							<Text style={styles.detailHeading}>How to cook</Text>
+							{steps.length ? steps.map((item, index) => (
+								<Text style={styles.detailItem} key={`${item}-${index}`}>
+									{index + 1}. {item}
+								</Text>
+							)) : <Text style={styles.detailEmpty}>No cooking steps listed.</Text>}
+						</ScrollView>
+					</View>
+				</View>
+			</Modal>
+		</>
 	);
+}
+
+function getRecipeList(value: unknown) {
+	if (!Array.isArray(value)) return [];
+	return value.map((item) => String(item)).filter(Boolean);
 }
 
 const styles = StyleSheet.create({
 	card: {
 		width: "100%",
-		maxWidth: 540,
+		maxWidth: 600,
 	},
 	image: {
 		width: "100%",
-		height: 154,
+		height: 300,
 		backgroundColor: AppTheme.accentSoft,
 	},
-	compactImage: { height: 104 },
-	postContent: {
-		padding: 16,
+	imageFallback: {
+		height: 300,
+		backgroundColor: AppTheme.accentSoft,
+		alignItems: "center",
+		justifyContent: "center",
 	},
-	compactContent: { padding: 12 },
+	imageFallbackMark: { color: AppTheme.accent, fontSize: 30, fontWeight: "700" },
+	imageFallbackText: { color: AppTheme.muted, fontSize: 12, marginTop: 6 },
+	postContent: {
+		padding: 20,
+	},
 	authorRow: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -122,10 +197,6 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 9,
 		paddingVertical: 5,
 	},
-	compactTag: {
-		paddingHorizontal: 7,
-		paddingVertical: 4,
-	},
 	tagText: {
 		color: AppTheme.accent,
 		fontSize: 10,
@@ -133,15 +204,34 @@ const styles = StyleSheet.create({
 	},
 	meal: {
 		color: AppTheme.text,
-		fontSize: 18,
+		fontSize: 24,
 		fontWeight: "600",
-		marginTop: 14,
+		marginTop: 16,
 	},
-	compactMeal: { fontSize: 15, marginTop: 10 },
 	description: {
 		color: AppTheme.muted,
 		fontSize: 13,
 		lineHeight: 19,
 		marginTop: 5,
 	},
+	modalBackdrop: {
+		flex: 1,
+		backgroundColor: "rgba(48, 49, 46, 0.45)",
+		justifyContent: "flex-end",
+	},
+	modalCard: {
+		maxHeight: "88%",
+		backgroundColor: AppTheme.background,
+		borderTopLeftRadius: 22,
+		borderTopRightRadius: 22,
+		padding: 24,
+	},
+	closeButton: { alignSelf: "flex-end", paddingVertical: 4, paddingHorizontal: 2 },
+	closeText: { color: AppTheme.accent, fontSize: 14, fontWeight: "700" },
+	modalTitle: { color: AppTheme.text, fontSize: 28, fontWeight: "700", marginTop: 12 },
+	modalMeta: { color: AppTheme.accent, fontSize: 13, fontWeight: "600", marginTop: 8 },
+	modalDescription: { color: AppTheme.muted, fontSize: 15, lineHeight: 23, marginTop: 18 },
+	detailHeading: { color: AppTheme.text, fontSize: 18, fontWeight: "700", marginTop: 26, marginBottom: 10 },
+	detailItem: { color: AppTheme.text, fontSize: 15, lineHeight: 23, marginBottom: 7 },
+	detailEmpty: { color: AppTheme.muted, fontSize: 14 },
 });

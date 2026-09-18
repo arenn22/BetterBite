@@ -28,5 +28,7 @@ export function toPostCardProps(post: Post): PostCardProps {
 		imageUrl: post.image_url,
 		timeAgo: formatPostTime(post.date_created),
 		tag: `Level ${post.difficulty || 1}`,
+		difficulty: post.difficulty || 1,
+		recipe: post.recipe,
 	};
 }

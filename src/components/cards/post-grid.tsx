@@ -10,7 +10,7 @@ export function PostGrid({ posts }: { posts: Post[] }) {
 		<View style={styles.grid}>
 			{posts.map((post) => (
 				<View style={styles.item} key={post.id}>
-					<PostCard {...toPostCardProps(post)} compact />
+					<PostCard {...toPostCardProps(post)} />
 				</View>
 			))}
 		</View>
@@ -18,6 +18,6 @@ export function PostGrid({ posts }: { posts: Post[] }) {
 }
 
 const styles = StyleSheet.create({
-	grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-	item: { width: "48%" },
+	grid: { gap: 22, alignItems: "center" },
+	item: { width: "100%" },
 });
