@@ -42,8 +42,15 @@ export function usePostFeed(
 				const profiles = new Map(
 					(profilesResult.data || []).map((profile) => [profile.id, profile]),
 				);
+				const postsWithImages = await Promise.all(
+					postRows.map(async (post) => ({
+						...post,
+						image_url: await resolvePostImageUrl(post.image_url),
+					})),
+				);
+				if (!active) return;
 				setPosts(
-					postRows.map((post) => {
+					postsWithImages.map((post) => {
 						const profile = profiles.get(post.profile_id);
 						return {
 							...post,
@@ -63,4 +70,45 @@ export function usePostFeed(
 	}, [authorId, enabled, limit]);
 
 	return { posts, loading };
+}
+
+async function resolvePostImageUrl(imageValue: string | undefined) {
+	if (!imageValue?.trim()) return "";
+
+	const storagePath = getPostImagePath(imageValue);
+	if (!storagePath) return imageValue;
+
+	const { data } = await supabase.storage
+		.from("post-images")
+		.createSignedUrl(storagePath, 60 * 60);
+	const publicUrl = supabase.storage
+		.from("post-images")
+		.getPublicUrl(storagePath).data.publicUrl;
+
+	return data?.signedUrl || publicUrl || imageValue;
+}
+
+function getPostImagePath(imageValue: string) {
+	if (!/^https?:\/\//i.test(imageValue)) return imageValue;
+
+	try {
+		const pathname = decodeURIComponent(new URL(imageValue).pathname);
+		const marker = "/storage/v1/object/";
+		const markerIndex = pathname.indexOf(marker);
+		if (markerIndex === -1) return null;
+
+		const bucketAndPath = pathname.slice(markerIndex + marker.length);
+		const publicPrefix = "public/post-images/";
+		const signedPrefix = "sign/post-images/";
+		if (bucketAndPath.startsWith(publicPrefix)) {
+			return bucketAndPath.slice(publicPrefix.length);
+		}
+		if (bucketAndPath.startsWith(signedPrefix)) {
+			return bucketAndPath.slice(signedPrefix.length);
+		}
+	} catch {
+		return null;
+	}
+
+	return null;
 }

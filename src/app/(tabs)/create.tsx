@@ -93,14 +93,11 @@ export default function CreateScreen() {
 					upsert: true,
 				});
 			if (upload.error) throw upload.error;
-			const imageUrl = supabase.storage
-				.from("post-images")
-				.getPublicUrl(path).data.publicUrl;
 			await createPost({
 				title: title.trim(),
 				description: description.trim(),
 				difficulty,
-				imageUrl,
+				imageUrl: path,
 				authorUsername: currentUser.username,
 				recipeJson: {
 					ingredients: parsedIngredients,
