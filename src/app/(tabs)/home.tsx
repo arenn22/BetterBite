@@ -8,6 +8,8 @@ import {
 	fetchDietaryRestrictions,
 	fetchFriendRequests,
 	fetchFriends,
+	fetchPostByCuisines,
+	fetchPostsByDietaryRestrictions,
 	fetchUserProfile,
 	respondToFriendRequest,
 	searchUsers,
@@ -63,6 +65,14 @@ export default function HomeScreen() {
 	const [friends, setFriends] = useState<any[]>([]);
 	const [friendRequests, setFriendRequests] = useState<any[]>([]);
 	const [communityLoading, setCommunityLoading] = useState(false);
+	const [dietaryTestLoading, setDietaryTestLoading] = useState(false);
+	const [cuisineTestLoading, setCuisineTestLoading] = useState(false);
+	const [dietaryTestSelected, setDietaryTestSelected] = useState<number[]>([]);
+	const [cuisineTestSelected, setCuisineTestSelected] = useState<number[]>([]);
+	const [dietaryTestPosts, setDietaryTestPosts] = useState<any[]>([]);
+	const [cuisineTestPosts, setCuisineTestPosts] = useState<any[]>([]);
+	const [dietaryTestSummary, setDietaryTestSummary] = useState("No dietary filter test run yet.");
+	const [cuisineTestSummary, setCuisineTestSummary] = useState("No cuisine filter test run yet.");
 
 	// 1. Fetch tags from the database on component mount
 	useEffect(() => {
@@ -196,6 +206,68 @@ export default function HomeScreen() {
 			.map((line) => line.trim())
 			.map((line) => line.replace(/^\d+[.)-]\s*/, "").trim())
 			.filter(Boolean);
+	};
+
+	const toggleDietaryTestFilter = (id: number) => {
+		setDietaryTestSelected((prev) =>
+			prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]
+		);
+	};
+
+	const toggleCuisineTestFilter = (id: number) => {
+		setCuisineTestSelected((prev) =>
+			prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]
+		);
+	};
+
+	const runDietaryFilterTest = async () => {
+		const ids = dietaryTestSelected;
+		if (ids.length === 0) {
+			Alert.alert("No dietary tags selected", "Select at least one dietary restriction to test the filter.");
+			return;
+		}
+
+		setDietaryTestLoading(true);
+		try {
+			const posts = await fetchPostsByDietaryRestrictions(ids);
+			setDietaryTestPosts(posts);
+			setDietaryTestSummary(
+				posts.length
+					? `Loaded ${posts.length} post(s) for dietary restriction IDs: ${ids.join(", ")}`
+					: `No posts found for dietary restriction IDs: ${ids.join(", ")}. The IDs may not be linked to any recipe posts yet.`
+			);
+		} catch (error: any) {
+			setDietaryTestPosts([]);
+			setDietaryTestSummary(error.message || "Failed to fetch dietary restriction posts.");
+			Alert.alert("Dietary test failed", error.message || "Could not run the dietary restriction test.");
+		} finally {
+			setDietaryTestLoading(false);
+		}
+	};
+
+	const runCuisineFilterTest = async () => {
+		const ids = cuisineTestSelected;
+		if (ids.length === 0) {
+			Alert.alert("No cuisine tags selected", "Select at least one cuisine to test the filter.");
+			return;
+		}
+
+		setCuisineTestLoading(true);
+		try {
+			const posts = await fetchPostByCuisines(ids);
+			setCuisineTestPosts(posts);
+			setCuisineTestSummary(
+				posts.length
+					? `Loaded ${posts.length} post(s) for cuisine IDs: ${ids.join(", ")}`
+					: `No posts found for cuisine IDs: ${ids.join(", ")}. The IDs may not be linked to any recipe posts yet.`
+			);
+		} catch (error: any) {
+			setCuisineTestPosts([]);
+			setCuisineTestSummary(error.message || "Failed to fetch cuisine posts.");
+			Alert.alert("Cuisine test failed", error.message || "Could not run the cuisine filter test.");
+		} finally {
+			setCuisineTestLoading(false);
+		}
 	};
 
 	const activeProfileImage = profile?.pfp_url || currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE;
@@ -399,234 +471,300 @@ export default function HomeScreen() {
 	};
 
 	return (
-		<ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-			<Text style={styles.title}>New Recipe</Text>
+		<View style={styles.screenShell}>
+			<ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+				<Text style={styles.title}>New Recipe</Text>
 
-			<View style={styles.card}>
-				{/* Image Picker Box */}
-				<TouchableOpacity style={styles.imagePlaceholder} onPress={pickImage}>
-					{imageUri ? (
-						<Image source={{ uri: imageUri }} style={styles.previewImage} />
+				<View style={styles.card}>
+					{/* Image Picker Box */}
+					<TouchableOpacity style={styles.imagePlaceholder} onPress={pickImage}>
+						{imageUri ? (
+							<Image source={{ uri: imageUri }} style={styles.previewImage} />
+						) : (
+							<Text style={styles.placeholderText}>📸 Press to upload Recipe Image</Text>
+						)}
+					</TouchableOpacity>
+
+					{/* Text inputs */}
+					<Text style={styles.label}>Recipe Name</Text>
+					<TextInput
+						style={styles.input}
+						value={title}
+						onChangeText={setTitle}
+						placeholder="e.g., Spicy Creamy Pasta"
+						placeholderTextColor="#9ca3af"
+					/>
+
+					<Text style={styles.label}>Description</Text>
+					<TextInput
+						style={[styles.input, styles.textArea]}
+						value={description}
+						onChangeText={setDescription}
+						placeholder="Describe instructions or flavor details..."
+						placeholderTextColor="#9ca3af"
+						multiline
+						numberOfLines={3}
+					/>
+
+					<DifficultySlider value={difficulty} onChange={setDifficulty} />
+
+					<Text style={styles.label}>Ingredients (numbered list)</Text>
+					<TextInput
+						style={[styles.input, styles.textAreaLarge]}
+						value={ingredientsInput}
+						onChangeText={setIngredientsInput}
+						placeholder="1. Pasta\n2. Garlic\n3. Parmesan"
+						placeholderTextColor="#9ca3af"
+						multiline
+						numberOfLines={5}
+					/>
+
+					<Text style={styles.label}>Steps (numbered list)</Text>
+					<TextInput
+						style={[styles.input, styles.textAreaLarge]}
+						value={stepsInput}
+						onChangeText={setStepsInput}
+						placeholder="1. Boil the pasta\n2. Sauté garlic\n3. Combine and serve"
+						placeholderTextColor="#9ca3af"
+						multiline
+						numberOfLines={5}
+					/>
+
+					{/* Dynamic Dietary Tags */}
+					<Text style={styles.label}>Dietary Restrictions</Text>
+					{fetchingOptions ? (
+						<ActivityIndicator size="small" color="#687B5D" style={{ alignSelf: 'flex-start' }} />
 					) : (
-						<Text style={styles.placeholderText}>📸 Press to upload Recipe Image</Text>
+						<View style={styles.tagGroup}>
+							{dietaryOptions.map((option) => {
+								const isSelected = selectedRestrictions.includes(option.id);
+								return (
+									<TouchableOpacity
+										key={option.id}
+										style={[styles.tagButton, isSelected && styles.tagActive]}
+										onPress={() => toggleRestriction(option.id)}
+									>
+										<Text style={[styles.tagText, isSelected && styles.tagTextActive]}>
+											{option.name}
+										</Text>
+									</TouchableOpacity>
+								);
+							})}
+							{dietaryOptions.length === 0 && <Text style={styles.emptyText}>No dietary tags found in DB.</Text>}
+						</View>
 					)}
-				</TouchableOpacity>
 
-				{/* Text inputs */}
-				<Text style={styles.label}>Recipe Name</Text>
-				<TextInput
-					style={styles.input}
-					value={title}
-					onChangeText={setTitle}
-					placeholder="e.g., Spicy Creamy Pasta"
-					placeholderTextColor="#9ca3af"
-				/>
+					{/* Dynamic Cuisine Tags */}
+					<Text style={styles.label}>Cuisine Type</Text>
+					{fetchingOptions ? (
+						<ActivityIndicator size="small" color="#687B5D" style={{ alignSelf: 'flex-start' }} />
+					) : (
+						<View style={styles.tagGroup}>
+							{cuisineOptions.map((option) => {
+								const isSelected = selectedCuisines.includes(option.id);
+								return (
+									<TouchableOpacity
+										key={option.id}
+										style={[styles.tagButton, isSelected && styles.tagActive]}
+										onPress={() => toggleCuisine(option.id)}
+									>
+										<Text style={[styles.tagText, isSelected && styles.tagTextActive]}>
+											{option.name}
+										</Text>
+									</TouchableOpacity>
+								);
+							})}
+							{cuisineOptions.length === 0 && <Text style={styles.emptyText}>No cuisines found in DB.</Text>}
+						</View>
+					)}
 
-				<Text style={styles.label}>Description</Text>
-				<TextInput
-					style={[styles.input, styles.textArea]}
-					value={description}
-					onChangeText={setDescription}
-					placeholder="Describe instructions or flavor details..."
-					placeholderTextColor="#9ca3af"
-					multiline
-					numberOfLines={3}
-				/>
+					{/* Submit Control */}
+					<TouchableOpacity
+						style={[styles.button, (loading || fetchingOptions) && styles.buttonDisabled]}
+						onPress={handleCreateRecipePost}
+						disabled={loading || fetchingOptions}
+					>
+						{loading ? (
+							<ActivityIndicator color="#ffffff" />
+						) : (
+							<Text style={styles.buttonText}>Publish Recipe Post</Text>
+						)}
+					</TouchableOpacity>
+				</View>
 
-				<DifficultySlider value={difficulty} onChange={setDifficulty} />
+				<View style={styles.card}>
+					<Text style={styles.sectionTitle}>Community</Text>
+					{currentUser ? (
+						<>
+							<View style={styles.profileHeaderRow}>
+								<TouchableOpacity onPress={pickProfileImage} disabled={profileImageUploading}>
+									<Image
+										source={{ uri: normalizedProfileImage }}
+										style={styles.profileAvatar}
+										onError={handleProfileImageError}
+									/>
+								</TouchableOpacity>
+								<View style={styles.profileHeaderText}>
+									<Text style={styles.communityText}>
+										Signed in as {profile?.username || currentUser.username}
+									</Text>
+									<TouchableOpacity onPress={pickProfileImage} disabled={profileImageUploading}>
+										<Text style={styles.profileUploadText}>
+											{profileImageUploading ? "Uploading..." : "Upload profile photo"}
+										</Text>
+									</TouchableOpacity>
+								</View>
+							</View>
 
-				<Text style={styles.label}>Ingredients (numbered list)</Text>
-				<TextInput
-					style={[styles.input, styles.textAreaLarge]}
-					value={ingredientsInput}
-					onChangeText={setIngredientsInput}
-					placeholder="1. Pasta\n2. Garlic\n3. Parmesan"
-					placeholderTextColor="#9ca3af"
-					multiline
-					numberOfLines={5}
-				/>
+							<Text style={styles.label}>Find Users</Text>
+							<View style={styles.actionRow}>
+								<TextInput
+									style={[styles.input, styles.actionInput]}
+									value={friendSearch}
+									onChangeText={setFriendSearch}
+									placeholder="Search by username"
+									placeholderTextColor="#9ca3af"
+									onSubmitEditing={searchForUsers}
+								/>
+								<TouchableOpacity style={styles.smallButton} onPress={searchForUsers} disabled={communityLoading}>
+									<Text style={styles.buttonText}>Search</Text>
+								</TouchableOpacity>
+							</View>
 
-				<Text style={styles.label}>Steps (numbered list)</Text>
-				<TextInput
-					style={[styles.input, styles.textAreaLarge]}
-					value={stepsInput}
-					onChangeText={setStepsInput}
-					placeholder="1. Boil the pasta\n2. Sauté garlic\n3. Combine and serve"
-					placeholderTextColor="#9ca3af"
-					multiline
-					numberOfLines={5}
-				/>
+							{userResults.map((user) => (
+								<View style={styles.resultRow} key={user.id}>
+									<View>
+										<Text style={styles.resultName}>{user.display_name || user.username}</Text>
+										<Text style={styles.resultMeta}>{user.username} · {user.id}</Text>
+									</View>
+									<TouchableOpacity style={styles.smallButton} onPress={() => sendRequestToUser(user.id)} disabled={communityLoading}>
+										<Text style={styles.buttonText}>Add</Text>
+									</TouchableOpacity>
+								</View>
+							))}
 
-				{/* Dynamic Dietary Tags */}
-				<Text style={styles.label}>Dietary Restrictions</Text>
-				{fetchingOptions ? (
-					<ActivityIndicator size="small" color="#687B5D" style={{ alignSelf: 'flex-start' }} />
-				) : (
+							<Text style={styles.label}>Pending Friend Requests ({friendRequests.length})</Text>
+							{friendRequests.length > 0 ? friendRequests.map((request, index) => {
+								const senderName = request.sender_username || request.username || request.display_name || request.sender_id || "Someone";
+
+								return (
+									<View style={styles.resultRow} key={request.id || index}>
+										<Text style={styles.resultName}>{senderName} sent you a friend request</Text>
+										<View style={styles.actionRow}>
+											<TouchableOpacity style={styles.smallButton} onPress={() => respondToRequest(request.id, true)} disabled={communityLoading}>
+												<Text style={styles.buttonText}>Accept</Text>
+											</TouchableOpacity>
+											<TouchableOpacity style={styles.secondaryButton} onPress={() => respondToRequest(request.id, false)} disabled={communityLoading}>
+												<Text style={styles.secondaryButtonText}>Decline</Text>
+											</TouchableOpacity>
+										</View>
+									</View>
+								);
+							}) : <Text style={styles.emptyText}>No pending friend requests.</Text>}
+
+							<View style={styles.friendsHeader}>
+								<Text style={styles.label}>Friends ({friends.length})</Text>
+								<TouchableOpacity onPress={refreshFriends} disabled={communityLoading}>
+									<Text style={styles.refreshText}>Refresh</Text>
+								</TouchableOpacity>
+							</View>
+							{friends.length > 0 ? friends.map((friend, index) => (
+								<Text style={styles.communityText} key={friend.id || friend.friend_id || index}>
+									{friend.username || friend.display_name || friend.friend_username || friend.id || "Friend"}
+								</Text>
+							)) : <Text style={styles.emptyText}>No friends found yet.</Text>}
+						</>
+					) : (
+						<Text style={styles.emptyText}>Sign in to search for users and manage friends.</Text>
+					)}
+				</View>
+
+				<View style={styles.card}>
+					<Text style={styles.sectionTitle}>Filter Test</Text>
+					<Text style={styles.label}>Dietary restriction tags</Text>
 					<View style={styles.tagGroup}>
 						{dietaryOptions.map((option) => {
-							const isSelected = selectedRestrictions.includes(option.id);
+							const isSelected = dietaryTestSelected.includes(option.id);
 							return (
 								<TouchableOpacity
-									key={option.id}
+									key={`diet-test-${option.id}`}
 									style={[styles.tagButton, isSelected && styles.tagActive]}
-									onPress={() => toggleRestriction(option.id)}
+									onPress={() => toggleDietaryTestFilter(option.id)}
 								>
-									<Text style={[styles.tagText, isSelected && styles.tagTextActive]}>
-										{option.name}
-									</Text>
+									<Text style={[styles.tagText, isSelected && styles.tagTextActive]}>{option.name}</Text>
 								</TouchableOpacity>
 							);
 						})}
-						{dietaryOptions.length === 0 && <Text style={styles.emptyText}>No dietary tags found in DB.</Text>}
 					</View>
-				)}
+					<TouchableOpacity
+						style={[styles.inlineButton, dietaryTestLoading && styles.buttonDisabled]}
+						onPress={runDietaryFilterTest}
+						disabled={dietaryTestLoading}
+					>
+						{dietaryTestLoading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Test dietary filter</Text>}
+					</TouchableOpacity>
+					<Text style={styles.resultText}>{dietaryTestSummary}</Text>
+					{dietaryTestPosts.length > 0 ? dietaryTestPosts.slice(0, 4).map((post, index) => (
+						<Text key={`${post.id || index}-diet`} style={styles.listText}>
+							• {post.title || "Untitled post"}
+						</Text>
+					)) : <Text style={styles.emptyText}>No dietary test posts loaded yet.</Text>}
 
-				{/* Dynamic Cuisine Tags */}
-				<Text style={styles.label}>Cuisine Type</Text>
-				{fetchingOptions ? (
-					<ActivityIndicator size="small" color="#687B5D" style={{ alignSelf: 'flex-start' }} />
-				) : (
+					<Text style={[styles.label, { marginTop: 20 }]}>Cuisine tags</Text>
 					<View style={styles.tagGroup}>
 						{cuisineOptions.map((option) => {
-							const isSelected = selectedCuisines.includes(option.id);
+							const isSelected = cuisineTestSelected.includes(option.id);
 							return (
 								<TouchableOpacity
-									key={option.id}
+									key={`cuisine-test-${option.id}`}
 									style={[styles.tagButton, isSelected && styles.tagActive]}
-									onPress={() => toggleCuisine(option.id)}
+									onPress={() => toggleCuisineTestFilter(option.id)}
 								>
-									<Text style={[styles.tagText, isSelected && styles.tagTextActive]}>
-										{option.name}
-									</Text>
+									<Text style={[styles.tagText, isSelected && styles.tagTextActive]}>{option.name}</Text>
 								</TouchableOpacity>
 							);
 						})}
-						{cuisineOptions.length === 0 && <Text style={styles.emptyText}>No cuisines found in DB.</Text>}
 					</View>
-				)}
+					<TouchableOpacity
+						style={[styles.inlineButton, cuisineTestLoading && styles.buttonDisabled]}
+						onPress={runCuisineFilterTest}
+						disabled={cuisineTestLoading}
+					>
+						{cuisineTestLoading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Test cuisine filter</Text>}
+					</TouchableOpacity>
+					<Text style={styles.resultText}>{cuisineTestSummary}</Text>
+					{cuisineTestPosts.length > 0 ? cuisineTestPosts.slice(0, 4).map((post, index) => (
+						<Text key={`${post.id || index}-cuisine`} style={styles.listText}>
+							• {post.title || "Untitled post"}
+						</Text>
+					)) : <Text style={styles.emptyText}>No cuisine test posts loaded yet.</Text>}
+				</View>
+			</ScrollView>
 
-				{/* Submit Control */}
-				<TouchableOpacity
-					style={[styles.button, (loading || fetchingOptions) && styles.buttonDisabled]}
-					onPress={handleCreateRecipePost}
-					disabled={loading || fetchingOptions}
+			<View style={styles.logoutBar}>
+				<Pressable
+					style={({ hovered }) => [
+						styles.logoutButton,
+						hovered && styles.logoutButtonHover,
+						loggingOut && styles.buttonDisabled,
+					]}
+					onPress={handleLogout}
+					disabled={loggingOut}
 				>
-					{loading ? (
-						<ActivityIndicator color="#ffffff" />
-					) : (
-						<Text style={styles.buttonText}>Publish Recipe Post</Text>
-					)}
-				</TouchableOpacity>
+					<Text style={styles.logoutButtonText}>
+						{loggingOut ? "Logging out..." : "Log out"}
+					</Text>
+				</Pressable>
 			</View>
-
-			<View style={styles.card}>
-				<Text style={styles.sectionTitle}>Community</Text>
-				{currentUser ? (
-					<>
-						<View style={styles.profileHeaderRow}>
-							<TouchableOpacity onPress={pickProfileImage} disabled={profileImageUploading}>
-								<Image
-									source={{ uri: normalizedProfileImage }}
-									style={styles.profileAvatar}
-									onError={handleProfileImageError}
-								/>
-							</TouchableOpacity>
-							<View style={styles.profileHeaderText}>
-								<Text style={styles.communityText}>
-									Signed in as {profile?.username || currentUser.username}
-								</Text>
-								<TouchableOpacity onPress={pickProfileImage} disabled={profileImageUploading}>
-									<Text style={styles.profileUploadText}>
-										{profileImageUploading ? "Uploading..." : "Upload profile photo"}
-									</Text>
-								</TouchableOpacity>
-							</View>
-						</View>
-
-						<Text style={styles.label}>Find Users</Text>
-						<View style={styles.actionRow}>
-							<TextInput
-								style={[styles.input, styles.actionInput]}
-								value={friendSearch}
-								onChangeText={setFriendSearch}
-								placeholder="Search by username"
-								placeholderTextColor="#9ca3af"
-								onSubmitEditing={searchForUsers}
-							/>
-							<TouchableOpacity style={styles.smallButton} onPress={searchForUsers} disabled={communityLoading}>
-								<Text style={styles.buttonText}>Search</Text>
-							</TouchableOpacity>
-						</View>
-
-						{userResults.map((user) => (
-							<View style={styles.resultRow} key={user.id}>
-								<View>
-									<Text style={styles.resultName}>{user.display_name || user.username}</Text>
-									<Text style={styles.resultMeta}>{user.username} · {user.id}</Text>
-								</View>
-								<TouchableOpacity style={styles.smallButton} onPress={() => sendRequestToUser(user.id)} disabled={communityLoading}>
-									<Text style={styles.buttonText}>Add</Text>
-								</TouchableOpacity>
-							</View>
-						))}
-
-						<Text style={styles.label}>Pending Friend Requests ({friendRequests.length})</Text>
-						{friendRequests.length > 0 ? friendRequests.map((request, index) => {
-							const senderName = request.sender_username || request.username || request.display_name || request.sender_id || "Someone";
-
-							return (
-								<View style={styles.resultRow} key={request.id || index}>
-									<Text style={styles.resultName}>{senderName} sent you a friend request</Text>
-									<View style={styles.actionRow}>
-										<TouchableOpacity style={styles.smallButton} onPress={() => respondToRequest(request.id, true)} disabled={communityLoading}>
-											<Text style={styles.buttonText}>Accept</Text>
-										</TouchableOpacity>
-										<TouchableOpacity style={styles.secondaryButton} onPress={() => respondToRequest(request.id, false)} disabled={communityLoading}>
-											<Text style={styles.secondaryButtonText}>Decline</Text>
-										</TouchableOpacity>
-									</View>
-								</View>
-							);
-						}) : <Text style={styles.emptyText}>No pending friend requests.</Text>}
-
-						<View style={styles.friendsHeader}>
-							<Text style={styles.label}>Friends ({friends.length})</Text>
-							<TouchableOpacity onPress={refreshFriends} disabled={communityLoading}>
-								<Text style={styles.refreshText}>Refresh</Text>
-							</TouchableOpacity>
-						</View>
-						{friends.length > 0 ? friends.map((friend, index) => (
-							<Text style={styles.communityText} key={friend.id || friend.friend_id || index}>
-								{friend.username || friend.display_name || friend.friend_username || friend.id || "Friend"}
-							</Text>
-						)) : <Text style={styles.emptyText}>No friends found yet.</Text>}
-
-						<Pressable
-							style={({ hovered }) => [
-								styles.logoutButton,
-								hovered && styles.logoutButtonHover,
-								loggingOut && styles.buttonDisabled,
-							]}
-							onPress={handleLogout}
-							disabled={loggingOut}
-						>
-							<Text style={styles.logoutButtonText}>
-								{loggingOut ? "Logging out..." : "Log out"}
-							</Text>
-						</Pressable>
-					</>
-				) : (
-					<Text style={styles.emptyText}>Sign in to search for users and manage friends.</Text>
-				)}
-			</View>
-		</ScrollView>
+		</View>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: { padding: 24, backgroundColor: "#f7f7f5" },
+	screenShell: { flex: 1, backgroundColor: "#f7f7f5" },
+	container: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 170, backgroundColor: "#f7f7f5" },
 	title: { fontSize: 32, fontWeight: "700", marginBottom: 24, marginTop: 40, color: "#1f2a1f" },
-	card: { backgroundColor: "#ffffff", borderRadius: 16, padding: 20, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
+	card: { backgroundColor: "#ffffff", borderRadius: 16, padding: 20, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, elevation: 3, marginBottom: 20 },
 	sectionTitle: { fontSize: 24, fontWeight: "700", color: "#1f2a1f" },
 	communityText: { color: "#4b5563", fontSize: 14, marginTop: 6 },
 	profileHeaderRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 8, marginBottom: 4 },
@@ -656,9 +794,13 @@ const styles = StyleSheet.create({
 	tagText: { color: "#4b5563", fontSize: 14, fontWeight: "500" },
 	tagTextActive: { color: "#ffffff" },
 	button: { backgroundColor: "#687B5D", paddingVertical: 14, borderRadius: 12, marginTop: 28, alignItems: "center", justifyContent: "center" },
+	inlineButton: { backgroundColor: "#687B5D", paddingVertical: 12, borderRadius: 10, marginTop: 12, alignItems: "center", justifyContent: "center" },
 	buttonDisabled: { backgroundColor: "#a3b29a" },
 	buttonText: { color: "#ffffff", fontSize: 16, fontWeight: "600" },
-	logoutButton: { backgroundColor: "#fff1ed", paddingVertical: 13, borderRadius: 12, marginTop: 24, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#f3c8bb" },
+	resultText: { color: "#374151", fontSize: 13, marginTop: 10 },
+	listText: { color: "#1f2a1f", fontSize: 14, marginTop: 6 },
+	logoutBar: { position: "absolute", left: 16, right: 16, bottom: 90, zIndex: 20, elevation: 20 },
+	logoutButton: { backgroundColor: "#fff1ed", paddingVertical: 14, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#f3c8bb", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 10, elevation: 6 },
 	logoutButtonHover: { backgroundColor: "#e8b0a0", borderColor: "#d99582" },
 	logoutButtonText: { color: "#b45e42", fontSize: 16, fontWeight: "700" },
 	emptyText: { color: "#9ca3af", fontSize: 14, fontStyle: "italic", marginTop: 4 }
