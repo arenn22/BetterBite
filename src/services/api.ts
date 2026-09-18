@@ -187,6 +187,18 @@ export async function fetchCuisines() {
   return data || [];
 }
 
+export async function updateCuisinePreferences(
+  userId: string,
+  cuisineIds: number[],
+): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ cuisine_preferences: cuisineIds })
+    .eq("id", userId);
+
+  if (error) throw error;
+}
+
 export async function fetchUserProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')

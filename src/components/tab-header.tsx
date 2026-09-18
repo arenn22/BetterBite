@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppTheme } from "@/constants/app-theme";
 import { useAuthContext } from "@/lib/auth/auth-context";
@@ -9,6 +9,7 @@ export type TabHeaderProps = {
 	title: string;
 	subtitle: string;
 	initial?: string;
+	onSettingsPress?: () => void;
 };
 
 export function TabHeader({
@@ -16,6 +17,7 @@ export function TabHeader({
 	title,
 	subtitle,
 	initial,
+	onSettingsPress,
 }: TabHeaderProps) {
 	const { currentUser } = useAuthContext();
 	const [imageFailed, setImageFailed] = useState(false);
@@ -24,6 +26,18 @@ export function TabHeader({
 
 	return (
 		<View style={styles.container}>
+			{onSettingsPress ? (
+				<Pressable
+					accessibilityLabel="Open settings"
+					onPress={onSettingsPress}
+					style={({ pressed }) => [
+						styles.settingsButton,
+						pressed && styles.pressed,
+					]}
+				>
+					<Text style={styles.settingsIcon}>...</Text>
+				</Pressable>
+			) : null}
 			<View style={styles.copy}>
 				<Text style={styles.eyebrow}>{eyebrow}</Text>
 				<Text style={styles.title}>{title}</Text>
@@ -56,6 +70,24 @@ const styles = StyleSheet.create({
 		paddingBottom: 24,
 	},
 	copy: { flex: 1, paddingRight: 16 },
+	settingsButton: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: AppTheme.surface,
+		borderWidth: 1,
+		borderColor: AppTheme.border,
+		alignItems: "center",
+		justifyContent: "center",
+		marginRight: 12,
+	},
+	settingsIcon: {
+		color: AppTheme.accent,
+		fontSize: 16,
+		fontWeight: "800",
+		letterSpacing: 1,
+	},
+	pressed: { opacity: 0.65 },
 	eyebrow: {
 		color: AppTheme.muted,
 		fontSize: 13,

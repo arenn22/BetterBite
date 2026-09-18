@@ -1,9 +1,10 @@
+import { useRouter } from "expo-router";
 import {
-	ActivityIndicator,
-	ScrollView,
-	StyleSheet,
-	Text,
-	View,
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -20,6 +21,7 @@ import { useEffect, useState } from "react";
 type Friend = Record<string, unknown>;
 
 export default function HomeScreen() {
+	const router = useRouter();
 	const { currentUser } = useAuthContext();
 	const { posts, loading: postsLoading } = usePostFeed({ limit: 8 });
 	const [friends, setFriends] = useState<Friend[]>([]);
@@ -65,6 +67,7 @@ export default function HomeScreen() {
 					title={`Hey, ${firstName}.`}
 					subtitle="A little progress tastes good."
 					initial={firstName.charAt(0).toUpperCase()}
+					onSettingsPress={() => router.push("/settings")}
 				/>
 				<StreakCard
 					days={streak}
