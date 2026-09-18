@@ -401,3 +401,37 @@ export async function fetchPostByCuisines(cuisines: number[]): Promise<Post[]> {
 
   return [];
 }
+
+export async function fetchPostsByDifficulty(difficulty: number): Promise<Post[]> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("difficulty", difficulty);
+  if(error) {
+    console.error("Error fetching posts by difficulty:", error.message);
+    return [];
+  }
+  return (data || []) as Post[];
+}
+
+export async function likePost(postId: string, userId: string) {
+  const {error} = await supabase.rpc('like_post', {
+    p_post_id: postId,
+  });
+  if(error) {
+    console.error("Error liking post:", error.message);
+  }
+}
+
+export async function getLikedPostsByUser(userId: string): Promise<Post[]> {
+  const { data, error } = await supabase.rpc('get_liked_posts_by_user', {
+
+  });
+  if(error) {
+    console.error("Error fetching liked posts:", error.message);
+    return [];
+  }
+  else {
+    return (data || []) as Post[];
+  }
+}
