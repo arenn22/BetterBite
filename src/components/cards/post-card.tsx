@@ -1,12 +1,12 @@
 import { useState } from "react";
 import {
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+	Image,
+	Modal,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	View,
 } from "react-native";
 
 import { AppTheme } from "@/constants/app-theme";
@@ -68,7 +68,7 @@ export function PostCard({
 					{hasAuthorImage ? (
 						<Image
 							accessibilityLabel={`${username}'s profile picture`}
-							source={{ uri: profilePictureUrl }}
+							source={{ uri: profilePictureUrl?.trim() || undefined }}
 							style={styles.avatar}
 							resizeMode="cover"
 							onError={() => setAuthorImageFailed(true)}
