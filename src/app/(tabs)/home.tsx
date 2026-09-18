@@ -272,6 +272,16 @@ export default function HomeScreen() {
 
 	const activeProfileImage = profile?.pfp_url || currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE;
 	const normalizedProfileImage = activeProfileImage && activeProfileImage.trim() ? activeProfileImage : DEFAULT_PROFILE_IMAGE;
+	const currentStreak = Number(profile?.streakCount ?? profile?.streakcount ?? currentUser?.streakCount ?? currentUser?.streakcount ?? 0);
+
+	useEffect(() => {
+		console.log("DEBUG streak snapshot", {
+			currentUserId: currentUser?.id ?? null,
+			currentUserStreak: currentUser?.streakCount ?? currentUser?.streakcount ?? null,
+			profileStreak: profile?.streakCount ?? profile?.streakcount ?? null,
+			currentStreak,
+		});
+	}, [currentUser, profile, currentStreak]);
 
 	const handleProfileImageError = () => {
 		setProfile((previousProfile) =>
@@ -452,6 +462,7 @@ export default function HomeScreen() {
 			};
 
 			const newPostUuid = await createPost(postPayload);
+			await refreshCurrentUser();
 			Alert.alert("Success 🎉", `Recipe Published!\n\nID: ${newPostUuid}`);
 
 			// Reset form interface values
@@ -608,6 +619,9 @@ export default function HomeScreen() {
 									<Text style={styles.communityText}>
 										Signed in as {profile?.username || currentUser.username}
 									</Text>
+									<View style={styles.streakBadge}>
+										<Text style={styles.streakBadgeText}>🔥 {currentStreak} day streak</Text>
+									</View>
 									<TouchableOpacity onPress={pickProfileImage} disabled={profileImageUploading}>
 										<Text style={styles.profileUploadText}>
 											{profileImageUploading ? "Uploading..." : "Upload profile photo"}
@@ -770,6 +784,8 @@ const styles = StyleSheet.create({
 	profileHeaderRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 8, marginBottom: 4 },
 	profileHeaderText: { flex: 1 },
 	profileAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: "#e5e7eb", borderWidth: 2, borderColor: "#d1d5db" },
+	streakBadge: { alignSelf: "flex-start", backgroundColor: "#fff1d6", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, marginTop: 8 },
+	streakBadgeText: { color: "#b45309", fontSize: 12, fontWeight: "700" },
 	profileUploadText: { color: "#687B5D", fontSize: 13, fontWeight: "600", marginTop: 6 },
 	actionRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
 	actionInput: { flex: 1 },

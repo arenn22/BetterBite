@@ -72,7 +72,7 @@ export async function handleSignInEmail(
 
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
-    .select("username, date_joined, pfp_url")
+    .select("username, date_joined, pfp_url, streakCount, last_streak_post")
     .eq("id", data.user.id)
     .maybeSingle();
 
@@ -81,6 +81,9 @@ export async function handleSignInEmail(
   }
 
   const date = profileData?.date_joined ? new Date(profileData.date_joined) : null;
+  const streakValue = Number((profileData as any)?.streakCount ?? (profileData as any)?.streakcount ?? 0);
+  const lastStreakPost = (profileData as any)?.last_streak_post ?? (profileData as any)?.last_post_at ?? null;
+
   const authProfile: AuthResult = {
     profile: {
       id: data.user.id,
@@ -88,6 +91,10 @@ export async function handleSignInEmail(
       email: data.user.email || email,
       date_joined: date,
       pfp_url: profileData?.pfp_url || DEFAULT_PROFILE_IMAGE,
+      streakCount: streakValue,
+      streakcount: streakValue,
+      last_streak_post: lastStreakPost,
+      last_post_at: lastStreakPost,
     },
     error: null,
   };
@@ -186,14 +193,26 @@ export async function fetchUserProfile(userId: string): Promise<Profile | null> 
     .select('*')
     .eq('id', userId)
     .maybeSingle();
-  
+
   if (error) {
     console.error('Error fetching user profile:', error.message);
     return null;
   }
-  else {
-    return data as Profile | null;
+
+  if (!data) {
+    return null;
   }
+
+  const streakValue = Number((data as any).streakCount ?? (data as any).streakcount ?? 0);
+  const lastStreakPost = (data as any).last_streak_post ?? (data as any).last_post_at ?? null;
+
+  return {
+    ...data,
+    streakCount: streakValue,
+    streakcount: streakValue,
+    last_streak_post: lastStreakPost,
+    last_post_at: lastStreakPost,
+  } as Profile;
 } 
 
 export async function searchUsers(searchQuery: string): Promise<Pick<Profile, 'id' | 'username'>[]> {

@@ -4,6 +4,10 @@ export interface Profile {
 	email : string;
 	date_joined : Date | string | null;
 	pfp_url? : string | null;
+	streakCount?: number | null;
+	last_streak_post?: Date | string | null;
+	streakcount?: number | null;
+	last_post_at?: Date | string | null;
 }
 
 export interface AuthResult {

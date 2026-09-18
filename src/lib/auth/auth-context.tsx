@@ -1,10 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import {
-	fetchUserProfile,
-	handleSignInEmail,
-	handleSignInUsername,
-	handleSignUp,
-	signOut as signOutFromSupabase,
+    fetchUserProfile,
+    handleSignInEmail,
+    handleSignInUsername,
+    handleSignUp,
+    signOut as signOutFromSupabase,
 } from "@/services/api";
 import { Profile } from "@/types/auth";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -62,6 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						? new Date(session.user.created_at)
 						: null,
 					pfp_url: session.user.user_metadata?.pfp_url ?? null,
+					streakCount: 0,
+					last_streak_post: null,
+					streakcount: 0,
+					last_post_at: null,
 				},
 			);
 		}
@@ -168,6 +172,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		if (!currentUser) return;
 
 		const refreshedProfile = await fetchUserProfile(currentUser.id);
+		console.log("DEBUG refreshCurrentUser", {
+			userId: currentUser.id,
+			refreshedProfile,
+			streakCount: refreshedProfile?.streakCount ?? refreshedProfile?.streakcount ?? null,
+		});
 		if (refreshedProfile) {
 			setCurrentUser(refreshedProfile);
 		}
