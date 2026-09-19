@@ -1,3 +1,12 @@
+import DifficultySlider from "@/components/difficulty-slider";
+import { AppTheme } from "@/constants/app-theme";
+import { useRecipeOptions } from "@/hooks/use-recipe-options";
+import { useAuthContext } from "@/lib/auth/auth-context";
+import {
+    fetchUserProfile,
+    set_my_dietary_restrictions,
+    set_my_experience_level,
+} from "@/services/api";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -11,70 +20,101 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppTheme } from "@/constants/app-theme";
-import { useAuthContext } from "@/lib/auth/auth-context";
-import {
-    fetchCuisines,
-    fetchUserProfile,
-    updateCuisinePreferences,
-} from "@/services/api";
+function normalizeNumberArray(value: unknown): number[] {
+	if (!value) return [];
+	if (Array.isArray(value)) {
+		return value
+			.map((item) => Number(item))
+			.filter((item) => Number.isFinite(item));
+	}
+	if (typeof value === "string") {
+		return value
+			.split(",")
+			.map((item) => Number(item.trim()))
+			.filter((item) => Number.isFinite(item));
+	}
+	return [];
+}
+
+function normalizeExperienceLevel(value: unknown): number {
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) return 2;
+	return Math.min(5, Math.max(1, Math.round(parsed)));
+}
 
 export default function SettingsScreen() {
 	const router = useRouter();
-	const { currentUser, signOut } = useAuthContext();
-	const [cuisines, setCuisines] = useState<{ id: number; name: string }[]>([]);
-	const [selectedIds, setSelectedIds] = useState<number[]>(
-		currentUser?.cuisine_preferences || [],
-	);
+	const { currentUser, refreshCurrentUser, signOut } = useAuthContext();
+	const { dietaryOptions, loading: loadingOptions } = useRecipeOptions();
+	const [selectedRestrictionIds, setSelectedRestrictionIds] = useState<number[]>([]);
+	const [experienceLevel, setExperienceLevel] = useState(2);
 	const [loading, setLoading] = useState(true);
-	const [saving, setSaving] = useState(false);
+	const [savingProfile, setSavingProfile] = useState(false);
 	const [signingOut, setSigningOut] = useState(false);
 
 	useEffect(() => {
 		if (!currentUser) return;
 		let active = true;
+
 		async function loadSettings() {
 			try {
-				const [cuisineOptions, profile] = await Promise.all([
-					fetchCuisines(),
-					fetchUserProfile(currentUser.id),
-				]);
+				const profile = await fetchUserProfile(currentUser.id);
 				if (!active) return;
-				setCuisines(cuisineOptions);
-				setSelectedIds(profile?.cuisine_preferences || []);
+				const profileExtras = profile as typeof profile & {
+					experience_level?: number | null;
+					experienceLevel?: number | null;
+					dietary_restrictions?: number[] | null;
+					dietaryRestrictions?: number[] | null;
+				};
+
+				setSelectedRestrictionIds(
+					normalizeNumberArray(
+						profileExtras?.dietary_restrictions ?? profileExtras?.dietaryRestrictions,
+					),
+				);
+				setExperienceLevel(
+					normalizeExperienceLevel(
+						profileExtras?.experience_level ?? profileExtras?.experienceLevel,
+					),
+				);
 			} catch {
 				if (active) Alert.alert("Unable to load settings", "Please try again.");
 			} finally {
 				if (active) setLoading(false);
 			}
 		}
+
 		void loadSettings();
 		return () => {
 			active = false;
 		};
 	}, [currentUser]);
 
-	function toggleCuisine(id: number) {
-		setSelectedIds((current) =>
+	function toggleCollection(id: number, setter: React.Dispatch<React.SetStateAction<number[]>>) {
+		setter((current) =>
 			current.includes(id)
-				? current.filter((cuisineId) => cuisineId !== id)
+				? current.filter((value) => value !== id)
 				: [...current, id],
 		);
 	}
 
-	async function savePreferences() {
+	async function saveProfilePreferences() {
 		if (!currentUser) return;
-		setSaving(true);
+		setSavingProfile(true);
 		try {
-			await updateCuisinePreferences(currentUser.id, selectedIds);
-			Alert.alert("Preferences saved", "Your cuisine preferences are up to date.");
+			await Promise.all([
+				set_my_dietary_restrictions(selectedRestrictionIds),
+				set_my_experience_level(experienceLevel),
+			]);
+			await refreshCurrentUser();
+			Alert.alert("Profile updated", "Your experience and dietary preferences were saved.");
 		} catch {
 			Alert.alert(
-				"Could not save preferences",
-				"Add the cuisine_preferences field to profiles before saving preferences.",
+				"Could not save profile settings",
+				"Please check your account permissions and try again.",
 			);
 		} finally {
-			setSaving(false);
+			setSavingProfile(false);
 		}
 	}
 
@@ -92,33 +132,48 @@ export default function SettingsScreen() {
 
 	return (
 		<SafeAreaView style={styles.safeArea} edges={["top"]}>
-			<ScrollView contentContainerStyle={styles.content}>
+			<ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 				<Pressable onPress={() => router.back()} style={styles.backButton}>
 					<Text style={styles.backText}>Back</Text>
 				</Pressable>
 				<Text style={styles.eyebrow}>Your account</Text>
 				<Text style={styles.title}>Settings</Text>
-				<Text style={styles.subtitle}>
-					Choose the flavors you want to see more often.
-				</Text>
+				<Text style={styles.subtitle}>Tune the recipes and the kitchen experience you want to see.</Text>
 
 				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Cuisine preferences</Text>
-					<Text style={styles.sectionHint}>Select all that sound good.</Text>
+					<Text style={styles.sectionTitle}>Experience level</Text>
+					<Text style={styles.sectionHint}>Set the difficulty range you want in your feed.</Text>
 					{loading ? (
 						<ActivityIndicator color={AppTheme.accent} style={styles.loading} />
 					) : (
+						<DifficultySlider value={experienceLevel} onChange={setExperienceLevel} />
+					)}
+					<Pressable
+						disabled={loading || savingProfile}
+						onPress={saveProfilePreferences}
+						style={[styles.saveButton, (loading || savingProfile) && styles.disabled]}
+					>
+						<Text style={styles.saveText}>{savingProfile ? "Saving..." : "Save profile"}</Text>
+					</Pressable>
+				</View>
+
+				<View style={styles.section}>
+					<Text style={styles.sectionTitle}>Dietary restrictions</Text>
+					<Text style={styles.sectionHint}>Choose the tags that fit your eating preferences.</Text>
+					{loadingOptions ? (
+						<ActivityIndicator color={AppTheme.accent} style={styles.loading} />
+					) : (
 						<View style={styles.options}>
-							{cuisines.map((cuisine) => {
-								const selected = selectedIds.includes(cuisine.id);
+							{dietaryOptions.map((option) => {
+								const selected = selectedRestrictionIds.includes(option.id);
 								return (
 									<Pressable
-										key={cuisine.id}
-										onPress={() => toggleCuisine(cuisine.id)}
+										key={option.id}
+										onPress={() => toggleCollection(option.id, setSelectedRestrictionIds)}
 										style={[styles.option, selected && styles.selectedOption]}
 									>
 										<Text style={[styles.optionText, selected && styles.selectedOptionText]}>
-											{cuisine.name}
+											{option.name}
 										</Text>
 									</Pressable>
 								);
@@ -126,11 +181,11 @@ export default function SettingsScreen() {
 						</View>
 					)}
 					<Pressable
-						disabled={loading || saving}
-						onPress={savePreferences}
-						style={[styles.saveButton, (loading || saving) && styles.disabled]}
+						disabled={loadingOptions || savingProfile}
+						onPress={saveProfilePreferences}
+						style={[styles.saveButton, (loadingOptions || savingProfile) && styles.disabled]}
 					>
-						<Text style={styles.saveText}>{saving ? "Saving..." : "Save preferences"}</Text>
+						<Text style={styles.saveText}>{savingProfile ? "Saving..." : "Save dietary choices"}</Text>
 					</Pressable>
 				</View>
 
@@ -148,7 +203,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
 	safeArea: { flex: 1, backgroundColor: AppTheme.background },
-	content: { padding: 20, paddingBottom: 40 },
+	content: { padding: 20, paddingBottom: 48 },
 	backButton: { alignSelf: "flex-start", paddingVertical: 8, paddingRight: 12 },
 	backText: { color: AppTheme.accent, fontSize: 14, fontWeight: "700" },
 	eyebrow: { color: AppTheme.muted, fontSize: 13, marginTop: 22 },
