@@ -8,15 +8,15 @@ import { createPost } from "@/services/api";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import {
-	ActivityIndicator,
-	Alert,
-	Image,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
 		alignSelf: "center",
 		paddingHorizontal: 20,
 		paddingTop: 18,
-		paddingBottom: 48,
+		paddingBottom: 120,
 	},
 	imageBox: {
 		height: 190,
