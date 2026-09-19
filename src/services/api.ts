@@ -478,6 +478,19 @@ export async function get_posts_by_profile_experience() {
   }
 }
 
+export async function set_my_dietary_restrictions(restrictionIds: number[]) {
+  const {error} = await supabase.rpc('set_my_dietary_restrictions', { p_restriction_ids: restrictionIds });
+  if(error) {
+    console.error("Error setting dietary restrictions:", error.message);
+  }
+}
+
+export async function set_my_experience_level(difficulty: number) {
+  const {error} = await supabase.rpc('set_my_experience_level', { p_difficulty: difficulty });
+  if(error) {
+    console.error("Error setting experience level:", error.message);
+  }
+}
 
 
 export async function get_recommended_posts() {
