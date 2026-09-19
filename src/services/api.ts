@@ -447,3 +447,33 @@ export async function getLikedPostsByUser(userId: string): Promise<Post[]> {
     return (data || []) as Post[];
   }
 }
+
+export async function get_post_by_profile_restrictions() { //USE FOR HOME SCREEN
+
+  const {data: restrictions, error} = await supabase.rpc('get_my_dietary_restrictions');
+  if(error) {
+    console.error("Error fetching profile restrictions:", error.message);
+    return [];
+  }
+  else {
+    const {data: posts, error} = await supabase.rpc('get_posts_by_dietary_restrictions', { p_restriction_ids: restrictions });
+    if(error) {
+      console.error("Error fetching posts by dietary restrictions:", error.message);
+      return [];
+    }
+    else {
+      return (posts || []) as Post[];
+    }
+  }
+}
+
+export async function get_posts_by_profile_experience() { //USE FOR HOME SCREEN 
+  const {data: posts, error} = await supabase.rpc('get_posts_by_experience_level');
+  if(error) {
+    console.error("Error fetching posts by experience level:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
