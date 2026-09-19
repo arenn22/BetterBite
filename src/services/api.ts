@@ -486,7 +486,7 @@ export async function set_my_dietary_restrictions(restrictionIds: number[]) {
 }
 
 export async function set_my_experience_level(difficulty: number) {
-  const {error} = await supabase.rpc('set_my_experience_level', { p_difficulty: difficulty });
+  const {error} = await supabase.rpc('set_my_experience_level', { p_experience_level: difficulty });
   if(error) {
     console.error("Error setting experience level:", error.message);
   }
