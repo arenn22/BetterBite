@@ -5,6 +5,10 @@ export interface Profile {
 	date_joined : Date | string | null;
 	pfp_url? : string | null;
 	cuisine_preferences?: number[] | null;
+	experience_level?: number | null;
+	experienceLevel?: number | null;
+	dietary_restrictions?: number[] | null;
+	dietaryRestrictions?: number[] | null;
 	streakCount?: number | null;
 	last_streak_post?: Date | string | null;
 	streakcount?: number | null;
