@@ -72,7 +72,7 @@ export function usePostFeed(
 	return { posts, loading };
 }
 
-async function resolvePostImageUrl(imageValue: string | undefined) {
+export async function resolvePostImageUrl(imageValue: string | undefined) {
 	if (!imageValue?.trim()) return "";
 
 	const storagePath = getPostImagePath(imageValue);
@@ -88,7 +88,7 @@ async function resolvePostImageUrl(imageValue: string | undefined) {
 	return data?.signedUrl || publicUrl || imageValue;
 }
 
-function getPostImagePath(imageValue: string) {
+export function getPostImagePath(imageValue: string) {
 	if (!/^https?:\/\//i.test(imageValue)) return imageValue;
 
 	try {
