@@ -1,21 +1,24 @@
 import { useRouter } from "expo-router";
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+	ActivityIndicator,
+	ScrollView,
+	StyleSheet,
+	Text,
+	View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { PostCard } from "@/components/cards/post-card";
 import { PostGrid } from "@/components/cards/post-grid";
 import { StreakCard } from "@/components/cards/streak-card";
 import { SectionHeading } from "@/components/section-heading";
 import { TabHeader } from "@/components/tab-header";
 import { AppTheme } from "@/constants/app-theme";
-import { usePostFeed } from "@/hooks/use-post-feed";
+import { resolvePostImageUrl, usePostFeed } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
-import { fetchFriends, fetchUserProfile } from "@/services/api";
+import { toPostCardProps } from "@/lib/post-card-data";
+import { fetchFriends, fetchUserProfile, get_recommended_posts } from "@/services/api";
+import type { Post } from "@/types/models";
 import { useEffect, useState } from "react";
 
 type Friend = Record<string, unknown>;
@@ -25,6 +28,8 @@ export default function HomeScreen() {
 	const { currentUser } = useAuthContext();
 	const { posts, loading: postsLoading } = usePostFeed({ limit: 8 });
 	const [friends, setFriends] = useState<Friend[]>([]);
+	const [recommendedPosts, setRecommendedPosts] = useState<Post[]>([]);
+	const [recommendedLoading, setRecommendedLoading] = useState(true);
 	const [streak, setStreak] = useState(0);
 	const firstName = currentUser?.username?.split(/[._-]/)[0] || "friend";
 
@@ -56,6 +61,32 @@ export default function HomeScreen() {
 		};
 	}, [currentUser]);
 
+	useEffect(() => {
+		let active = true;
+		async function loadRecommended() {
+			try {
+				const matches = await get_recommended_posts();
+				if (!active) return;
+				const resolvedMatches = await Promise.all(
+					(matches || []).map(async (post) => ({
+						...post,
+						image_url: await resolvePostImageUrl(post.image_url),
+					})),
+				);
+				setRecommendedPosts(resolvedMatches);
+			} catch {
+				if (!active) return;
+				setRecommendedPosts([]);
+			} finally {
+				if (active) setRecommendedLoading(false);
+			}
+		}
+		void loadRecommended();
+		return () => {
+			active = false;
+		};
+	}, []);
+
 	return (
 		<SafeAreaView style={styles.safeArea} edges={["top"]}>
 			<ScrollView
@@ -77,6 +108,29 @@ export default function HomeScreen() {
 							: "Share a recipe to start your streak."
 					}
 				/>
+				<View style={styles.section}>
+					<SectionHeading
+						title="Recommended for you"
+						subtitle="Hand-picked matches based on your tastes."
+					/>
+				</View>
+				{recommendedLoading ? (
+					<ActivityIndicator color={AppTheme.accent} style={styles.loading} />
+				) : recommendedPosts.length ? (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.recommendedRow}
+					>
+						{recommendedPosts.slice(0, 6).map((post) => (
+							<View style={styles.recommendedCard} key={post.id}>
+								<PostCard {...toPostCardProps(post)} />
+							</View>
+						))}
+					</ScrollView>
+				) : (
+					<Text style={styles.empty}>No recommendations yet. Try updating your preferences.</Text>
+				)}
 				<View style={styles.section}>
 					<SectionHeading
 						title="Your circle"
@@ -179,6 +233,8 @@ const styles = StyleSheet.create({
 		marginTop: 6,
 		maxWidth: 58,
 	},
+	recommendedRow: { gap: 16, paddingRight: 20, paddingBottom: 8 },
+	recommendedCard: { width: 290 },
 	loading: { marginTop: 24 },
 	empty: { color: AppTheme.muted, fontSize: 14, lineHeight: 21 },
 });
