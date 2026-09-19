@@ -448,7 +448,7 @@ export async function getLikedPostsByUser(userId: string): Promise<Post[]> {
   }
 }
 
-export async function get_post_by_profile_restrictions() { //USE FOR HOME SCREEN
+export async function get_post_by_profile_restrictions() { 
 
   const {data: restrictions, error} = await supabase.rpc('get_my_dietary_restrictions');
   if(error) {
@@ -467,7 +467,7 @@ export async function get_post_by_profile_restrictions() { //USE FOR HOME SCREEN
   }
 }
 
-export async function get_posts_by_profile_experience() { //USE FOR HOME SCREEN 
+export async function get_posts_by_profile_experience() { 
   const {data: posts, error} = await supabase.rpc('get_posts_by_experience_level');
   if(error) {
     console.error("Error fetching posts by experience level:", error.message);
@@ -477,3 +477,18 @@ export async function get_posts_by_profile_experience() { //USE FOR HOME SCREEN
     return (posts || []) as Post[];
   }
 }
+
+
+
+export async function get_recommended_posts() {
+  const {data: posts, error} = await supabase.rpc('get_recommended_posts');
+  if(error) {
+    console.error("Error fetching recommended posts:", error.message);
+    return [];
+  }
+  else {
+    
+    return (posts || []) as Post[];
+  }
+}
+//ULTIMATE HOME SCREEN FUNCTION ^
