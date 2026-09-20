@@ -13,14 +13,14 @@ export default function DifficultySlider({
 		<View style={styles.container}>
 			<View style={styles.headerRow}>
 				<Text style={styles.label}>Difficulty</Text>
-				<Text style={styles.value}>{value} / 5</Text>
+				<Text style={styles.value}>{value} / 10</Text>
 			</View>
 
 			<input
 				aria-label="Difficulty"
 				 type="range"
 				min={1}
-				max={5}
+				max={10}
 				step={1}
 				value={value}
 				onChange={(event) => onChange(Number(event.currentTarget.value))}

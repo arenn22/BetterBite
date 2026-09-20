@@ -42,7 +42,7 @@ function normalizeNumberArray(value: unknown): number[] {
 function normalizeExperienceLevel(value: unknown): number {
 	const parsed = Number(value);
 	if (!Number.isFinite(parsed)) return 2;
-	return Math.min(5, Math.max(1, Math.round(parsed)));
+	return Math.min(10, Math.max(1, Math.round(parsed)));
 }
 
 export default function SettingsScreen() {
