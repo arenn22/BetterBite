@@ -20,9 +20,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-function parseList(value: string) {
+function parseList(value: string[]) {
 	return value
-		.split(/\r?\n/)
 		.map((line) => line.replace(/^\d+[.)-]\s*/, "").trim())
 		.filter(Boolean);
 }
@@ -36,8 +35,8 @@ export default function CreateScreen() {
 	} = useRecipeOptions();
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
-	const [ingredients, setIngredients] = useState("");
-	const [steps, setSteps] = useState("");
+	const [ingredients, setIngredients] = useState([""]);
+	const [steps, setSteps] = useState([""]);
 	const [difficulty, setDifficulty] = useState(2);
 	const [imageUri, setImageUri] = useState<string | null>(null);
 	const [restrictions, setRestrictions] = useState<number[]>([]);
@@ -62,6 +61,32 @@ export default function CreateScreen() {
 		});
 		if (!result.canceled && result.assets[0]?.uri)
 			setImageUri(result.assets[0].uri);
+	}
+
+	function updateListValue(
+		index: number,
+		value: string,
+		setter: React.Dispatch<React.SetStateAction<string[]>>,
+	) {
+		setter((current) => {
+			const next = [...current];
+			next[index] = value;
+			return next;
+		});
+	}
+
+	function addListItem(setter: React.Dispatch<React.SetStateAction<string[]>>) {
+		setter((current) => [...current, ""]);
+	}
+
+	function removeListItem(
+		index: number,
+		setter: React.Dispatch<React.SetStateAction<string[]>>,
+	) {
+		setter((current) => {
+			if (current.length === 1) return [""];
+			return current.filter((_, itemIndex) => itemIndex !== index);
+		});
 	}
 
 	async function publish() {
@@ -109,8 +134,8 @@ export default function CreateScreen() {
 			await refreshCurrentUser();
 			setTitle("");
 			setDescription("");
-			setIngredients("");
-			setSteps("");
+			setIngredients([""]);
+			setSteps([""]);
 			setDifficulty(2);
 			setImageUri(null);
 			setRestrictions([]);
@@ -188,23 +213,53 @@ export default function CreateScreen() {
 				/>
 				<DifficultySlider value={difficulty} onChange={setDifficulty} />
 				<Text style={styles.label}>Ingredients</Text>
-				<TextInput
-					value={ingredients}
-					onChangeText={setIngredients}
-					style={[styles.input, styles.largeArea]}
-					multiline
-					placeholder="1. Pasta\n2. Garlic\n3. Parmesan"
-					placeholderTextColor="#9AA59D"
-				/>
+				{ingredients.map((item, index) => (
+					<View key={`ingredient-${index}`} style={styles.listRow}>
+						<Text style={styles.listIndex}>{index + 1}.</Text>
+						<TextInput
+							value={item}
+							onChangeText={(value) => updateListValue(index, value, setIngredients)}
+							style={[styles.input, styles.listInput]}
+							placeholder={`Ingredient ${index + 1}`}
+							placeholderTextColor="#9AA59D"
+						/>
+						{ingredients.length > 1 && (
+							<TouchableOpacity
+								onPress={() => removeListItem(index, setIngredients)}
+								style={styles.listRemove}
+							>
+								<Text style={styles.listRemoveText}>−</Text>
+							</TouchableOpacity>
+						)}
+					</View>
+				))}
+				<TouchableOpacity onPress={() => addListItem(setIngredients)} style={styles.addListButton}>
+					<Text style={styles.addListText}>+ Add ingredient</Text>
+				</TouchableOpacity>
 				<Text style={styles.label}>Steps</Text>
-				<TextInput
-					value={steps}
-					onChangeText={setSteps}
-					style={[styles.input, styles.largeArea]}
-					multiline
-					placeholder="1. Boil the pasta\n2. Sauté the garlic\n3. Combine and serve"
-					placeholderTextColor="#9AA59D"
-				/>
+				{steps.map((item, index) => (
+					<View key={`step-${index}`} style={styles.listRow}>
+						<Text style={styles.listIndex}>{index + 1}.</Text>
+						<TextInput
+							value={item}
+							onChangeText={(value) => updateListValue(index, value, setSteps)}
+							style={[styles.input, styles.listInput]}
+							placeholder={`Step ${index + 1}`}
+							placeholderTextColor="#9AA59D"
+						/>
+						{steps.length > 1 && (
+							<TouchableOpacity
+								onPress={() => removeListItem(index, setSteps)}
+								style={styles.listRemove}
+							>
+								<Text style={styles.listRemoveText}>−</Text>
+							</TouchableOpacity>
+						)}
+					</View>
+				))}
+				<TouchableOpacity onPress={() => addListItem(setSteps)} style={styles.addListButton}>
+					<Text style={styles.addListText}>+ Add step</Text>
+				</TouchableOpacity>
 				<Text style={styles.label}>Dietary restrictions</Text>
 				{loadingOptions ? (
 					<ActivityIndicator color="#688A5E" />
@@ -329,6 +384,49 @@ const styles = StyleSheet.create({
 	},
 	textArea: { minHeight: 88, textAlignVertical: "top" },
 	largeArea: { minHeight: 126, textAlignVertical: "top" },
+	listRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+		marginBottom: 10,
+	},
+	listIndex: {
+		color: AppTheme.muted,
+		fontSize: 14,
+		fontWeight: "700",
+		width: 22,
+	},
+	listInput: {
+		flex: 1,
+		minHeight: 46,
+	},
+	listRemove: {
+		width: 28,
+		height: 28,
+		borderRadius: 14,
+		backgroundColor: AppTheme.accentSoft,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	listRemoveText: {
+		color: AppTheme.accent,
+		fontSize: 18,
+		fontWeight: "700",
+	},
+	addListButton: {
+		alignSelf: "flex-start",
+		marginTop: 6,
+		marginBottom: 18,
+		paddingVertical: 8,
+		paddingHorizontal: 10,
+		borderRadius: 10,
+		backgroundColor: AppTheme.accentSoft,
+	},
+	addListText: {
+		color: AppTheme.accent,
+		fontSize: 13,
+		fontWeight: "700",
+	},
 	tags: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 	tag: {
 		backgroundColor: AppTheme.surface,

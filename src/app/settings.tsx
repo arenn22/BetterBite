@@ -6,12 +6,15 @@ import {
     fetchUserProfile,
     set_my_dietary_restrictions,
     set_my_experience_level,
+    updateProfilePhoto,
 } from "@/services/api";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -48,6 +51,7 @@ export default function SettingsScreen() {
 	const { dietaryOptions, loading: loadingOptions } = useRecipeOptions();
 	const [selectedRestrictionIds, setSelectedRestrictionIds] = useState<number[]>([]);
 	const [experienceLevel, setExperienceLevel] = useState(2);
+	const [uploadingPhoto, setUploadingPhoto] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [savingProfile, setSavingProfile] = useState(false);
 	const [signingOut, setSigningOut] = useState(false);
@@ -98,6 +102,40 @@ export default function SettingsScreen() {
 		);
 	}
 
+	async function pickProfilePhoto() {
+		if (!currentUser) return;
+
+		const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+		if (!permission.granted) {
+			Alert.alert("Permission required", "Allow photo access to update your profile picture.");
+			return;
+		}
+
+		const result = await ImagePicker.launchImageLibraryAsync({
+			mediaTypes: ImagePicker.MediaTypeOptions.Images,
+			allowsEditing: true,
+			aspect: [1, 1],
+			quality: 0.8,
+		});
+
+		if (result.canceled || !result.assets[0]?.uri) return;
+
+		setUploadingPhoto(true);
+		try {
+			const publicUrl = await updateProfilePhoto(currentUser.id, result.assets[0].uri);
+			await refreshCurrentUser();
+			Alert.alert("Profile photo updated", "Your new photo has been saved.");
+			console.log("Updated profile photo URL:", publicUrl);
+		} catch (error) {
+			Alert.alert(
+				"Upload failed",
+				error instanceof Error ? error.message : "Your profile photo could not be uploaded.",
+			);
+		} finally {
+			setUploadingPhoto(false);
+		}
+	}
+
 	async function saveProfilePreferences() {
 		if (!currentUser) return;
 		setSavingProfile(true);
@@ -139,6 +177,26 @@ export default function SettingsScreen() {
 				<Text style={styles.eyebrow}>Your account</Text>
 				<Text style={styles.title}>Settings</Text>
 				<Text style={styles.subtitle}>Tune the recipes and the kitchen experience you want to see.</Text>
+
+				<View style={styles.section}>
+					<Text style={styles.sectionTitle}>Profile photo</Text>
+					<Text style={styles.sectionHint}>Choose a photo to show up across the app.</Text>
+					<View style={styles.profileRow}>
+						<Image
+							source={{ uri: currentUser.pfp_url?.trim() || undefined }}
+							style={styles.profileImage}
+						/>
+						<Pressable
+							disabled={uploadingPhoto}
+							onPress={pickProfilePhoto}
+							style={[styles.photoButton, uploadingPhoto && styles.disabled]}
+						>
+							<Text style={styles.photoButtonText}>
+								{uploadingPhoto ? "Uploading..." : "Upload photo"}
+							</Text>
+						</Pressable>
+					</View>
+				</View>
 
 				<View style={styles.section}>
 					<Text style={styles.sectionTitle}>Experience level</Text>
@@ -219,6 +277,15 @@ const styles = StyleSheet.create({
 	},
 	sectionTitle: { color: AppTheme.text, fontSize: 18, fontWeight: "700" },
 	sectionHint: { color: AppTheme.muted, fontSize: 13, marginTop: 5 },
+	profileRow: { flexDirection: "row", alignItems: "center", marginTop: 18, gap: 16 },
+	profileImage: { width: 72, height: 72, borderRadius: 36, backgroundColor: AppTheme.accentSoft },
+	photoButton: {
+		backgroundColor: AppTheme.accent,
+		borderRadius: 10,
+		paddingHorizontal: 14,
+		paddingVertical: 12,
+	},
+	photoButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
 	loading: { marginVertical: 24 },
 	options: { flexDirection: "row", flexWrap: "wrap", gap: 9, marginTop: 18 },
 	option: {

@@ -227,6 +227,38 @@ export async function fetchUserProfile(userId: string): Promise<Profile | null> 
   } as Profile;
 } 
 
+export async function updateProfilePhoto(userId: string, imageUri: string): Promise<string> {
+  const filename = imageUri.split("/").pop() || `${Date.now()}.jpg`;
+  const path = `profile-photos/${userId}/${Date.now()}-${filename}`;
+  const blob = await (await fetch(imageUri)).blob();
+
+  const { error: uploadError } = await supabase.storage
+    .from("post-images")
+    .upload(path, blob, {
+      contentType: blob.type || "image/jpeg",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  const publicUrl = supabase.storage
+    .from("post-images")
+    .getPublicUrl(path).data.publicUrl;
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ pfp_url: publicUrl })
+    .eq("id", userId);
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  return publicUrl;
+}
+
 export async function searchUsers(searchQuery: string): Promise<Pick<Profile, 'id' | 'username'>[]> {
   const { data, error } = await supabase
     .from('profiles')
