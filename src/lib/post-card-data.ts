@@ -18,6 +18,8 @@ function formatPostTime(value: Date | string | undefined) {
 export function toPostCardProps(post: Post): PostCardProps {
 	const username = post.author_username || "BetterBite member";
 	return {
+		postId: post.id,
+		likeCount: post.likes || 0,
 		username,
 		initials: username.slice(0, 2).toUpperCase(),
 		profilePictureUrl: post.author_pfp_url,
