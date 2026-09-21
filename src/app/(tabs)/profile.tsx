@@ -42,6 +42,7 @@ export default function ProfileScreen() {
 	useEffect(() => {
 		if (!currentUser) return;
 		let active = true;
+		setLikedPosts([]);
 		setLikedLoading(true);
 		Promise.allSettled([
 			fetchUserProfile(currentUser.id),
@@ -177,6 +178,8 @@ export default function ProfileScreen() {
 							<Pressable
 								key={tab}
 								onPress={() => setActiveRecipeTab(tab)}
+								accessibilityRole="tab"
+								accessibilityState={{ selected: activeRecipeTab === tab }}
 								style={[
 									styles.recipeTab,
 									activeRecipeTab === tab && styles.activeRecipeTab,

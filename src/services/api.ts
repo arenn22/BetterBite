@@ -458,7 +458,7 @@ export async function fetchPostsByDifficulty(difficulty: number): Promise<Post[]
   return (data || []) as Post[];
 }
 
-export async function likePost(postId: string, userId: string) {
+export async function likePost(postId: string, _userId: string) {
   const {error} = await supabase.rpc('like_post', {
     p_post_id: postId,
   });
@@ -467,7 +467,7 @@ export async function likePost(postId: string, userId: string) {
   }
 }
 
-export async function getLikedPostsByUser(userId: string): Promise<Post[]> {
+export async function getLikedPostsByUser(_userId: string): Promise<Post[]> {
   const { data, error } = await supabase.rpc('get_liked_posts_by_user', {
 
   });
