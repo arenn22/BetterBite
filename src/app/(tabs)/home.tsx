@@ -8,23 +8,35 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { PostGrid } from "@/components/cards/post-grid";
+import { PostCard } from "@/components/cards/post-card";
 import { StreakCard } from "@/components/cards/streak-card";
 import { SectionHeading } from "@/components/section-heading";
 import { TabHeader } from "@/components/tab-header";
 import { AppTheme } from "@/constants/app-theme";
-import { usePostFeed } from "@/hooks/use-post-feed";
+import { resolvePostImageUrl } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
-import { fetchFriends, fetchUserProfile } from "@/services/api";
+import { toPostCardProps } from "@/lib/post-card-data";
+import {
+    fetchUserProfile,
+    get_challenge_posts,
+    get_easy_posts,
+    get_friend_posts,
+    get_recommended_posts,
+} from "@/services/api";
+import type { Post } from "@/types/models";
 import { useEffect, useState } from "react";
-
-type Friend = Record<string, unknown>;
 
 export default function HomeScreen() {
 	const router = useRouter();
 	const { currentUser } = useAuthContext();
-	const { posts, loading: postsLoading } = usePostFeed({ limit: 8 });
-	const [friends, setFriends] = useState<Friend[]>([]);
+	const [recommendedPosts, setRecommendedPosts] = useState<Post[]>([]);
+	const [recommendedLoading, setRecommendedLoading] = useState(true);
+	const [easyPosts, setEasyPosts] = useState<Post[]>([]);
+	const [easyLoading, setEasyLoading] = useState(true);
+	const [challengePosts, setChallengePosts] = useState<Post[]>([]);
+	const [challengeLoading, setChallengeLoading] = useState(true);
+	const [friendPosts, setFriendPosts] = useState<Post[]>([]);
+	const [friendLoading, setFriendLoading] = useState(true);
 	const [streak, setStreak] = useState(0);
 	const firstName = currentUser?.username?.split(/[._-]/)[0] || "friend";
 
@@ -33,28 +45,85 @@ export default function HomeScreen() {
 		let active = true;
 		const userId = currentUser.id;
 		async function loadCommunity() {
-			const [profileResult, friendsResult] = await Promise.allSettled([
-				fetchUserProfile(userId),
-				fetchFriends(),
-			]);
+			const profileResult = await Promise.allSettled([fetchUserProfile(userId)]);
 			if (!active) return;
-			if (profileResult.status === "fulfilled" && profileResult.value) {
+			if (profileResult[0].status === "fulfilled" && profileResult[0].value) {
 				setStreak(
 					Number(
-						profileResult.value.streakCount ??
-							profileResult.value.streakcount ??
+						profileResult[0].value.streakCount ??
+							profileResult[0].value.streakcount ??
 							0,
 					),
 				);
 			}
-			if (friendsResult.status === "fulfilled")
-				setFriends((friendsResult.value || []) as Friend[]);
 		}
 		void loadCommunity();
 		return () => {
 			active = false;
 		};
 	}, [currentUser]);
+
+	useEffect(() => {
+		let active = true;
+		async function loadRecommended() {
+			try {
+				const matches = await get_recommended_posts();
+				if (!active) return;
+				const resolvedMatches = await Promise.all(
+					(matches || []).map(async (post) => ({
+						...post,
+						image_url: await resolvePostImageUrl(post.image_url),
+					})),
+				);
+				setRecommendedPosts(resolvedMatches);
+			} catch {
+				if (!active) return;
+				setRecommendedPosts([]);
+			} finally {
+				if (active) setRecommendedLoading(false);
+			}
+		}
+		void loadRecommended();
+		return () => {
+			active = false;
+		};
+	}, []);
+
+	useEffect(() => {
+		let active = true;
+		async function loadSection(
+			fetcher: () => Promise<Post[]>,
+			setPosts: React.Dispatch<React.SetStateAction<Post[]>>,
+			setLoading: React.Dispatch<React.SetStateAction<boolean>>,
+		) {
+			try {
+				const matches = await fetcher();
+				if (!active) return;
+				const resolvedMatches = await Promise.all(
+					(matches || []).map(async (post) => ({
+						...post,
+						image_url: await resolvePostImageUrl(post.image_url),
+					})),
+				);
+				setPosts(resolvedMatches);
+			} catch {
+				if (!active) return;
+				setPosts([]);
+			} finally {
+				if (active) setLoading(false);
+			}
+		}
+
+		void Promise.all([
+			loadSection(get_easy_posts, setEasyPosts, setEasyLoading),
+			loadSection(get_challenge_posts, setChallengePosts, setChallengeLoading),
+			loadSection(get_friend_posts, setFriendPosts, setFriendLoading),
+		]);
+
+		return () => {
+			active = false;
+		};
+	}, []);
 
 	return (
 		<SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -79,71 +148,95 @@ export default function HomeScreen() {
 				/>
 				<View style={styles.section}>
 					<SectionHeading
-						title="Your circle"
-						subtitle={`${friends.length} friend${friends.length === 1 ? "" : "s"} connected`}
-						rightContent={
-							<Text style={styles.count}>{friends.length}</Text>
-						}
+						title="Recommended for you"
+						subtitle="Hand-picked matches based on your tastes."
 					/>
 				</View>
-				{friends.length ? (
+				{recommendedLoading ? (
+					<ActivityIndicator color={AppTheme.accent} style={styles.loading} />
+				) : recommendedPosts.length ? (
 					<ScrollView
 						horizontal
 						showsHorizontalScrollIndicator={false}
-						contentContainerStyle={styles.friends}
+						contentContainerStyle={styles.horizontalRow}
 					>
-						{friends.slice(0, 8).map((friend, index) => {
-							const name = String(
-								friend.username ||
-									friend.display_name ||
-									friend.friend_username ||
-									"Friend",
-							);
-							return (
-								<View
-									style={styles.friend}
-									key={String(
-										friend.id || friend.friend_id || index,
-									)}
-								>
-									<View style={styles.friendAvatar}>
-										<Text style={styles.friendInitial}>
-											{name.charAt(0).toUpperCase()}
-										</Text>
-									</View>
-									<Text
-										style={styles.friendName}
-										numberOfLines={1}
-									>
-										{name}
-									</Text>
-								</View>
-							);
-						})}
+						{recommendedPosts.slice(0, 6).map((post) => (
+							<View style={styles.horizontalCard} key={post.id}>
+								<PostCard {...toPostCardProps(post)} />
+							</View>
+						))}
 					</ScrollView>
 				) : (
-					<Text style={styles.empty}>
-						Your friends will appear here when you connect with
-						them.
-					</Text>
+					<Text style={styles.empty}>No recommendations yet. Try updating your preferences.</Text>
 				)}
-				<View style={[styles.section, styles.recipeSection]}>
+				<View style={styles.section}>
 					<SectionHeading
-						title="Latest recipes"
-						subtitle="Fresh posts from the community."
+						title="Easy wins"
+						subtitle="Quick recipes to keep the momentum going."
 					/>
 				</View>
-				{postsLoading ? (
-					<ActivityIndicator
-						color={AppTheme.accent}
-						style={styles.loading}
-					/>
-				) : posts.length ? (
-					<PostGrid posts={posts} />
+				{easyLoading ? (
+					<ActivityIndicator color={AppTheme.accent} style={styles.loading} />
+				) : easyPosts.length ? (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.horizontalRow}
+					>
+						{easyPosts.slice(0, 6).map((post) => (
+							<View style={styles.horizontalCard} key={post.id}>
+								<PostCard {...toPostCardProps(post)} />
+							</View>
+						))}
+					</ScrollView>
 				) : (
-					<Text style={styles.empty}>
-						No recipes have been shared yet.
-					</Text>
+					<Text style={styles.empty}>No easy recipes right now.</Text>
+				)}
+				<View style={styles.section}>
+					<SectionHeading
+						title="Challenge yourself"
+						subtitle="Big flavours, bigger wins."
+					/>
+				</View>
+				{challengeLoading ? (
+					<ActivityIndicator color={AppTheme.accent} style={styles.loading} />
+				) : challengePosts.length ? (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.horizontalRow}
+					>
+						{challengePosts.slice(0, 6).map((post) => (
+							<View style={styles.horizontalCard} key={post.id}>
+								<PostCard {...toPostCardProps(post)} />
+							</View>
+						))}
+					</ScrollView>
+				) : (
+					<Text style={styles.empty}>No challenge recipes right now.</Text>
+				)}
+				<View style={styles.section}>
+					<SectionHeading
+						title="From your friends"
+						subtitle="Fresh ideas from people you know."
+					/>
+				</View>
+				{friendLoading ? (
+					<ActivityIndicator color={AppTheme.accent} style={styles.loading} />
+				) : friendPosts.length ? (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.horizontalRow}
+					>
+						{friendPosts.slice(0, 6).map((post) => (
+							<View style={styles.horizontalCard} key={post.id}>
+								<PostCard {...toPostCardProps(post)} />
+							</View>
+						))}
+					</ScrollView>
+				) : (
+					<Text style={styles.empty}>No posts from friends yet.</Text>
 				)}
 			</ScrollView>
 		</SafeAreaView>
@@ -161,24 +254,8 @@ const styles = StyleSheet.create({
 	},
 	section: { marginTop: 28, marginBottom: 14 },
 	recipeSection: { marginTop: 32 },
-	count: { color: AppTheme.accent, fontSize: 14, fontWeight: "600" },
-	friends: { gap: 16, paddingRight: 20 },
-	friend: { width: 58, alignItems: "center" },
-	friendAvatar: {
-		width: 42,
-		height: 42,
-		borderRadius: 21,
-		backgroundColor: AppTheme.accentSoft,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	friendInitial: { color: AppTheme.accent, fontSize: 15, fontWeight: "600" },
-	friendName: {
-		color: AppTheme.muted,
-		fontSize: 11,
-		marginTop: 6,
-		maxWidth: 58,
-	},
+	horizontalRow: { gap: 16, paddingRight: 20, paddingBottom: 8 },
+	horizontalCard: { width: 290 },
 	loading: { marginTop: 24 },
 	empty: { color: AppTheme.muted, fontSize: 14, lineHeight: 21 },
 });

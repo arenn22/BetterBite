@@ -1,12 +1,12 @@
 import { useState } from "react";
 import {
-	Image,
-	Modal,
-	Pressable,
-	ScrollView,
-	StyleSheet,
-	Text,
-	View,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 
 import { AppTheme } from "@/constants/app-theme";
@@ -111,7 +111,7 @@ export function PostCard({
 							</Pressable>
 							<Text style={styles.modalTitle}>{meal}</Text>
 							<Text style={styles.modalMeta}>
-								{username}  |  Difficulty {difficulty}/5
+									{username}  |  Difficulty {difficulty}/10
 							</Text>
 							<Text style={styles.modalDescription}>{description}</Text>
 							<Text style={styles.detailHeading}>Ingredients</Text>

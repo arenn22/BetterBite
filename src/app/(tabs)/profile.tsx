@@ -87,7 +87,6 @@ export default function ProfileScreen() {
 					<Text style={styles.displayName}>
 						{publicProfile.username}
 					</Text>
-					<Text style={styles.email}>{publicProfile.email}</Text>
 					<View style={styles.stats}>
 						<View style={styles.stat}>
 							<Text style={styles.statValue}>{posts.length}</Text>

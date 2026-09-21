@@ -8,8 +8,8 @@ import { PostCard } from "./post-card";
 export function PostGrid({ posts }: { posts: Post[] }) {
 	return (
 		<View style={styles.grid}>
-			{posts.map((post) => (
-				<View style={styles.item} key={post.id}>
+			{posts.map((post, index) => (
+				<View style={styles.item} key={`${post.id ?? "post"}-${index}`}>
 					<PostCard {...toPostCardProps(post)} />
 				</View>
 			))}

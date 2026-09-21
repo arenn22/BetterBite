@@ -72,23 +72,38 @@ export function usePostFeed(
 	return { posts, loading };
 }
 
-async function resolvePostImageUrl(imageValue: string | undefined) {
-	if (!imageValue?.trim()) return "";
+export async function resolvePostImageUrl(imageValue: string | undefined) {
+	const trimmed = imageValue?.trim();
+	if (!trimmed) return "";
 
-	const storagePath = getPostImagePath(imageValue);
-	if (!storagePath) return imageValue;
+	if (/^data:/i.test(trimmed)) return trimmed;
 
-	const { data } = await supabase.storage
-		.from("post-images")
-		.createSignedUrl(storagePath, 60 * 60);
-	const publicUrl = supabase.storage
-		.from("post-images")
-		.getPublicUrl(storagePath).data.publicUrl;
+	const storagePath = getPostImagePath(trimmed);
+	if (!storagePath) return trimmed;
 
-	return data?.signedUrl || publicUrl || imageValue;
+	try {
+		const { data, error } = await supabase.storage
+			.from("post-images")
+			.createSignedUrl(storagePath, 60 * 60);
+
+		if (!error && data?.signedUrl) return data.signedUrl;
+	} catch {
+		// fall through to public URL fallback below
+	}
+
+	try {
+		const publicUrl = supabase.storage
+			.from("post-images")
+			.getPublicUrl(storagePath).data.publicUrl;
+		if (publicUrl) return publicUrl;
+	} catch {
+		// if the bucket lookup fails, keep the original image URL
+	}
+
+	return trimmed;
 }
 
-function getPostImagePath(imageValue: string) {
+export function getPostImagePath(imageValue: string) {
 	if (!/^https?:\/\//i.test(imageValue)) return imageValue;
 
 	try {

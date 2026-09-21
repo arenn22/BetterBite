@@ -27,6 +27,15 @@ export default function AppTabs() {
 					renderingMode="template"
 				/>
 			</NativeTabs.Trigger>
+<<<<<<< HEAD
+=======
+			<NativeTabs.Trigger name="social">
+				<NativeTabs.Trigger.Label>Social</NativeTabs.Trigger.Label>
+			</NativeTabs.Trigger>
+			<NativeTabs.Trigger name="profile">
+				<NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
+			</NativeTabs.Trigger>
+>>>>>>> 117219dc591f84331d44a1d10c1e041bc3addff2
 			<NativeTabs.Trigger name="create">
 				<NativeTabs.Trigger.Label>+</NativeTabs.Trigger.Label>
 			</NativeTabs.Trigger>

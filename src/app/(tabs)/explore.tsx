@@ -19,8 +19,11 @@ import {
 	fetchCuisines,
 	fetchDietaryRestrictions,
 	fetchFriends,
+	fetchPostByCuisines,
+	fetchPostsByDietaryRestrictions,
 } from "@/services/api";
-import { useEffect, useMemo, useState } from "react";
+import type { Post } from "@/types/models";
+import { useEffect, useState } from "react";
 
 type Option = { id: number; name: string };
 type Friend = Record<string, unknown>;
@@ -39,6 +42,7 @@ export default function ExploreScreen() {
 	const [categories, setCategories] = useState<FilterOption[]>([]);
 	const [query, setQuery] = useState("");
 	const [selectedFilters, setSelectedFilters] = useState(["all"]);
+	const [visiblePosts, setVisiblePosts] = useState<Post[]>([]);
 
 	useEffect(() => {
 		let active = true;
@@ -86,45 +90,99 @@ export default function ExploreScreen() {
 		...categories,
 	];
 
-	const visiblePosts = useMemo(() => {
-		const search = query.trim().toLowerCase();
-		const friendNames = new Set(
-			friends.map((friend) =>
-				String(
-					friend.username ||
-						friend.display_name ||
-						friend.friend_username ||
-						"",
-				).toLowerCase(),
-			),
-		);
-		const activeFilters = filters.filter((filter) =>
-			selectedFilters.includes(filter.key),
-		);
-		const showAll = selectedFilters.includes("all");
-		return posts.filter((post) => {
-			const searchable = [
-				post.title,
-				post.description,
-				post.author_username,
-			]
-				.filter(Boolean)
-				.join(" ")
-				.toLowerCase();
-			const matchesSearch = !search || searchable.includes(search);
-			const matchesFilters = activeFilters.some((filter) => {
-				if (filter.kind === "friends") {
-					return friendNames.has((post.author_username || "").toLowerCase());
+	useEffect(() => {
+		let active = true;
+		async function resolveVisiblePosts() {
+			const search = query.trim().toLowerCase();
+			const friendNames = new Set(
+				friends.map((friend) =>
+					String(
+						friend.username ||
+							friend.display_name ||
+							friend.friend_username ||
+							"",
+					).toLowerCase(),
+				),
+			);
+			const selectedCuisineIds = categories
+				.filter(
+					(category) =>
+						selectedFilters.includes(category.key) &&
+						category.field === "cuisineIds" &&
+						category.id !== undefined,
+				)
+				.map((category) => category.id as number);
+			const selectedRestrictionIds = categories
+				.filter(
+					(category) =>
+						selectedFilters.includes(category.key) &&
+						category.field === "restrictionIds" &&
+						category.id !== undefined,
+				)
+				.map((category) => category.id as number);
+			const hasCategorySelection = selectedCuisineIds.length > 0 || selectedRestrictionIds.length > 0;
+			const hasFriendSelection = selectedFilters.includes("friends");
+			const showAll = selectedFilters.includes("all");
+
+			const dedupePosts = (items: Post[]) => {
+				const unique = new Map<string, Post>();
+				for (const item of items) {
+					if (!item?.id) continue;
+					unique.set(item.id, item);
 				}
-				const ids = filter.field ? post[filter.field] || [] : [];
-				return (
-					(filter.id !== undefined && ids.includes(filter.id)) ||
-					searchable.includes(filter.label.toLowerCase())
+				return [...unique.values()];
+			};
+
+			let nextPosts: Post[] = showAll ? [...posts] : [];
+
+			if (hasCategorySelection) {
+				const [cuisineMatches, restrictionMatches] = await Promise.all([
+					selectedCuisineIds.length ? fetchPostByCuisines(selectedCuisineIds) : Promise.resolve([] as Post[]),
+					selectedRestrictionIds.length ? fetchPostsByDietaryRestrictions(selectedRestrictionIds) : Promise.resolve([] as Post[]),
+				]);
+				const categoryMatches = dedupePosts([...cuisineMatches, ...restrictionMatches]);
+				const categoryMatchIds = new Set(categoryMatches.map((post) => post.id));
+				nextPosts = showAll
+					? posts.filter((post) => categoryMatchIds.has(post.id) || categoryMatches.length === 0)
+					: categoryMatches;
+			}
+
+			if (hasFriendSelection) {
+				const friendMatches = dedupePosts(
+					posts.filter((post) =>
+						friendNames.has((post.author_username || "").toLowerCase()),
+					),
 				);
-			});
-			return matchesSearch && (showAll || matchesFilters);
-		});
-	}, [filters, friends, posts, query, selectedFilters]);
+				const friendMatchIds = new Set(friendMatches.map((post) => post.id));
+				nextPosts = nextPosts.length
+					? dedupePosts(nextPosts.filter((post) => friendMatchIds.has(post.id)))
+					: friendMatches;
+			}
+
+			if (!showAll && !hasCategorySelection && !hasFriendSelection) {
+				nextPosts = [...posts];
+			}
+
+			if (search) {
+				nextPosts = nextPosts.filter((post) => {
+					const searchable = [
+						post.title,
+						post.description,
+						post.author_username,
+					].filter(Boolean).join(" ").toLowerCase();
+					return searchable.includes(search);
+				});
+			}
+
+			if (!active) return;
+			setVisiblePosts(dedupePosts(nextPosts));
+		}
+
+		void resolveVisiblePosts();
+		return () => {
+			active = false;
+		};
+	}, [categories, friends, posts, query, selectedFilters]);
 
 	function toggleFilter(key: string) {
 		if (key === "all") {

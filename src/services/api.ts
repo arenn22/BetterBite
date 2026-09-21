@@ -227,6 +227,38 @@ export async function fetchUserProfile(userId: string): Promise<Profile | null> 
   } as Profile;
 } 
 
+export async function updateProfilePhoto(userId: string, imageUri: string): Promise<string> {
+  const filename = imageUri.split("/").pop() || `${Date.now()}.jpg`;
+  const path = `profile-photos/${userId}/${Date.now()}-${filename}`;
+  const blob = await (await fetch(imageUri)).blob();
+
+  const { error: uploadError } = await supabase.storage
+    .from("post-images")
+    .upload(path, blob, {
+      contentType: blob.type || "image/jpeg",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  const publicUrl = supabase.storage
+    .from("post-images")
+    .getPublicUrl(path).data.publicUrl;
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ pfp_url: publicUrl })
+    .eq("id", userId);
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  return publicUrl;
+}
+
 export async function searchUsers(searchQuery: string): Promise<Pick<Profile, 'id' | 'username'>[]> {
   const { data, error } = await supabase
     .from('profiles')
@@ -445,5 +477,96 @@ export async function getLikedPostsByUser(userId: string): Promise<Post[]> {
   }
   else {
     return (data || []) as Post[];
+  }
+}
+
+export async function get_post_by_profile_restrictions() { 
+
+  const {data: restrictions, error} = await supabase.rpc('get_my_dietary_restrictions');
+  if(error) {
+    console.error("Error fetching profile restrictions:", error.message);
+    return [];
+  }
+  else {
+    const {data: posts, error} = await supabase.rpc('get_posts_by_dietary_restrictions', { p_restriction_ids: restrictions });
+    if(error) {
+      console.error("Error fetching posts by dietary restrictions:", error.message);
+      return [];
+    }
+    else {
+      return (posts || []) as Post[];
+    }
+  }
+}
+
+export async function get_posts_by_profile_experience() { 
+  const {data: posts, error} = await supabase.rpc('get_posts_by_experience_level');
+  if(error) {
+    console.error("Error fetching posts by experience level:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
+export async function set_my_dietary_restrictions(restrictionIds: number[]) {
+  const {error} = await supabase.rpc('set_my_dietary_restrictions', { p_restriction_ids: restrictionIds });
+  if(error) {
+    console.error("Error setting dietary restrictions:", error.message);
+  }
+}
+
+export async function set_my_experience_level(difficulty: number) {
+  const {error} = await supabase.rpc('set_my_experience_level', { p_experience_level: difficulty });
+  if(error) {
+    console.error("Error setting experience level:", error.message);
+  }
+}
+
+const posts_per_section = 5;
+const offset = 0;
+export async function get_recommended_posts() {
+  const {data: posts, error} = await supabase.rpc('get_recommended_posts', {limit_count: posts_per_section, offset_count: offset});
+  if(error) {
+    console.error("Error fetching recommended posts:", error.message);
+    return [];
+  }
+  else {
+    
+    return (posts || []) as Post[];
+  }
+}
+
+export async function get_easy_posts() {
+  const {data: posts, error} = await supabase.rpc('get_easy_posts', {limit_count: posts_per_section, offset_count: offset});
+  if(error) {
+    console.error("Error fetching easy posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
+export async function get_challenge_posts() {
+  const {data: posts, error} = await supabase.rpc('get_challenge_posts', {limit_count: posts_per_section, offset_count: offset});
+  if(error) {
+    console.error("Error fetching challenge posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
+export async function get_friend_posts() {
+  const {data: posts, error} = await supabase.rpc('get_friend_posts', {limit_count: posts_per_section, offset_count: offset});
+  if(error) {
+    console.error("Error fetching friend posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
   }
 }

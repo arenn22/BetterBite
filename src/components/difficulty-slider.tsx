@@ -14,13 +14,13 @@ export default function DifficultySlider({
 		<View style={styles.container}>
 			<View style={styles.headerRow}>
 				<Text style={styles.label}>Difficulty</Text>
-				<Text style={styles.value}>{value} / 5</Text>
+				<Text style={styles.value}>{value} / 10</Text>
 			</View>
 
 			<Slider
 				value={value}
 				minimumValue={1}
-				maximumValue={5}
+				maximumValue={10}
 				step={1}
 				onValueChange={onChange}
 				minimumTrackTintColor="#687B5D"
