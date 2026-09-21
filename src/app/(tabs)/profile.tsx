@@ -1,10 +1,11 @@
 import {
-    ActivityIndicator,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+	ActivityIndicator,
+	Image,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -15,13 +16,16 @@ import { AppTheme } from "@/constants/app-theme";
 import { usePostFeed } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import {
-    DEFAULT_PROFILE_IMAGE,
-    fetchFriends,
-    fetchUserProfile,
+	DEFAULT_PROFILE_IMAGE,
+	fetchFriends,
+	fetchUserProfile,
+	getLikedPostsByUser,
 } from "@/services/api";
+import type { Post } from "@/types/models";
 import { useEffect, useState } from "react";
 
 type Friend = Record<string, unknown>;
+type RecipeTab = "created" | "cooked" | "liked";
 
 export default function ProfileScreen() {
 	const { currentUser } = useAuthContext();
@@ -31,19 +35,27 @@ export default function ProfileScreen() {
 	});
 	const [profile, setProfile] = useState(currentUser);
 	const [friends, setFriends] = useState<Friend[]>([]);
+	const [likedPosts, setLikedPosts] = useState<Post[]>([]);
+	const [likedLoading, setLikedLoading] = useState(false);
+	const [activeRecipeTab, setActiveRecipeTab] = useState<RecipeTab>("created");
 
 	useEffect(() => {
 		if (!currentUser) return;
 		let active = true;
+		setLikedLoading(true);
 		Promise.allSettled([
 			fetchUserProfile(currentUser.id),
 			fetchFriends(),
-		]).then(([profileResult, friendsResult]) => {
+			getLikedPostsByUser(currentUser.id),
+		]).then(([profileResult, friendsResult, likedPostsResult]) => {
 			if (!active) return;
 			if (profileResult.status === "fulfilled")
 				setProfile(profileResult.value || currentUser);
 			if (friendsResult.status === "fulfilled")
 				setFriends((friendsResult.value || []) as Friend[]);
+			if (likedPostsResult.status === "fulfilled")
+				setLikedPosts(likedPostsResult.value || []);
+			setLikedLoading(false);
 		});
 		return () => {
 			active = false;
@@ -61,6 +73,13 @@ export default function ProfileScreen() {
 		publicProfile.streakCount ?? publicProfile.streakcount ?? 0,
 	);
 	const firstName = publicProfile.username.charAt(0).toUpperCase();
+	const activePosts = activeRecipeTab === "created" ? posts : likedPosts;
+	const activeLoading = activeRecipeTab === "created" ? loading : likedLoading;
+	const tabLabels: Record<RecipeTab, string> = {
+		created: "Created",
+		cooked: "Cooked",
+		liked: "Liked",
+	};
 
 	return (
 		<SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -150,19 +169,46 @@ export default function ProfileScreen() {
 				</View>
 				<View style={styles.section}>
 					<SectionHeading
-						title="Your recipes"
-						subtitle="The dishes you have shared."
+						title="Your recipe library"
+						subtitle="Recipes connected to your account."
 					/>
-					{loading ? (
+					<View style={styles.recipeTabs}>
+						{(Object.keys(tabLabels) as RecipeTab[]).map((tab) => (
+							<Pressable
+								key={tab}
+								onPress={() => setActiveRecipeTab(tab)}
+								style={[
+									styles.recipeTab,
+									activeRecipeTab === tab && styles.activeRecipeTab,
+								]}
+							>
+								<Text
+									style={[
+										styles.recipeTabText,
+										activeRecipeTab === tab && styles.activeRecipeTabText,
+									]}
+								>
+									{tabLabels[tab]}
+								</Text>
+							</Pressable>
+						))}
+					</View>
+					{activeRecipeTab === "cooked" ? (
+						<Text style={styles.empty}>
+							Cooked recipes will appear here once a backend cooking-history function is available.
+						</Text>
+					) : activeLoading ? (
 						<ActivityIndicator
 							color={AppTheme.accent}
 							style={styles.loading}
 						/>
-					) : posts.length ? (
-						<PostGrid posts={posts} />
+					) : activePosts.length ? (
+						<PostGrid posts={activePosts} />
 					) : (
 						<Text style={styles.empty}>
-							Your published recipes will appear here.
+							{activeRecipeTab === "liked"
+								? "Recipes you like will appear here."
+								: "Your published recipes will appear here."}
 						</Text>
 					)}
 				</View>
@@ -239,6 +285,27 @@ const styles = StyleSheet.create({
 		maxWidth: 64,
 		textAlign: "center",
 	},
+	recipeTabs: {
+		flexDirection: "row",
+		borderBottomWidth: 1,
+		borderBottomColor: AppTheme.border,
+		marginTop: 18,
+		marginBottom: 18,
+	},
+	recipeTab: {
+		flex: 1,
+		alignItems: "center",
+		paddingVertical: 12,
+		borderBottomWidth: 2,
+		borderBottomColor: "transparent",
+	},
+	activeRecipeTab: { borderBottomColor: AppTheme.accent },
+	recipeTabText: {
+		color: AppTheme.muted,
+		fontSize: 13,
+		fontWeight: "600",
+	},
+	activeRecipeTabText: { color: AppTheme.accent },
 	loading: { marginTop: 20 },
 	empty: { color: AppTheme.muted, fontSize: 14, lineHeight: 21 },
 });
