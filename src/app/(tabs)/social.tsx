@@ -1,13 +1,13 @@
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+	ActivityIndicator,
+	Alert,
+	Image,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -17,15 +17,15 @@ import { AppTheme } from "@/constants/app-theme";
 import { usePostFeed } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import {
-    DEFAULT_PROFILE_IMAGE,
-    fetchFriendRequests,
-    fetchFriends,
-    fetchUserProfile,
-    respondToFriendRequest,
-    searchUsers,
-    sendFriendRequest,
+	DEFAULT_PROFILE_IMAGE,
+	fetchFriendRequests,
+	fetchFriends,
+	fetchUserProfile,
+	respondToFriendRequest,
+	searchUsers,
+	sendFriendRequest,
 } from "@/services/api";
-import type { Profile } from "@/types/auth";
+import type { Profile, SearchUserResult } from "@/types/auth";
 import { useEffect, useMemo, useState } from "react";
 
 type FriendRow = Record<string, unknown>;
@@ -46,7 +46,7 @@ export default function SocialScreen() {
 	const [friends, setFriends] = useState<FriendRow[]>([]);
 	const [friendRequests, setFriendRequests] = useState<FriendRequestRow[]>([]);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [searchResults, setSearchResults] = useState<Profile[]>([]);
+	const [searchResults, setSearchResults] = useState<SearchUserResult[]>([]);
 	const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [sending, setSending] = useState(false);
@@ -130,7 +130,7 @@ export default function SocialScreen() {
 		selectedProfile?.experience_level ?? selectedProfile?.experienceLevel ?? 0,
 	);
 
-	async function handleAddFriend(user: Profile) {
+	async function handleAddFriend(user: SearchUserResult) {
 		if (!currentUser || !user.id) return;
 		setSending(true);
 		try {

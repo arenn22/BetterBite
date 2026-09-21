@@ -15,6 +15,8 @@ export interface Profile {
 	last_post_at?: Date | string | null;
 }
 
+export type SearchUserResult = Pick<Profile, "id" | "username" | "pfp_url">;
+
 export interface AuthResult {
 	profile : Profile | null;
 	error : string | null;

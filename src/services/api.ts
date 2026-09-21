@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import type { AuthResult, Profile } from "../types/auth";
+import type { AuthResult, Profile, SearchUserResult } from "../types/auth";
 import type { CreatePostPayload, PendingFriendRequest, Post } from "../types/models";
 export const DEFAULT_PROFILE_IMAGE =
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80";
@@ -259,10 +259,10 @@ export async function updateProfilePhoto(userId: string, imageUri: string): Prom
   return publicUrl;
 }
 
-export async function searchUsers(searchQuery: string): Promise<Pick<Profile, 'id' | 'username'>[]> {
+export async function searchUsers(searchQuery: string): Promise<SearchUserResult[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, pfp_url')
     .ilike('username', `%${searchQuery}%`); // Matches partial names (e.g., "joh" matches "john")
 
   if (error) {
@@ -270,7 +270,7 @@ export async function searchUsers(searchQuery: string): Promise<Pick<Profile, 'i
     return [];
   }
 
-  return (data || []) as Pick<Profile, 'id' | 'username'>[];
+  return (data || []) as SearchUserResult[];
 }
 
 
