@@ -1,11 +1,11 @@
 import {
-	ActivityIndicator,
-	Image,
-	Pressable,
-	ScrollView,
-	StyleSheet,
-	Text,
-	View,
+    ActivityIndicator,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -16,10 +16,10 @@ import { AppTheme } from "@/constants/app-theme";
 import { usePostFeed } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import {
-	DEFAULT_PROFILE_IMAGE,
-	fetchFriends,
-	fetchUserProfile,
-	getLikedPostsByUser,
+    DEFAULT_PROFILE_IMAGE,
+    fetchFriends,
+    fetchUserProfile,
+    get_liked_posts,
 } from "@/services/api";
 import type { Post } from "@/types/models";
 import { useEffect, useState } from "react";
@@ -39,25 +39,34 @@ export default function ProfileScreen() {
 	const [likedLoading, setLikedLoading] = useState(false);
 	const [activeRecipeTab, setActiveRecipeTab] = useState<RecipeTab>("created");
 
+	const loadLikedPosts = async () => {
+		setLikedLoading(true);
+		try {
+			const posts = await get_liked_posts();
+			setLikedPosts(posts || []);
+		} catch (error) {
+			console.error("Error loading liked posts:", error);
+			setLikedPosts([]);
+		} finally {
+			setLikedLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		if (!currentUser) return;
 		let active = true;
 		setLikedPosts([]);
-		setLikedLoading(true);
 		Promise.allSettled([
 			fetchUserProfile(currentUser.id),
 			fetchFriends(),
-			getLikedPostsByUser(currentUser.id),
-		]).then(([profileResult, friendsResult, likedPostsResult]) => {
+		]).then(([profileResult, friendsResult]) => {
 			if (!active) return;
 			if (profileResult.status === "fulfilled")
 				setProfile(profileResult.value || currentUser);
 			if (friendsResult.status === "fulfilled")
 				setFriends((friendsResult.value || []) as Friend[]);
-			if (likedPostsResult.status === "fulfilled")
-				setLikedPosts(likedPostsResult.value || []);
-			setLikedLoading(false);
 		});
+		void loadLikedPosts();
 		return () => {
 			active = false;
 		};
@@ -177,7 +186,12 @@ export default function ProfileScreen() {
 						{(Object.keys(tabLabels) as RecipeTab[]).map((tab) => (
 							<Pressable
 								key={tab}
-								onPress={() => setActiveRecipeTab(tab)}
+								onPress={() => {
+									if (tab === "liked") {
+										void loadLikedPosts();
+									}
+									setActiveRecipeTab(tab);
+								}}
 								accessibilityRole="tab"
 								accessibilityState={{ selected: activeRecipeTab === tab }}
 								style={[

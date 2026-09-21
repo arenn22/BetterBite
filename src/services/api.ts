@@ -570,3 +570,15 @@ export async function get_friend_posts() {
     return (posts || []) as Post[];
   }
 }
+
+export async function get_liked_posts() {
+  const {data: posts, error} = await supabase.rpc('get_liked_posts', {limit_count: posts_per_section, offset_count: offset});
+  if(error) {
+    console.error("Error fetching liked posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
