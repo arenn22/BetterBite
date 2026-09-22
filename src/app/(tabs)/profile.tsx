@@ -19,6 +19,7 @@ import {
     DEFAULT_PROFILE_IMAGE,
     fetchFriends,
     fetchUserProfile,
+    get_cooked_posts,
     get_liked_posts,
 } from "@/services/api";
 import type { Post } from "@/types/models";
@@ -36,7 +37,9 @@ export default function ProfileScreen() {
 	const [profile, setProfile] = useState(currentUser);
 	const [friends, setFriends] = useState<Friend[]>([]);
 	const [likedPosts, setLikedPosts] = useState<Post[]>([]);
+	const [cookedPosts, setCookedPosts] = useState<Post[]>([]);
 	const [likedLoading, setLikedLoading] = useState(false);
+	const [cookedLoading, setCookedLoading] = useState(false);
 	const [activeRecipeTab, setActiveRecipeTab] = useState<RecipeTab>("created");
 
 	const loadLikedPosts = async () => {
@@ -52,10 +55,24 @@ export default function ProfileScreen() {
 		}
 	};
 
+	const loadCookedPosts = async () => {
+		setCookedLoading(true);
+		try {
+			const posts = await get_cooked_posts();
+			setCookedPosts(posts || []);
+		} catch (error) {
+			console.error("Error loading cooked posts:", error);
+			setCookedPosts([]);
+		} finally {
+			setCookedLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		if (!currentUser) return;
 		let active = true;
 		setLikedPosts([]);
+		setCookedPosts([]);
 		Promise.allSettled([
 			fetchUserProfile(currentUser.id),
 			fetchFriends(),
@@ -67,6 +84,7 @@ export default function ProfileScreen() {
 				setFriends((friendsResult.value || []) as Friend[]);
 		});
 		void loadLikedPosts();
+		void loadCookedPosts();
 		return () => {
 			active = false;
 		};
@@ -83,8 +101,18 @@ export default function ProfileScreen() {
 		publicProfile.streakCount ?? publicProfile.streakcount ?? 0,
 	);
 	const firstName = publicProfile.username.charAt(0).toUpperCase();
-	const activePosts = activeRecipeTab === "created" ? posts : likedPosts;
-	const activeLoading = activeRecipeTab === "created" ? loading : likedLoading;
+	const activePosts =
+		activeRecipeTab === "created"
+			? posts
+			: activeRecipeTab === "cooked"
+				? cookedPosts
+				: likedPosts;
+	const activeLoading =
+		activeRecipeTab === "created"
+			? loading
+			: activeRecipeTab === "cooked"
+				? cookedLoading
+				: likedLoading;
 	const tabLabels: Record<RecipeTab, string> = {
 		created: "Created",
 		cooked: "Cooked",
@@ -120,6 +148,10 @@ export default function ProfileScreen() {
 						<View style={styles.stat}>
 							<Text style={styles.statValue}>{posts.length}</Text>
 							<Text style={styles.statLabel}>Recipes</Text>
+						</View>
+						<View style={styles.stat}>
+							<Text style={styles.statValue}>{cookedPosts.length}</Text>
+							<Text style={styles.statLabel}>Cooked</Text>
 						</View>
 						<View style={styles.stat}>
 							<Text style={styles.statValue}>
@@ -190,6 +222,9 @@ export default function ProfileScreen() {
 									if (tab === "liked") {
 										void loadLikedPosts();
 									}
+									if (tab === "cooked") {
+										void loadCookedPosts();
+									}
 									setActiveRecipeTab(tab);
 								}}
 								accessibilityRole="tab"
@@ -210,11 +245,7 @@ export default function ProfileScreen() {
 							</Pressable>
 						))}
 					</View>
-					{activeRecipeTab === "cooked" ? (
-						<Text style={styles.empty}>
-							Cooked recipes will appear here once a backend cooking-history function is available.
-						</Text>
-					) : activeLoading ? (
+					{activeLoading ? (
 						<ActivityIndicator
 							color={AppTheme.accent}
 							style={styles.loading}
@@ -225,7 +256,9 @@ export default function ProfileScreen() {
 						<Text style={styles.empty}>
 							{activeRecipeTab === "liked"
 								? "Recipes you like will appear here."
-								: "Your published recipes will appear here."}
+								: activeRecipeTab === "cooked"
+									? "Recipes you have cooked will appear here."
+									: "Your published recipes will appear here."}
 						</Text>
 					)}
 				</View>

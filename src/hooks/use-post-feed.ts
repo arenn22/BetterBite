@@ -72,18 +72,20 @@ export function usePostFeed(
 	return { posts, loading };
 }
 
-export async function resolvePostImageUrl(imageValue: string | undefined) {
+export async function resolvePostImageUrl(
+	imageValue: string | undefined,
+	bucketName: string = "post-images",
+) {
 	const trimmed = imageValue?.trim();
 	if (!trimmed) return "";
-
 	if (/^data:/i.test(trimmed)) return trimmed;
 
-	const storagePath = getPostImagePath(trimmed);
+	const storagePath = getPostImagePath(trimmed, bucketName) ?? trimmed.replace(/^\/+/, "");
 	if (!storagePath) return trimmed;
 
 	try {
 		const { data, error } = await supabase.storage
-			.from("post-images")
+			.from(bucketName)
 			.createSignedUrl(storagePath, 60 * 60);
 
 		if (!error && data?.signedUrl) return data.signedUrl;
@@ -93,7 +95,7 @@ export async function resolvePostImageUrl(imageValue: string | undefined) {
 
 	try {
 		const publicUrl = supabase.storage
-			.from("post-images")
+			.from(bucketName)
 			.getPublicUrl(storagePath).data.publicUrl;
 		if (publicUrl) return publicUrl;
 	} catch {
@@ -103,18 +105,29 @@ export async function resolvePostImageUrl(imageValue: string | undefined) {
 	return trimmed;
 }
 
-export function getPostImagePath(imageValue: string) {
-	if (!/^https?:\/\//i.test(imageValue)) return imageValue;
+export function getPostImagePath(imageValue: string, bucketName: string = "post-images") {
+	const normalized = imageValue.trim();
+	if (!normalized) return "";
+
+	if (!/^https?:\/\//i.test(normalized)) {
+		const cleaned = normalized.replace(/^\/+/, "");
+		const publicPrefix = `public/${bucketName}/`;
+		const signedPrefix = `sign/${bucketName}/`;
+		if (cleaned.startsWith(publicPrefix)) return cleaned.slice(publicPrefix.length);
+		if (cleaned.startsWith(signedPrefix)) return cleaned.slice(signedPrefix.length);
+		if (cleaned.startsWith(`${bucketName}/`)) return cleaned.slice(`${bucketName}/`.length);
+		return cleaned;
+	}
 
 	try {
-		const pathname = decodeURIComponent(new URL(imageValue).pathname);
+		const pathname = decodeURIComponent(new URL(normalized).pathname);
 		const marker = "/storage/v1/object/";
 		const markerIndex = pathname.indexOf(marker);
 		if (markerIndex === -1) return null;
 
 		const bucketAndPath = pathname.slice(markerIndex + marker.length);
-		const publicPrefix = "public/post-images/";
-		const signedPrefix = "sign/post-images/";
+		const publicPrefix = `public/${bucketName}/`;
+		const signedPrefix = `sign/${bucketName}/`;
 		if (bucketAndPath.startsWith(publicPrefix)) {
 			return bucketAndPath.slice(publicPrefix.length);
 		}

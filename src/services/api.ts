@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase";
 import type { AuthResult, Profile, SearchUserResult } from "../types/auth";
-import type { CreatePostPayload, PendingFriendRequest, Post } from "../types/models";
+import type { CookedPost, CreatePostPayload, PendingFriendRequest, Post, PostReview } from "../types/models";
 export const DEFAULT_PROFILE_IMAGE =
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80";
 
@@ -518,9 +518,42 @@ export async function set_my_dietary_restrictions(restrictionIds: number[]) {
 }
 
 export async function set_my_experience_level(difficulty: number) {
-  const {error} = await supabase.rpc('set_my_experience_level', { p_experience_level: difficulty });
-  if(error) {
-    console.error("Error setting experience level:", error.message);
+  const normalizedDifficulty = Math.min(10, Math.max(1, Math.round(Number(difficulty) || 1)));
+
+  try {
+    const { error } = await supabase.rpc('set_my_experience_level', {
+      p_experience_level: normalizedDifficulty,
+    });
+
+    if (!error) return;
+
+    const legacyErrorMessage = error.message?.toLowerCase() ?? "";
+    const needsFallback =
+      legacyErrorMessage.includes("could not find the function") ||
+      legacyErrorMessage.includes("between 1 and 5") ||
+      legacyErrorMessage.includes("must be between 1 and 5");
+
+    if (!needsFallback) {
+      throw error;
+    }
+
+    const { data: authUser, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser?.user?.id) {
+      throw authError ?? new Error("Unable to determine the current user.");
+    }
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ experience_level: normalizedDifficulty })
+      .eq("id", authUser.user.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error setting experience level:", message);
+    throw error;
   }
 }
 
@@ -582,3 +615,133 @@ export async function get_liked_posts() {
   }
 }
 
+export async function create_cooked_post(
+  source_post_id: string,
+  cooked_image_path: string,
+) {
+  const safePath = cooked_image_path.replace(/^\/+/, "");
+
+  const { data: authUserData, error: authUserError } = await supabase.auth.getUser();
+  if (authUserError || !authUserData.user?.id) {
+    throw new Error("You must be signed in to save a cooked recipe.");
+  }
+
+  const userFolder = `${authUserData.user.id}/`;
+  if (!safePath.startsWith(userFolder) && !safePath.includes(`/${authUserData.user.id}/`)) {
+    throw new Error("cooked_image_path must be inside the authenticated user folder");
+  }
+
+  const insertPayload = {
+    source_post_id,
+    profile_id: authUserData.user.id,
+    cooked_image_path: safePath,
+  };
+
+  const directTableAttempts = ["cooked_posts", "cooked_post"];
+  let lastInsertError: Error | null = null;
+
+  for (const tableName of directTableAttempts) {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .insert(insertPayload)
+        .select()
+        .maybeSingle();
+
+      if (!error && data) {
+        console.log("Cooked post inserted directly:", data);
+        return data;
+      }
+
+      const message = error?.message || "Direct insert failed";
+      if (!/does not exist|relation .* does not exist|not found/i.test(message)) {
+        lastInsertError = new Error(message);
+      }
+      console.warn(`Direct insert failed for ${tableName}:`, message);
+    } catch (error) {
+      lastInsertError = error instanceof Error ? error : new Error("Unknown direct insert error");
+      console.warn(`Direct insert threw for ${tableName}:`, lastInsertError.message);
+    }
+  }
+
+  const rpcAttempts = [
+    { source_post_id, cooked_image_path: safePath },
+    { p_source_post_id: source_post_id, p_cooked_image_path: safePath },
+    { post_id: source_post_id, image_path: safePath },
+  ];
+
+  let lastError: Error | null = lastInsertError;
+  for (const payload of rpcAttempts) {
+    try {
+      const { data, error } = await supabase.rpc('create_cooked_post', payload);
+      if (!error) {
+        console.log("Cooked post created successfully via RPC:", data);
+        return data;
+      }
+      lastError = new Error(error.message);
+      console.warn("create_cooked_post RPC attempt failed:", payload, error.message);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Unknown create_cooked_post error");
+      console.warn("create_cooked_post RPC threw:", payload, lastError.message);
+    }
+  }
+
+  throw new Error(lastError?.message || "Failed to create cooked post.");
+}
+
+export async function create_post_review(
+  post_id: string,
+  description: string,
+  rating: number,
+) {
+  const normalizedDescription = typeof description === "string" ? description.trim() : "";
+  const normalizedRating = Math.min(5, Math.max(0, Number(rating) || 0));
+
+  if (!normalizedDescription.length) {
+    return null;
+  }
+
+  const rpcAttempts = [
+    { p_post_id: post_id, p_rating: normalizedRating, p_description: normalizedDescription },
+    { post_id, rating: normalizedRating, description: normalizedDescription },
+  ];
+
+  let lastError: Error | null = null;
+  for (const payload of rpcAttempts) {
+    try {
+      const { data, error } = await supabase.rpc("create_post_review", payload);
+      if (!error) {
+        return data;
+      }
+      lastError = new Error(error.message);
+      console.warn("create_post_review RPC attempt failed:", payload, error.message);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Unknown create_post_review error");
+      console.warn("create_post_review RPC threw:", payload, lastError.message);
+    }
+  }
+
+  throw new Error(lastError?.message || "Failed to save review.");
+}
+
+export async function get_cooked_posts() {
+  const {data: posts, error} = await supabase.rpc('get_cooked_posts', {limit_count: posts_per_section, offset_count: offset});
+  if(error) {
+    console.error("Error fetching cooked posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as CookedPost[];
+  }
+}
+
+export async function get_post_reviews(post_id: string) {
+  const {data: reviews, error} = await supabase.rpc('get_post_reviews', {target_post_id: post_id, limit_count: 20, offset_count: 0});
+  if(error) {
+    console.error("Error fetching post reviews:", error.message);
+    return [];
+  }
+  else {
+    return (reviews || []) as PostReview[];
+  }
+}

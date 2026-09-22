@@ -1,20 +1,23 @@
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-	ActivityIndicator,
-	Alert,
-	Image,
-	Modal,
-	Pressable,
-	ScrollView,
-	StyleSheet,
-	Text,
-	View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 
 import { AppTheme } from "@/constants/app-theme";
+import { resolvePostImageUrl } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
-import { likePost } from "@/services/api";
+import { supabase } from "@/lib/supabase";
+import { create_cooked_post, create_post_review, fetchUserProfile, get_cooked_posts, get_post_reviews, likePost } from "@/services/api";
 
 import { BaseCard } from "./base-card";
 
@@ -55,12 +58,143 @@ export function PostCard({
 	const [liking, setLiking] = useState(false);
 	const [cookVisible, setCookVisible] = useState(false);
 	const [cookedImage, setCookedImage] = useState<string | null>(null);
+	const [cookReview, setCookReview] = useState("");
 	const [cookRating, setCookRating] = useState(0);
+	const [submittingCook, setSubmittingCook] = useState(false);
+	const [resolvedImageUrl, setResolvedImageUrl] = useState<string>(imageUrl || "");
+	const [reviews, setReviews] = useState<Array<{
+		id: string;
+		authorUsername: string;
+		authorPfpUrl?: string | null;
+		rating: number;
+		description: string;
+		imageUrl?: string | null;
+	}>>([]);
+	const [loadingReviews, setLoadingReviews] = useState(false);
 	const { currentUser } = useAuthContext();
 	const ingredients = getRecipeList(recipe?.ingredients);
 	const steps = getRecipeList(recipe?.steps);
-	const hasImage = Boolean(imageUrl?.trim()) && !imageFailed;
+	const hasImage = Boolean(resolvedImageUrl?.trim()) && !imageFailed;
 	const hasAuthorImage = Boolean(profilePictureUrl?.trim()) && !authorImageFailed;
+
+	useEffect(() => {
+		let active = true;
+		async function resolveImage() {
+			const nextUrl = await resolvePostImageUrl(imageUrl);
+			if (!active) return;
+			setResolvedImageUrl(nextUrl || imageUrl || "");
+		}
+		void resolveImage();
+		return () => {
+			active = false;
+		};
+	}, [imageUrl]);
+
+	useEffect(() => {
+		const currentPostId = postId;
+		if (!detailsVisible || typeof currentPostId !== "string" || !currentPostId.trim()) {
+			setReviews([]);
+			setLoadingReviews(false);
+			return;
+		}
+		const safePostId = currentPostId.trim();
+
+		let active = true;
+
+		async function loadReviews() {
+			setLoadingReviews(true);
+			try {
+				const [reviewData, cookedPostsData] = await Promise.all([
+					get_post_reviews(safePostId),
+					get_cooked_posts(),
+				]);
+				if (!active) return;
+
+				const cookedPostsByProfileId = new Map<string, any>();
+				for (const cookedPost of (cookedPostsData || []) as any[]) {
+					const sourceId = cookedPost?.source_post_id ?? cookedPost?.post_id ?? cookedPost?.recipe_post_id ?? cookedPost?.sourcePostId;
+					if (sourceId !== safePostId || !cookedPost?.profile_id) {
+						continue;
+					}
+					cookedPostsByProfileId.set(String(cookedPost.profile_id), cookedPost);
+				}
+
+				const uniqueProfileIds = Array.from(new Set((reviewData || [])
+					.map((review: any) => String(review?.profile_id || ""))
+					.filter(Boolean)
+					.filter((profileId) => cookedPostsByProfileId.has(profileId))));
+
+				const profileMap = new Map<string, any>();
+				const profileResults = await Promise.all(
+					uniqueProfileIds.map(async (profileId) => {
+						const profile = await fetchUserProfile(profileId);
+						if (profile) {
+							profileMap.set(profileId, profile);
+						}
+					})
+				);
+				void profileResults;
+
+				const normalizedReviews = await Promise.all((reviewData || [])
+					.filter((review: any) => review?.profile_id && cookedPostsByProfileId.has(String(review.profile_id)))
+					.map(async (review: any) => {
+						const cookedPost = cookedPostsByProfileId.get(String(review.profile_id));
+						const profile = profileMap.get(String(review.profile_id));
+						const rawImage =
+							cookedPost?.cooked_image_url ??
+							cookedPost?.cooked_image_path ??
+							cookedPost?.image_url ??
+							cookedPost?.photo_url ??
+							review?.cooked_image_url ??
+							review?.cooked_image_path ??
+							review?.image_url ??
+							review?.review_image_url ??
+							review?.photo_url ??
+							null;
+						const resolvedImage = rawImage ? await resolvePostImageUrl(rawImage as string, "cooked_posts-images") : null;
+						const authorUsername =
+							profile?.username ??
+							cookedPost?.author_username ??
+							cookedPost?.username ??
+							review?.author_username ??
+							review?.username ??
+							review?.profile_username ??
+							review?.user_name ??
+							"User";
+						const authorPfpUrl =
+							profile?.pfp_url ??
+							cookedPost?.author_pfp_url ??
+							cookedPost?.pfp_url ??
+							cookedPost?.profile_pfp_url ??
+							review?.author_pfp_url ??
+							review?.pfp_url ??
+							review?.profile_pfp_url ??
+							null;
+
+						return {
+							id: String(review?.id ?? cookedPost?.id ?? `${safePostId}-${Math.random()}`),
+							authorUsername: String(authorUsername),
+							authorPfpUrl,
+							rating: Number(review?.rating ?? 0),
+							description: String(review?.description ?? review?.review_description ?? review?.text ?? ""),
+							imageUrl: resolvedImage,
+						};
+					}));
+
+				setReviews(normalizedReviews);
+			} catch (error) {
+				console.error("Error loading post reviews:", error);
+				if (active) setReviews([]);
+			} finally {
+				if (active) setLoadingReviews(false);
+			}
+		}
+
+		loadReviews();
+		return () => {
+			active = false;
+		};
+	}, [detailsVisible, postId]);
 
 	async function toggleLike() {
 		if (!postId || liked || liking) return;
@@ -89,15 +223,53 @@ export function PostCard({
 		if (!result.canceled && result.assets[0]?.uri) setCookedImage(result.assets[0].uri);
 	}
 
-	function submitCookedRecipe() {
-		if (!cookedImage || !cookRating) {
-			Alert.alert("Missing details", "Add a photo and rating for the cooked recipe.");
+	async function submitCookedRecipe() {
+		if (!postId) {
+			Alert.alert("Unable to save", "This recipe is missing its post ID.");
 			return;
 		}
-		Alert.alert(
-			"Backend function required",
-			"The photo and rating are ready, but BetterBite does not yet have a function to save cooked recipes.",
-		);
+		if (!currentUser?.id) {
+			Alert.alert("Sign in required", "Please sign in before saving a cooked recipe.");
+			return;
+		}
+		if (!cookedImage) {
+			Alert.alert("Missing photo", "Upload a photo of your cooked recipe before saving.");
+			return;
+		}
+
+		setSubmittingCook(true);
+		try {
+			const filename = cookedImage.split("/").pop() || `${Date.now()}.jpg`;
+			const storagePath = `${currentUser.id}/${Date.now()}-${filename}`;
+			const blob = await (await fetch(cookedImage)).blob();
+			const { error: uploadError } = await supabase.storage
+				.from("cooked_posts-images")
+				.upload(storagePath, blob, {
+					contentType: blob.type || "image/jpeg",
+					upsert: true,
+				});
+
+			if (uploadError) throw uploadError;
+
+			await create_cooked_post(postId, storagePath);
+
+			if (cookRating > 0 || cookReview.trim().length > 0) {
+				await create_post_review(postId, cookReview.trim(), cookRating);
+			}
+
+			setCookVisible(false);
+			setCookedImage(null);
+			setCookReview("");
+			setCookRating(0);
+			Alert.alert("Saved", "Your cooked recipe has been added to your profile.");
+		} catch (error) {
+			Alert.alert(
+				"Could not save cooked recipe",
+				error instanceof Error ? error.message : "Please try again.",
+			);
+		} finally {
+			setSubmittingCook(false);
+		}
 	}
 
 	return (
@@ -106,7 +278,7 @@ export function PostCard({
 				<BaseCard style={styles.card}>
 					{hasImage ? (
 						<Image
-							source={{ uri: imageUrl }}
+							source={{ uri: resolvedImageUrl }}
 							style={styles.image}
 								resizeMode="cover"
 								onError={() => setImageFailed(true)}
@@ -167,7 +339,7 @@ export function PostCard({
 							<Text style={styles.modalMeta}>
 									{username}  |  Difficulty {difficulty}/10
 							</Text>
-							{hasImage && <Image source={{ uri: imageUrl }} style={styles.modalImage} resizeMode="cover" />}
+							{hasImage && <Image source={{ uri: resolvedImageUrl }} style={styles.modalImage} resizeMode="cover" />}
 							<View style={styles.engagementRow}>
 								<Pressable style={styles.likeButton} onPress={toggleLike} disabled={liking}>
 									{liking ? <ActivityIndicator color={AppTheme.accent} /> : <Text style={styles.likeText}>{liked ? "Liked" : "Like"}</Text>}
@@ -191,7 +363,45 @@ export function PostCard({
 								</Text>
 							)) : <Text style={styles.detailEmpty}>No cooking steps listed.</Text>}
 							<Text style={styles.detailHeading}>Cooked by</Text>
-							<Text style={styles.detailEmpty}>No cooked recipes are available yet.</Text>
+							{loadingReviews ? (
+								<Text style={styles.detailEmpty}>Loading cooked reviews...</Text>
+							) : reviews.length ? (
+								<View style={styles.reviewList}>
+									{reviews.map((review) => (
+										<View key={review.id} style={styles.reviewCard}>
+											<View style={styles.reviewHeader}>
+												{review.authorPfpUrl ? (
+													<Image
+														source={{ uri: review.authorPfpUrl }}
+														style={styles.reviewAvatar}
+														resizeMode="cover"
+													/>
+												) : (
+													<View style={styles.reviewAvatarFallback}>
+														<Text style={styles.reviewAvatarText}>{review.authorUsername.slice(0, 1).toUpperCase()}</Text>
+													</View>
+												)}
+												<View style={styles.reviewMeta}>
+													<Text style={styles.reviewUser}>{review.authorUsername}</Text>
+													<Text style={styles.reviewRating}>Rated {review.rating}/5</Text>
+												</View>
+											</View>
+											{review.imageUrl ? (
+												<Image
+													source={{ uri: review.imageUrl }}
+													style={styles.reviewImage}
+													resizeMode="cover"
+												/>
+											) : null}
+											{review.description ? (
+												<Text style={styles.reviewDescription}>{review.description}</Text>
+											) : null}
+										</View>
+									))}
+								</View>
+							) : (
+								<Text style={styles.detailEmpty}>No cooked recipes are available yet.</Text>
+							)}
 						</ScrollView>
 					</View>
 				</View>
@@ -209,13 +419,31 @@ export function PostCard({
 						<Text style={styles.ratingLabel}>Your rating</Text>
 						<View style={styles.ratingRow}>
 							{[1, 2, 3, 4, 5].map((rating) => (
-								<Pressable key={rating} onPress={() => setCookRating(rating)} style={styles.ratingButton}>
-									<Text style={[styles.ratingText, rating <= cookRating && styles.selectedRating]}>{rating}</Text>
+								<Pressable
+									key={rating}
+									onPress={() => setCookRating(rating)}
+									style={[styles.ratingButton, cookRating === rating && styles.selectedRatingButton]}
+								>
+									<Text style={[styles.ratingText, cookRating === rating && styles.selectedRating]}>{rating}</Text>
 								</Pressable>
 							))}
 						</View>
-						<Pressable style={styles.submitCookButton} onPress={submitCookedRecipe}>
-							<Text style={styles.submitCookText}>Save cooked recipe</Text>
+						<Text style={styles.reviewLabel}>Review note (optional)</Text>
+						<TextInput
+							style={styles.reviewInput}
+							value={cookReview}
+							onChangeText={setCookReview}
+							placeholder="Tell everyone how it turned out..."
+							placeholderTextColor={AppTheme.muted}
+							multiline
+							numberOfLines={4}
+						/>
+						<Pressable
+							disabled={submittingCook}
+							style={[styles.submitCookButton, submittingCook && styles.submitCookButtonDisabled]}
+							onPress={submitCookedRecipe}
+						>
+							<Text style={styles.submitCookText}>{submittingCook ? "Saving..." : "Save cooked recipe"}</Text>
 						</Pressable>
 					</View>
 				</View>
@@ -380,17 +608,39 @@ const styles = StyleSheet.create({
 		height: 38,
 		borderRadius: 19,
 		backgroundColor: AppTheme.surface,
+		borderWidth: 1,
+		borderColor: AppTheme.border,
 		alignItems: "center",
 		justifyContent: "center",
 	},
+	selectedRatingButton: {
+		backgroundColor: AppTheme.accentSoft,
+		borderColor: AppTheme.accent,
+	},
 	ratingText: { color: AppTheme.muted, fontWeight: "700" },
 	selectedRating: { color: AppTheme.accent },
+	reviewLabel: { color: AppTheme.text, fontWeight: "700", marginTop: 18 },
+	reviewInput: {
+		marginTop: 10,
+		minHeight: 90,
+		borderWidth: 1,
+		borderColor: AppTheme.border,
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		color: AppTheme.text,
+		backgroundColor: AppTheme.surface,
+		textAlignVertical: "top",
+	},
 	submitCookButton: {
 		alignItems: "center",
 		backgroundColor: AppTheme.accent,
 		borderRadius: 9,
 		marginTop: 22,
 		paddingVertical: 13,
+	},
+	submitCookButtonDisabled: {
+		opacity: 0.7,
 	},
 	submitCookText: { color: AppTheme.card, fontWeight: "700" },
 	closeButton: { alignSelf: "flex-end", paddingVertical: 4, paddingHorizontal: 2 },
@@ -401,4 +651,43 @@ const styles = StyleSheet.create({
 	detailHeading: { color: AppTheme.text, fontSize: 18, fontWeight: "700", marginTop: 26, marginBottom: 10 },
 	detailItem: { color: AppTheme.text, fontSize: 15, lineHeight: 23, marginBottom: 7 },
 	detailEmpty: { color: AppTheme.muted, fontSize: 14 },
+	reviewList: { marginTop: 10, gap: 12 },
+	reviewCard: {
+		backgroundColor: AppTheme.surface,
+		borderRadius: 12,
+		borderWidth: 1,
+		borderColor: AppTheme.border,
+		padding: 12,
+		gap: 10,
+	},
+	reviewHeader: { flexDirection: "row", alignItems: "center" },
+	reviewAvatar: {
+		width: 34,
+		height: 34,
+		borderRadius: 17,
+		backgroundColor: AppTheme.accentSoft,
+	},
+	reviewAvatarFallback: {
+		width: 34,
+		height: 34,
+		borderRadius: 17,
+		backgroundColor: AppTheme.warmSoft,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	reviewAvatarText: { color: AppTheme.warm, fontWeight: "700" },
+	reviewMeta: { marginLeft: 10, flex: 1 },
+	reviewUser: { color: AppTheme.text, fontWeight: "700" },
+	reviewRating: { color: AppTheme.accent, fontSize: 12, marginTop: 2 },
+	reviewImage: {
+		width: "100%",
+		height: 180,
+		borderRadius: 10,
+		backgroundColor: AppTheme.accentSoft,
+	},
+	reviewDescription: {
+		color: AppTheme.text,
+		fontSize: 14,
+		lineHeight: 20,
+	},
 });

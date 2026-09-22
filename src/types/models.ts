@@ -42,3 +42,20 @@ export interface CreatePostPayload {
  * @param payload The clean post data from your application state
  * @returns The newly created post UUID string
  */
+
+export interface PostReview {
+  id: string;
+  created_at: Date | string;
+  postS_id: string;
+  profile_id: string;
+  rating: number;
+  description: string;
+}
+
+export interface CookedPost {
+  id: string;
+  created_at: Date | string;
+  post_id: string;
+  profile_id: string;
+  image_url: string;
+}
