@@ -1,23 +1,23 @@
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+	ActivityIndicator,
+	Alert,
+	Image,
+	Modal,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	View,
 } from "react-native";
 
 import { AppTheme } from "@/constants/app-theme";
 import { resolvePostImageUrl } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { supabase } from "@/lib/supabase";
-import { create_cooked_post, create_post_review, fetchUserProfile, get_cooked_posts, get_post_reviews, likePost } from "@/services/api";
+import { createCookedPostAndReview, fetchUserProfile, get_cooked_posts, get_post_reviews, likePost } from "@/services/api";
 
 import { BaseCard } from "./base-card";
 
@@ -239,23 +239,31 @@ export function PostCard({
 
 		setSubmittingCook(true);
 		try {
-			const filename = cookedImage.split("/").pop() || `${Date.now()}.jpg`;
-			const storagePath = `${currentUser.id}/${Date.now()}-${filename}`;
-			const blob = await (await fetch(cookedImage)).blob();
+			const file = await (await fetch(cookedImage)).blob();
+			const filePath = `${currentUser.id}/${postId}/${crypto.randomUUID()}-${Date.now()}.jpg`;
 			const { error: uploadError } = await supabase.storage
 				.from("cooked_posts-images")
-				.upload(storagePath, blob, {
-					contentType: blob.type || "image/jpeg",
-					upsert: true,
+				.upload(filePath, file, {
+					contentType: file.type || "image/jpeg",
+					upsert: false,
 				});
 
-			if (uploadError) throw uploadError;
-
-			await create_cooked_post(postId, storagePath);
-
-			if (cookRating > 0 || cookReview.trim().length > 0) {
-				await create_post_review(postId, cookReview.trim(), cookRating);
+			if (uploadError) {
+				throw new Error(`Image upload failed: ${uploadError.message}`);
 			}
+
+			const publicUrl = supabase.storage
+				.from("cooked_posts-images")
+				.getPublicUrl(filePath).data.publicUrl;
+
+			const trimmedReview = cookReview.trim();
+			await createCookedPostAndReview(supabase, {
+				profile_id: currentUser.id,
+				post_id: postId,
+				image_url: publicUrl,
+				rating: cookRating,
+				description: trimmedReview,
+			});
 
 			setCookVisible(false);
 			setCookedImage(null);
@@ -263,6 +271,7 @@ export function PostCard({
 			setCookRating(0);
 			Alert.alert("Saved", "Your cooked recipe has been added to your profile.");
 		} catch (error) {
+			console.error("submitCookedRecipe failed:", error);
 			Alert.alert(
 				"Could not save cooked recipe",
 				error instanceof Error ? error.message : "Please try again.",

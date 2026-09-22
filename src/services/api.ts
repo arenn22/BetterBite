@@ -615,113 +615,61 @@ export async function get_liked_posts() {
   }
 }
 
-export async function create_cooked_post(
-  source_post_id: string,
-  cooked_image_path: string,
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type CreateCookedPostAndReviewParams = {
+  profile_id: string;
+  post_id: string;
+  image_url?: string | null;
+  rating: number;
+  description?: string | null;
+};
+
+export async function createCookedPostAndReview(
+  supabase: SupabaseClient,
+  params: CreateCookedPostAndReviewParams
 ) {
-  const safePath = cooked_image_path.replace(/^\/+/, "");
+  const {
+    profile_id,
+    post_id,
+    image_url = null,
+    rating,
+    description = null,
+  } = params;
 
-  const { data: authUserData, error: authUserError } = await supabase.auth.getUser();
-  if (authUserError || !authUserData.user?.id) {
-    throw new Error("You must be signed in to save a cooked recipe.");
+  const { data: cookedPost, error: cookedPostError } =
+    await supabase.rpc('create_cooked_post', {
+      p_profile_id: profile_id,
+      p_post_id: post_id,
+      p_image_url: image_url,
+    });
+
+  if (cookedPostError) {
+    throw new Error(
+      `Failed to create cooked post: ${cookedPostError.message}`
+    );
   }
 
-  const userFolder = `${authUserData.user.id}/`;
-  if (!safePath.startsWith(userFolder) && !safePath.includes(`/${authUserData.user.id}/`)) {
-    throw new Error("cooked_image_path must be inside the authenticated user folder");
+  const { data: review, error: reviewError } = await supabase.rpc(
+    'create_post_review',
+    {
+      p_profile_id: profile_id,
+      p_post_id: post_id,
+      p_rating: rating,
+      p_description: description,
+    }
+  );
+
+  if (reviewError) {
+    throw new Error(
+      `Cooked post was created, but the review failed: ${reviewError.message}`
+    );
   }
 
-  const insertPayload = {
-    source_post_id,
-    profile_id: authUserData.user.id,
-    cooked_image_path: safePath,
+  return {
+    cookedPost,
+    review,
   };
-
-  const directTableAttempts = ["cooked_posts", "cooked_post"];
-  let lastInsertError: Error | null = null;
-
-  for (const tableName of directTableAttempts) {
-    try {
-      const { data, error } = await supabase
-        .from(tableName)
-        .insert(insertPayload)
-        .select()
-        .maybeSingle();
-
-      if (!error && data) {
-        console.log("Cooked post inserted directly:", data);
-        return data;
-      }
-
-      const message = error?.message || "Direct insert failed";
-      if (!/does not exist|relation .* does not exist|not found/i.test(message)) {
-        lastInsertError = new Error(message);
-      }
-      console.warn(`Direct insert failed for ${tableName}:`, message);
-    } catch (error) {
-      lastInsertError = error instanceof Error ? error : new Error("Unknown direct insert error");
-      console.warn(`Direct insert threw for ${tableName}:`, lastInsertError.message);
-    }
-  }
-
-  const rpcAttempts = [
-    { source_post_id, cooked_image_path: safePath },
-    { p_source_post_id: source_post_id, p_cooked_image_path: safePath },
-    { post_id: source_post_id, image_path: safePath },
-  ];
-
-  let lastError: Error | null = lastInsertError;
-  for (const payload of rpcAttempts) {
-    try {
-      const { data, error } = await supabase.rpc('create_cooked_post', payload);
-      if (!error) {
-        console.log("Cooked post created successfully via RPC:", data);
-        return data;
-      }
-      lastError = new Error(error.message);
-      console.warn("create_cooked_post RPC attempt failed:", payload, error.message);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error("Unknown create_cooked_post error");
-      console.warn("create_cooked_post RPC threw:", payload, lastError.message);
-    }
-  }
-
-  throw new Error(lastError?.message || "Failed to create cooked post.");
-}
-
-export async function create_post_review(
-  post_id: string,
-  description: string,
-  rating: number,
-) {
-  const normalizedDescription = typeof description === "string" ? description.trim() : "";
-  const normalizedRating = Math.min(5, Math.max(0, Number(rating) || 0));
-
-  if (!normalizedDescription.length) {
-    return null;
-  }
-
-  const rpcAttempts = [
-    { p_post_id: post_id, p_rating: normalizedRating, p_description: normalizedDescription },
-    { post_id, rating: normalizedRating, description: normalizedDescription },
-  ];
-
-  let lastError: Error | null = null;
-  for (const payload of rpcAttempts) {
-    try {
-      const { data, error } = await supabase.rpc("create_post_review", payload);
-      if (!error) {
-        return data;
-      }
-      lastError = new Error(error.message);
-      console.warn("create_post_review RPC attempt failed:", payload, error.message);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error("Unknown create_post_review error");
-      console.warn("create_post_review RPC threw:", payload, lastError.message);
-    }
-  }
-
-  throw new Error(lastError?.message || "Failed to save review.");
 }
 
 export async function get_cooked_posts() {
