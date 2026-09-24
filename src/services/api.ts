@@ -137,7 +137,7 @@ async function getEmailWithUsername(username: string) {
 
 export async function createPost(payload: CreatePostPayload): Promise<string> {
   // Call the database function via Remote Procedure Call (RPC)
-  const { data: newPostId, error } = await supabase.rpc('create_recipe_post', {
+  const { data: newPostId, error } = await supabase.rpc('create_post', {
     p_title: payload.title,
     p_description: payload.description,
     p_difficulty: payload.difficulty,
@@ -146,6 +146,7 @@ export async function createPost(payload: CreatePostPayload): Promise<string> {
     p_recipe: payload.recipeJson,
     p_restriction_ids: payload.restrictionIds,
     p_cuisine_ids: payload.cuisineIds,
+    p_time: payload.time,
   });
 
   // Handle RLS policy rejections or database errors

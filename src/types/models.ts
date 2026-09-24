@@ -32,6 +32,7 @@ export interface CreatePostPayload {
   recipeJson: Record<string, any>; // For your jsonb recipe data structure
   restrictionIds: number[];       // Array of IDs for post_restrictions
   cuisineIds: number[];           // Array of IDs for post_cuisines
+  time: number;
 }
 // Type definitions matching your Postgres schema fields
 
