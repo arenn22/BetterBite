@@ -65,7 +65,7 @@ function PostImage({ imageUrl, title, featured = false }: { imageUrl?: string; t
 	);
 }
 
-function RecipeCard({ post, wide, userId }: { post: Post; wide?: boolean; userId?: string }) {
+function RecipeCard({ post, userId }: { post: Post; userId?: string }) {
 	const [liked, setLiked] = useState(false);
 	const [likeTotal, setLikeTotal] = useState(post.likes || 0);
 	const [liking, setLiking] = useState(false);
@@ -84,7 +84,7 @@ function RecipeCard({ post, wide, userId }: { post: Post; wide?: boolean; userId
 	}
 
 	return (
-		<View style={[styles.recipeCard, wide && styles.wideCard]}>
+		<View style={styles.recipeCard}>
 			<View style={styles.cardImageWrap}>
 				<PostImage imageUrl={post.image_url} title={post.title} />
 				<Pressable accessibilityLabel={liked ? "Recipe liked" : "Like recipe"} onPress={() => void handleLike()} style={styles.likeButton}>
@@ -369,8 +369,8 @@ export default function ExploreScreen() {
 					/>
 				) : visiblePosts.length ? (
 					<View style={styles.recipeGrid}>
-						{visiblePosts.map((post, index) => (
-							<RecipeCard key={post.id} post={post} wide={index % 5 === 1 || index % 5 === 4} userId={currentUser?.id} />
+						{visiblePosts.map((post) => (
+							<RecipeCard key={post.id} post={post} userId={currentUser?.id} />
 						))}
 					</View>
 				) : (
@@ -439,8 +439,7 @@ const styles = StyleSheet.create({
 	headingTitle: { color: AppTheme.text, fontSize: 15, fontWeight: "800" },
 	count: { color: AppTheme.muted, backgroundColor: "#ECECE7", borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, fontSize: 10, fontWeight: "700" },
 	recipeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 11, justifyContent: "space-between" },
-	recipeCard: { width: "48.2%", overflow: "hidden", borderRadius: 15, borderWidth: 1, borderColor: "#E5E5E0", backgroundColor: "#FFFFFF" },
-	wideCard: { width: "100%" },
+	recipeCard: { width: "48.2%", height: 226, overflow: "hidden", borderRadius: 15, borderWidth: 1, borderColor: "#E5E5E0", backgroundColor: "#FFFFFF" },
 	cardImageWrap: { height: 132, overflow: "hidden", backgroundColor: "#E8EDE5" },
 	cardImage: { width: "100%", height: "100%", backgroundColor: "#E8EDE5" },
 	likeButton: { position: "absolute", top: 8, right: 8, width: 29, height: 29, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.88)", alignItems: "center", justifyContent: "center" },
