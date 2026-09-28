@@ -561,7 +561,7 @@ export async function set_my_experience_level(difficulty: number) {
 const posts_per_section = 5;
 const offset = 0;
 export async function get_recommended_posts() {
-  const {data: posts, error} = await supabase.rpc('get_recommended_posts', {limit_count: posts_per_section, offset_count: offset});
+  const {data: posts, error} = await supabase.rpc('get_recommended_posts');
   if(error) {
     console.error("Error fetching recommended posts:", error.message);
     return [];
@@ -573,7 +573,7 @@ export async function get_recommended_posts() {
 }
 
 export async function get_easy_posts() {
-  const {data: posts, error} = await supabase.rpc('get_easy_posts', {limit_count: posts_per_section, offset_count: offset});
+  const {data: posts, error} = await supabase.rpc('get_easy_posts');
   if(error) {
     console.error("Error fetching easy posts:", error.message);
     return [];
@@ -584,7 +584,7 @@ export async function get_easy_posts() {
 }
 
 export async function get_challenge_posts() {
-  const {data: posts, error} = await supabase.rpc('get_challenge_posts', {limit_count: posts_per_section, offset_count: offset});
+  const {data: posts, error} = await supabase.rpc('get_challenge_posts');
   if(error) {
     console.error("Error fetching challenge posts:", error.message);
     return [];
@@ -595,7 +595,7 @@ export async function get_challenge_posts() {
 }
 
 export async function get_friend_posts() {
-  const {data: posts, error} = await supabase.rpc('get_friend_posts', {limit_count: posts_per_section, offset_count: offset});
+  const {data: posts, error} = await supabase.rpc('get_friend_posts');
   if(error) {
     console.error("Error fetching friend posts:", error.message);
     return [];
@@ -674,7 +674,7 @@ export async function createCookedPostAndReview(
 }
 
 export async function get_cooked_posts() {
-  const {data: posts, error} = await supabase.rpc('get_cooked_posts', {limit_count: posts_per_section, offset_count: offset});
+  const {data: posts, error} = await supabase.rpc('get_cooked_posts');
   if(error) {
     console.error("Error fetching cooked posts:", error.message);
     return [];
