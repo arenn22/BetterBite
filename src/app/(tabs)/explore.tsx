@@ -1,12 +1,12 @@
 import {
-    ActivityIndicator,
-    Image,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+	ActivityIndicator,
+	Image,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -14,12 +14,12 @@ import { AppTheme } from "@/constants/app-theme";
 import { resolvePostImageUrl, usePostFeed } from "@/hooks/use-post-feed";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import {
-    fetchCuisines,
-    fetchDietaryRestrictions,
-    fetchFriends,
-    fetchPostByCuisines,
-    fetchPostsByDietaryRestrictions,
-    likePost,
+	fetchCuisines,
+	fetchDietaryRestrictions,
+	fetchFriends,
+	fetchPostByCuisines,
+	fetchPostsByDietaryRestrictions,
+	likePost,
 } from "@/services/api";
 import type { Post } from "@/types/models";
 import { useEffect, useState } from "react";
@@ -29,7 +29,6 @@ type Friend = Record<string, unknown>;
 type FilterOption = {
 	key: string;
 	label: string;
-	kind: "friends" | "category";
 	id?: number;
 	field?: "cuisineIds" | "restrictionIds";
 };
@@ -157,7 +156,6 @@ export default function ExploreScreen() {
 					options.set(`cuisine-${option.id}`, {
 						key: `cuisine-${option.id}`,
 						label: option.name,
-						kind: "category",
 						id: option.id,
 						field: "cuisineIds",
 					});
@@ -168,7 +166,6 @@ export default function ExploreScreen() {
 					options.set(`restriction-${option.id}`, {
 						key: `restriction-${option.id}`,
 						label: option.name,
-						kind: "category",
 						id: option.id,
 						field: "restrictionIds",
 					});
@@ -183,8 +180,8 @@ export default function ExploreScreen() {
 		};
 	}, [currentUser]);
 	const filters: FilterOption[] = [
-		{ key: "all", label: "All", kind: "category" },
-		{ key: "friends", label: "Friends", kind: "friends" },
+		{ key: "all", label: "All" },
+		{ key: "friends", label: "Friends" },
 		...categories,
 	];
 
