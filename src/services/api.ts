@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase";
-import type { AuthResult, Profile } from "../types/auth";
-import type { CreatePostPayload, PendingFriendRequest, Post } from "../types/models";
+import type { AuthResult, Profile, SearchUserResult } from "../types/auth";
+import type { CookedPost, CreatePostPayload, PendingFriendRequest, Post, PostReview } from "../types/models";
 export const DEFAULT_PROFILE_IMAGE =
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80";
 
@@ -137,7 +137,7 @@ async function getEmailWithUsername(username: string) {
 
 export async function createPost(payload: CreatePostPayload): Promise<string> {
   // Call the database function via Remote Procedure Call (RPC)
-  const { data: newPostId, error } = await supabase.rpc('create_recipe_post', {
+  const { data: newPostId, error } = await supabase.rpc('create_post', {
     p_title: payload.title,
     p_description: payload.description,
     p_difficulty: payload.difficulty,
@@ -146,6 +146,7 @@ export async function createPost(payload: CreatePostPayload): Promise<string> {
     p_recipe: payload.recipeJson,
     p_restriction_ids: payload.restrictionIds,
     p_cuisine_ids: payload.cuisineIds,
+    p_time: payload.time,
   });
 
   // Handle RLS policy rejections or database errors
@@ -187,6 +188,18 @@ export async function fetchCuisines() {
   return data || [];
 }
 
+export async function updateCuisinePreferences(
+  userId: string,
+  cuisineIds: number[],
+): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ cuisine_preferences: cuisineIds })
+    .eq("id", userId);
+
+  if (error) throw error;
+}
+
 export async function fetchUserProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
@@ -215,10 +228,42 @@ export async function fetchUserProfile(userId: string): Promise<Profile | null> 
   } as Profile;
 } 
 
-export async function searchUsers(searchQuery: string): Promise<Pick<Profile, 'id' | 'username'>[]> {
+export async function updateProfilePhoto(userId: string, imageUri: string): Promise<string> {
+  const filename = imageUri.split("/").pop() || `${Date.now()}.jpg`;
+  const path = `profile-photos/${userId}/${Date.now()}-${filename}`;
+  const blob = await (await fetch(imageUri)).blob();
+
+  const { error: uploadError } = await supabase.storage
+    .from("post-images")
+    .upload(path, blob, {
+      contentType: blob.type || "image/jpeg",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  const publicUrl = supabase.storage
+    .from("post-images")
+    .getPublicUrl(path).data.publicUrl;
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ pfp_url: publicUrl })
+    .eq("id", userId);
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  return publicUrl;
+}
+
+export async function searchUsers(searchQuery: string): Promise<SearchUserResult[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username')
+    .select('id, username, pfp_url')
     .ilike('username', `%${searchQuery}%`); // Matches partial names (e.g., "joh" matches "john")
 
   if (error) {
@@ -226,7 +271,7 @@ export async function searchUsers(searchQuery: string): Promise<Pick<Profile, 'i
     return [];
   }
 
-  return (data || []) as Pick<Profile, 'id' | 'username'>[];
+  return (data || []) as SearchUserResult[];
 }
 
 
@@ -400,4 +445,252 @@ export async function fetchPostByCuisines(cuisines: number[]): Promise<Post[]> {
   }
 
   return [];
+}
+
+export async function fetchPostsByDifficulty(difficulty: number): Promise<Post[]> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("difficulty", difficulty);
+  if(error) {
+    console.error("Error fetching posts by difficulty:", error.message);
+    return [];
+  }
+  return (data || []) as Post[];
+}
+
+export async function likePost(postId: string, _userId: string) {
+  const {error} = await supabase.rpc('like_post', {
+    p_post_id: postId,
+  });
+  if(error) {
+    console.error("Error liking post:", error.message);
+  }
+}
+
+export async function getLikedPostsByUser(_userId: string): Promise<Post[]> {
+  const { data, error } = await supabase.rpc('get_liked_posts_by_user', {
+
+  });
+  if(error) {
+    console.error("Error fetching liked posts:", error.message);
+    return [];
+  }
+  else {
+    return (data || []) as Post[];
+  }
+}
+
+export async function get_post_by_profile_restrictions() { 
+
+  const {data: restrictions, error} = await supabase.rpc('get_my_dietary_restrictions');
+  if(error) {
+    console.error("Error fetching profile restrictions:", error.message);
+    return [];
+  }
+  else {
+    const {data: posts, error} = await supabase.rpc('get_posts_by_dietary_restrictions', { p_restriction_ids: restrictions });
+    if(error) {
+      console.error("Error fetching posts by dietary restrictions:", error.message);
+      return [];
+    }
+    else {
+      return (posts || []) as Post[];
+    }
+  }
+}
+
+export async function get_posts_by_profile_experience() { 
+  const {data: posts, error} = await supabase.rpc('get_posts_by_experience_level');
+  if(error) {
+    console.error("Error fetching posts by experience level:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
+export async function set_my_dietary_restrictions(restrictionIds: number[]) {
+  const {error} = await supabase.rpc('set_my_dietary_restrictions', { p_restriction_ids: restrictionIds });
+  if(error) {
+    console.error("Error setting dietary restrictions:", error.message);
+  }
+}
+
+export async function set_my_experience_level(difficulty: number) {
+  const normalizedDifficulty = Math.min(10, Math.max(1, Math.round(Number(difficulty) || 1)));
+
+  try {
+    const { error } = await supabase.rpc('set_my_experience_level', {
+      p_experience_level: normalizedDifficulty,
+    });
+
+    if (!error) return;
+
+    const legacyErrorMessage = error.message?.toLowerCase() ?? "";
+    const needsFallback =
+      legacyErrorMessage.includes("could not find the function") ||
+      legacyErrorMessage.includes("between 1 and 5") ||
+      legacyErrorMessage.includes("must be between 1 and 5");
+
+    if (!needsFallback) {
+      throw error;
+    }
+
+    const { data: authUser, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser?.user?.id) {
+      throw authError ?? new Error("Unable to determine the current user.");
+    }
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ experience_level: normalizedDifficulty })
+      .eq("id", authUser.user.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error setting experience level:", message);
+    throw error;
+  }
+}
+
+const posts_per_section = 5;
+const offset = 0;
+export async function get_recommended_posts() {
+  const {data: posts, error} = await supabase.rpc('get_recommended_posts');
+  if(error) {
+    console.error("Error fetching recommended posts:", error.message);
+    return [];
+  }
+  else {
+    
+    return (posts || []) as Post[];
+  }
+}
+
+export async function get_easy_posts() {
+  const {data: posts, error} = await supabase.rpc('get_easy_posts');
+  if(error) {
+    console.error("Error fetching easy posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
+export async function get_challenge_posts() {
+  const {data: posts, error} = await supabase.rpc('get_challenge_posts');
+  if(error) {
+    console.error("Error fetching challenge posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
+export async function get_friend_posts() {
+  const {data: posts, error} = await supabase.rpc('get_friend_posts');
+  if(error) {
+    console.error("Error fetching friend posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
+export async function get_liked_posts() {
+  const {data: posts, error} = await supabase.rpc('get_liked_posts', {limit_count: posts_per_section, offset_count: offset});
+  if(error) {
+    console.error("Error fetching liked posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as Post[];
+  }
+}
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type CreateCookedPostAndReviewParams = {
+  profile_id: string;
+  post_id: string;
+  image_url?: string | null;
+  rating: number;
+  description?: string | null;
+};
+
+export async function createCookedPostAndReview(
+  supabase: SupabaseClient,
+  params: CreateCookedPostAndReviewParams
+) {
+  const {
+    profile_id,
+    post_id,
+    image_url = null,
+    rating,
+    description = null,
+  } = params;
+
+  const { data: cookedPost, error: cookedPostError } =
+    await supabase.rpc('create_cooked_post', {
+      p_profile_id: profile_id,
+      p_post_id: post_id,
+      p_image_url: image_url,
+    });
+
+  if (cookedPostError) {
+    throw new Error(
+      `Failed to create cooked post: ${cookedPostError.message}`
+    );
+  }
+
+  const { data: review, error: reviewError } = await supabase.rpc(
+    'create_post_review',
+    {
+      p_profile_id: profile_id,
+      p_post_id: post_id,
+      p_rating: rating,
+      p_description: description,
+    }
+  );
+
+  if (reviewError) {
+    throw new Error(
+      `Cooked post was created, but the review failed: ${reviewError.message}`
+    );
+  }
+
+  return {
+    cookedPost,
+    review,
+  };
+}
+
+export async function get_cooked_posts() {
+  const {data: posts, error} = await supabase.rpc('get_cooked_posts');
+  if(error) {
+    console.error("Error fetching cooked posts:", error.message);
+    return [];
+  }
+  else {
+    return (posts || []) as CookedPost[];
+  }
+}
+
+export async function get_post_reviews(post_id: string) {
+  const {data: reviews, error} = await supabase.rpc('get_post_reviews', {target_post_id: post_id, limit_count: 20, offset_count: 0});
+  if(error) {
+    console.error("Error fetching post reviews:", error.message);
+    return [];
+  }
+  else {
+    return (reviews || []) as PostReview[];
+  }
 }

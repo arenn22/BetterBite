@@ -240,6 +240,34 @@ export default function CreateScreen() {
 			setImageUri(result.assets[0].uri);
 	}
 
+	function updateListValue(
+		index: number,
+		value: string,
+		setter: React.Dispatch<React.SetStateAction<string[]>>,
+	) {
+		setter((current) => {
+			const next = [...current];
+			next[index] = value;
+			return next;
+		});
+	}
+
+	function addListItem(
+		setter: React.Dispatch<React.SetStateAction<string[]>>,
+	) {
+		setter((current) => [...current, ""]);
+	}
+
+	function removeListItem(
+		index: number,
+		setter: React.Dispatch<React.SetStateAction<string[]>>,
+	) {
+		setter((current) => {
+			if (current.length === 1) return [""];
+			return current.filter((_, itemIndex) => itemIndex !== index);
+		});
+	}
+
 	async function publish() {
 		if (!currentUser) return;
 		const parsedIngredients = ingredientItems.filter((item) => item.trim());
@@ -269,14 +297,11 @@ export default function CreateScreen() {
 					upsert: true,
 				});
 			if (upload.error) throw upload.error;
-			const imageUrl = supabase.storage
-				.from("post-images")
-				.getPublicUrl(path).data.publicUrl;
 			await createPost({
 				title: title.trim(),
 				description: description.trim(),
 				difficulty,
-				imageUrl,
+				imageUrl: path,
 				authorUsername: currentUser.username,
 				recipeJson: {
 					ingredients: parsedIngredients,

@@ -113,6 +113,8 @@ export default function ProfileScreen() {
 		if (!currentUser) return;
 		setDraftUsername(currentUser.username);
 		let active = true;
+		setLikedPosts([]);
+		setCookedPosts([]);
 		Promise.allSettled([
 			fetchUserProfile(currentUser.id),
 			fetchFriends(),
@@ -125,6 +127,8 @@ export default function ProfileScreen() {
 			if (friendsResult.status === "fulfilled")
 				setFriends(friendsResult.value as Friend[]);
 		});
+		void loadLikedPosts();
+		void loadCookedPosts();
 		return () => {
 			active = false;
 		};
