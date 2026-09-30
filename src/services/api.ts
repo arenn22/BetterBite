@@ -1,3 +1,4 @@
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import type { AuthResult, Profile, SearchUserResult } from "../types/auth";
 import type { CookedPost, CreatePostPayload, PendingFriendRequest, Post, PostReview } from "../types/models";
@@ -227,6 +228,108 @@ export async function fetchUserProfile(userId: string): Promise<Profile | null> 
     last_post_at: lastStreakPost,
   } as Profile;
 } 
+
+export async function fetchPosts(options: { authorId?: string; limit?: number } = {}): Promise<Post[]> {
+  const { authorId, limit = 30 } = options;
+  let query = supabase
+    .from("posts")
+    .select("*")
+    .order("date_created", { ascending: false })
+    .limit(limit);
+  if (authorId) query = query.eq("profile_id", authorId);
+
+  const { data: postRows, error } = await query;
+  if (error) throw error;
+
+  const posts = (postRows || []) as Post[];
+  const profileIds = [...new Set(posts.map((post) => post.profile_id))];
+  const { data: profileRows, error: profilesError } = profileIds.length
+    ? await supabase
+        .from("profiles")
+        .select("id, username, pfp_url")
+        .in("id", profileIds)
+    : { data: [], error: null };
+  if (profilesError) throw profilesError;
+
+  const profiles = new Map(
+    (profileRows || []).map((profile) => [profile.id, profile]),
+  );
+  return Promise.all(
+    posts.map(async (post) => {
+      const profile = profiles.get(post.profile_id);
+      return {
+        ...post,
+        image_url: await resolvePostImageUrl(post.image_url),
+        author_username: profile?.username || post.author_username,
+        author_pfp_url: profile?.pfp_url || null,
+      };
+    }),
+  );
+}
+
+export async function resolvePostImageUrl(
+  imageValue: string | undefined,
+  bucketName = "post-images",
+): Promise<string> {
+  const trimmed = imageValue?.trim();
+  if (!trimmed) return "";
+  if (/^data:/i.test(trimmed)) return trimmed;
+
+  const storagePath = getPostImagePath(trimmed, bucketName) ?? trimmed.replace(/^\/+/, "");
+  if (!storagePath) return trimmed;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .createSignedUrl(storagePath, 60 * 60);
+    if (!error && data?.signedUrl) return data.signedUrl;
+  } catch {
+    // Use the public URL fallback below.
+  }
+
+  try {
+    const publicUrl = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(storagePath).data.publicUrl;
+    if (publicUrl) return publicUrl;
+  } catch {
+    // Keep the original image URL if storage lookup fails.
+  }
+
+  return trimmed;
+}
+
+export function getPostImagePath(imageValue: string, bucketName = "post-images") {
+  const normalized = imageValue.trim();
+  if (!normalized) return "";
+
+  if (!/^https?:\/\//i.test(normalized)) {
+    const cleaned = normalized.replace(/^\/+/, "");
+    const publicPrefix = `public/${bucketName}/`;
+    const signedPrefix = `sign/${bucketName}/`;
+    if (cleaned.startsWith(publicPrefix)) return cleaned.slice(publicPrefix.length);
+    if (cleaned.startsWith(signedPrefix)) return cleaned.slice(signedPrefix.length);
+    if (cleaned.startsWith(`${bucketName}/`)) return cleaned.slice(`${bucketName}/`.length);
+    return cleaned;
+  }
+
+  try {
+    const pathname = decodeURIComponent(new URL(normalized).pathname);
+    const marker = "/storage/v1/object/";
+    const markerIndex = pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const bucketAndPath = pathname.slice(markerIndex + marker.length);
+    const publicPrefix = `public/${bucketName}/`;
+    const signedPrefix = `sign/${bucketName}/`;
+    if (bucketAndPath.startsWith(publicPrefix)) return bucketAndPath.slice(publicPrefix.length);
+    if (bucketAndPath.startsWith(signedPrefix)) return bucketAndPath.slice(signedPrefix.length);
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 export async function updateProfilePhoto(userId: string, imageUri: string): Promise<string> {
   const filename = imageUri.split("/").pop() || `${Date.now()}.jpg`;
@@ -459,19 +562,18 @@ export async function fetchPostsByDifficulty(difficulty: number): Promise<Post[]
   return (data || []) as Post[];
 }
 
-export async function likePost(postId: string, _userId: string) {
+export async function likePost(postId: string): Promise<void> {
   const {error} = await supabase.rpc('like_post', {
     p_post_id: postId,
   });
   if(error) {
     console.error("Error liking post:", error.message);
+    throw new Error(error.message);
   }
 }
 
-export async function getLikedPostsByUser(_userId: string): Promise<Post[]> {
-  const { data, error } = await supabase.rpc('get_liked_posts_by_user', {
-
-  });
+export async function getLikedPostsByUser(): Promise<Post[]> {
+  const { data, error } = await supabase.rpc('get_liked_posts');
   if(error) {
     console.error("Error fetching liked posts:", error.message);
     return [];
@@ -616,7 +718,6 @@ export async function get_liked_posts() {
   }
 }
 
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 type CreateCookedPostAndReviewParams = {
   profile_id: string;
@@ -627,7 +728,6 @@ type CreateCookedPostAndReviewParams = {
 };
 
 export async function createCookedPostAndReview(
-  supabase: SupabaseClient,
   params: CreateCookedPostAndReviewParams
 ) {
   const {
@@ -693,4 +793,139 @@ export async function get_post_reviews(post_id: string) {
   else {
     return (reviews || []) as PostReview[];
   }
+}
+
+export type PostReviewWithAuthor = PostReview & {
+  author_username: string;
+  author_pfp_url: string | null;
+};
+
+export type CookedPhotoWithAuthor = CookedPost & {
+  author_username: string;
+  author_pfp_url: string | null;
+};
+
+export async function fetchPostEngagement(postId: string): Promise<{
+  reviews: PostReviewWithAuthor[];
+  cookedPhotos: CookedPhotoWithAuthor[];
+}> {
+  const [reviews, allCookedPosts] = await Promise.all([
+    get_post_reviews(postId),
+    get_cooked_posts(),
+  ]);
+  const cookedPosts = allCookedPosts.filter((post) => post.post_id === postId);
+  const profileIds = new Set([
+    ...reviews.map((review) => review.profile_id),
+    ...cookedPosts.map((post) => post.profile_id),
+  ].filter(Boolean));
+  const profiles = new Map<string, Profile>();
+
+  await Promise.all([...profileIds].map(async (profileId) => {
+    const profile = await fetchUserProfile(profileId);
+    if (profile) profiles.set(profileId, profile);
+  }));
+
+  return {
+    reviews: reviews.map((review) => {
+      const profile = profiles.get(review.profile_id);
+      return {
+        ...review,
+        author_username: profile?.username || "BetterBite member",
+        author_pfp_url: profile?.pfp_url || null,
+      };
+    }),
+    cookedPhotos: await Promise.all(cookedPosts.map(async (post) => {
+      const profile = profiles.get(post.profile_id);
+      return {
+        ...post,
+        image_url: await resolvePostImageUrl(post.image_url, "cooked_posts-images"),
+        author_username: profile?.username || "BetterBite member",
+        author_pfp_url: profile?.pfp_url || null,
+      };
+    })),
+  };
+}
+
+export async function getCurrentSession(): Promise<Session | null> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
+export function subscribeToAuthStateChanges(
+  callback: (event: AuthChangeEvent, session: Session | null) => void,
+): () => void {
+  const { data } = supabase.auth.onAuthStateChange(callback);
+  return () => data.subscription.unsubscribe();
+}
+
+export async function updateProfileUsername(userId: string, username: string): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ username })
+    .eq("id", userId);
+
+  if (error) throw error;
+}
+
+export async function uploadPostImage(imageUri: string, userId: string): Promise<string> {
+  const filename = imageUri.split("/").pop() || `${Date.now()}.jpg`;
+  const path = `${userId}/${Date.now()}-${filename}`;
+  const blob = await (await fetch(imageUri)).blob();
+  const { error } = await supabase.storage
+    .from("post-images")
+    .upload(path, blob, {
+      contentType: blob.type || "image/jpeg",
+      upsert: true,
+    });
+
+  if (error) throw new Error(error.message);
+  return path;
+}
+
+export async function uploadCookedPostImage(
+  imageUri: string,
+  userId: string,
+  postId: string,
+): Promise<string> {
+  const blob = await (await fetch(imageUri)).blob();
+  const path = `${userId}/${postId}/${crypto.randomUUID()}-${Date.now()}.jpg`;
+  const { error } = await supabase.storage
+    .from("cooked_posts-images")
+    .upload(path, blob, {
+      contentType: blob.type || "image/jpeg",
+      upsert: false,
+    });
+
+  if (error) throw new Error(`Image upload failed: ${error.message}`);
+
+  return supabase.storage
+    .from("cooked_posts-images")
+    .getPublicUrl(path).data.publicUrl;
+}
+
+export async function getCookedPostsByUser(userId: string): Promise<Post[]> {
+  const cookedPosts = await get_cooked_posts();
+  const userCookedPosts = cookedPosts.filter((post) => post.profile_id === userId);
+  if (!userCookedPosts.length) return [];
+
+  const postIds = [...new Set(userCookedPosts.map((post) => post.post_id))];
+  const { data, error } = await supabase
+    .from("posts")
+    .select("*")
+    .in("id", postIds);
+  if (error) throw error;
+
+  const postsById = new Map(((data || []) as Post[]).map((post) => [post.id, post]));
+  return Promise.all(
+    userCookedPosts.flatMap((cookedPost) => {
+      const post = postsById.get(cookedPost.post_id);
+      if (!post) return [];
+      return [resolvePostImageUrl(cookedPost.image_url, "cooked_posts-images").then((imageUrl) => ({
+        ...post,
+        date_created: cookedPost.created_at,
+        image_url: imageUrl || post.image_url,
+      }))];
+    }),
+  );
 }

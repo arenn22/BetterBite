@@ -1,10 +1,11 @@
-import { supabase } from "@/lib/supabase";
 import {
     fetchUserProfile,
+    getCurrentSession,
     handleSignInEmail,
     handleSignInUsername,
     handleSignUp,
     signOut as signOutFromSupabase,
+    subscribeToAuthStateChanges,
 } from "@/services/api";
 import { Profile } from "@/types/auth";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		let isActive = true;
 
-		async function restoreProfile(session: NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>>["data"]["session"]) {
+		async function restoreProfile(session: Awaited<ReturnType<typeof getCurrentSession>>) {
 			if (!session) {
 				if (isActive) {
 					setCurrentUser(null);
@@ -72,25 +73,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 		async function restoreSession() {
 			setLoading(true);
-			const { data, error: sessionError } = await supabase.auth.getSession();
-
-			if (sessionError) {
+			try {
+				const session = await getCurrentSession();
+				await restoreProfile(session);
+				if (isActive) setLoading(false);
+			} catch (sessionError) {
 				if (isActive) {
-					setError(sessionError.message);
+					setError(sessionError instanceof Error ? sessionError.message : "Unable to restore session.");
 					setLoading(false);
 				}
-				return;
-			}
-
-			await restoreProfile(data.session);
-			if (isActive) {
-				setLoading(false);
 			}
 		}
 
 		void restoreSession();
 
-		const { data } = supabase.auth.onAuthStateChange((event, session) => {
+		const unsubscribe = subscribeToAuthStateChanges((event, session) => {
 			if (event === "SIGNED_OUT") {
 				setCurrentUser(null);
 				return;
@@ -103,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 		return () => {
 			isActive = false;
-			data.subscription.unsubscribe();
+			unsubscribe();
 		};
 	}, []);
 
