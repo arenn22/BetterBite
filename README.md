@@ -1,56 +1,69 @@
-# Welcome to your Expo app 👋
+# BetterBite 🍳
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Mission
 
-## Get started
+BetterBite makes cooking accessible, rewarding, and social for everyone. We believe that cooking shouldn't require culinary expertise or hours of free time—it should be something you *want* to come back to.
+
+## The Problem We're Solving
+
+In modern American society, packed schedules from work, school, and other responsibilities leave many people without the time or motivation to cook. This pushes people toward fast food that is quick and cheap but often loaded with additives, oversized portions, and excess calories that hurt health.
+
+Other cooking apps cater to home chefs and people already enthusiastic about cooking. **BetterBite is different.** We reward the *act* of cooking itself, not just picture-perfect results.
+
+## How BetterBite Works
+
+### Core Features
+- **Weekly Themed Challenges** – Participate in community cooking challenges and build streaks
+- **Tiered Leaderboards** – Compete meaningfully with cooks at your skill level, not just professionals
+- **Social Discovery** – Add friends, share dishes you've actually made, and inspire others
+- **Smart Explore** – Browse recipes filtered by cuisine type and dietary needs (gluten-free, kosher, vegan, etc.)
+- **AI-Powered Recommendations** – Get personalized suggestions based on your preferences and what friends are making
+- **Review Summaries** – AI summarizes food reviews to help you decide what to cook
+
+## Why BetterBite?
+
+✨ **Achievable Progress** – See your cooking journey tracked and celebrated, even if you're just starting out  
+👥 **Social & Community-Driven** – Cook with friends, share wins, and inspire each other  
+🎯 **Accessible Design** – Built for busy people; quick recipes and simple challenges  
+💪 **Healthy Habits** – Make cooking a rewarding habit that builds over time
+
+## Tech Stack
+
+- **Frontend**: React Native & Expo (cross-platform development)
+- **Backend**: Supabase (user data, posts, and community features)
+- **Design**: Figma (App Store compliant design guidelines)
+- **AI**: Integrated recommendations and review summarization
+- **Collaboration**: GitHub & VS Code
+
+## Get Started
 
 1. Install dependencies
-
    ```bash
    npm install
    ```
 
 2. Start the app
-
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+3. Open in:
+   - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+   - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+   - [Expo Go](https://expo.dev/go)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Project Roadmap
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- **Milestone 1 (Sept 18)** – Backend architecture, feature definitions, feed algorithms
+- **Milestone 2 (Oct 9)** – Fully functioning frontend and backend
+- **Launch (Oct 26)** – Public release with bug fixes and polish
 
-## Get a fresh project
+## Learn More
 
-When you're ready, run:
+- [Expo documentation](https://docs.expo.dev/)
+- [React Native docs](https://reactnative.dev/)
+- [Supabase docs](https://supabase.com/docs)
 
-```bash
-npm run reset-project
-```
+---
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Join us in making cooking something everyone can enjoy. Let's make better food, together. 🍽️
