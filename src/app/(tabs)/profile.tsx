@@ -1,18 +1,18 @@
 import { useState } from "react";
 import {
-    Image, Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  Image, Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import Svg, {
-    Circle, Defs,
-    Ellipse, G, Line,
-    Rect,
-    Stop, LinearGradient as SvgLinearGradient,
+  Circle, Defs,
+  Ellipse, G, Line,
+  Rect,
+  Stop, LinearGradient as SvgLinearGradient,
 } from "react-native-svg";
 import { colors, fonts, shadowMd, shadowSm } from "./theme";
 

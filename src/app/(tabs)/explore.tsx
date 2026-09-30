@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
 
   hero: { height: 208, borderRadius: 16, overflow: "hidden", backgroundColor: colors.clay },
   heroBlob: { position: "absolute", top: -32, right: -32, width: 160, height: 160, borderRadius: 80, backgroundColor: "rgba(196,133,95,0.3)" },
-  heroInner: { ...StyleSheet.absoluteFillObject, padding: 16, justifyContent: "space-between" },
+  heroInner: { ...StyleSheet.absoluteFill, padding: 16, justifyContent: "space-between" },
   heroBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", borderWidth: 1, borderColor: "rgba(255,255,255,0.3)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   heroBadgeText: { fontSize: 10, fontWeight: "800", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
   heroHeart: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },

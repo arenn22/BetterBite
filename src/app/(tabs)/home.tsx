@@ -1,14 +1,6 @@
 import { useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
-import CreateScreen from "./CreateScreen";
-import ExploreScreen from "./ExploreScreen";
-import ProfileScreen from "./ProfileScreen";
-import RecipeDetailModal from "./RecipeDetailModal"; // NOTE: not provided, must be converted too
-import SocialScreen from "./SocialScreen";
-import type { FullRecipe } from "./data/recipes";
-import { getRecipe } from "./data/recipes";
 import { colors, fonts, shadowSm } from "./theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -225,64 +217,8 @@ function HomeScreen({ onOpen }: { onOpen: (id: number) => void }) {
   );
 }
 
-type TabId = "home" | "explore" | "log" | "friends" | "profile";
-
-const NAV: { id: TabId; icon: string; label: string }[] = [
-  { id: "home", icon: "🏠", label: "Home" },
-  { id: "explore", icon: "🔍", label: "Explore" },
-  { id: "log", icon: "📝", label: "Log" },
-  { id: "friends", icon: "👥", label: "Friends" },
-  { id: "profile", icon: "👤", label: "Profile" },
-];
-
-function AppInner() {
-  const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<TabId>("home");
-  const [openRecipe, setOpenRecipe] = useState<FullRecipe | null>(null);
-
-  const handleOpenRecipe = (id: number) => setOpenRecipe(getRecipe(id));
-
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
-      {/* Screens each own their ScrollView */}
-      <View style={{ flex: 1 }}>
-        {activeTab === "home" && <HomeScreen onOpen={handleOpenRecipe} />}
-        {activeTab === "explore" && <ExploreScreen onOpenRecipe={handleOpenRecipe} />}
-        {activeTab === "friends" && <SocialScreen />}
-        {activeTab === "profile" && <ProfileScreen onOpenRecipe={handleOpenRecipe} />}
-        {activeTab === "log" && <CreateScreen />}
-      </View>
-
-      {/* BOTTOM NAV */}
-      <View style={[styles.nav, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        {NAV.map((item) => {
-          const active = activeTab === item.id;
-          return (
-            <Pressable
-              key={item.id}
-              onPress={() => setActiveTab(item.id)}
-              style={({ pressed }) => [styles.navItem, pressed && { transform: [{ scale: 0.95 }] }]}
-            >
-              <Text style={{ fontSize: 20 }}>{item.icon}</Text>
-              <Text style={[styles.navLabel, { color: active ? colors.sage : colors.faint }]}>{item.label}</Text>
-              {active && <View style={styles.navDot} />}
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* RECIPE DETAIL MODAL */}
-      {openRecipe && <RecipeDetailModal recipe={openRecipe} onClose={() => setOpenRecipe(null)} />}
-    </View>
-  );
-}
-
-export default function App() {
-  return (
-    <SafeAreaProvider>
-      <AppInner />
-    </SafeAreaProvider>
-  );
+export default function HomeScreenRoute() {
+  return <HomeScreen onOpen={() => undefined} />;
 }
 
 const styles = StyleSheet.create({
@@ -332,9 +268,4 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 10, fontWeight: "600" },
   recipeTime: { fontSize: 10, fontWeight: "500", color: colors.muted },
 
-  // Nav
-  nav: { flexDirection: "row", justifyContent: "space-around", backgroundColor: "rgba(255,255,255,0.95)", borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 8, paddingTop: 8 },
-  navItem: { alignItems: "center", gap: 2, paddingHorizontal: 12, paddingVertical: 4 },
-  navLabel: { fontSize: 9, fontWeight: "700" },
-  navDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.sage },
 });
