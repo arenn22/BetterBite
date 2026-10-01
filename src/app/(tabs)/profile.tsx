@@ -1,18 +1,19 @@
 import { useState } from "react";
 import {
-  Image, Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
+    Image, Modal, Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import Svg, {
-  Circle, Defs,
-  Ellipse, G, Line,
-  Rect,
-  Stop, LinearGradient as SvgLinearGradient,
+    Circle, Defs,
+    Ellipse, G, Line,
+    Path,
+    Rect,
+    Stop, LinearGradient as SvgLinearGradient,
 } from "react-native-svg";
 import { colors, fonts, shadowMd, shadowSm } from "./theme";
 
@@ -55,6 +56,8 @@ const COOKED_RECIPES = [
   { id: 9, title: "Veggie Grain Bowl", img: "https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=300&h=240&fit=crop&auto=format" },
   { id: 10, title: "Spiced Ramen Bowl", img: "https://images.unsplash.com/photo-1773817728515-612df7f78e1b?w=300&h=240&fit=crop&auto=format" },
 ];
+
+type LibraryRecipe = (typeof CREATED_RECIPES)[number];
 
 type TabId = "created" | "cooked" | "liked";
 const TABS: { id: TabId; label: string }[] = [
@@ -157,6 +160,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<TabId>("created");
   const [editMode, setEditMode] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState<LibraryRecipe | null>(null);
 
   const cardWidth = (width - 32 - 12) / 2;
 
@@ -167,6 +171,14 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
   };
   const recipes = tabRecipes[activeTab];
 
+  const handleOpenRecipe = (recipe: LibraryRecipe) => {
+    if (onOpenRecipe) {
+      onOpenRecipe(recipe.id);
+    } else {
+      setSelectedRecipe(recipe);
+    }
+  };
+
   const stats = [
     { label: "Recipes", value: String(USER.recipes) },
     { label: "Friends", value: String(USER.friends) },
@@ -174,6 +186,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
   ];
 
   return (
+    <>
     <ScrollView
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
@@ -189,14 +202,17 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
         <Pressable
           onPress={() => setEditMode(!editMode)}
           style={({ pressed }) => [
-            styles.editBtn,
+            styles.settingsBtn,
             editMode && { backgroundColor: colors.sage, borderColor: colors.sage },
             pressed && { transform: [{ scale: 0.95 }] },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={editMode ? "Close profile editing" : "Settings"}
         >
-          <Text style={{ fontSize: 12, fontWeight: "700", color: editMode ? "#fff" : colors.muted }}>
-            {editMode ? "Save" : "Edit"}
-          </Text>
+          <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={editMode ? "#fff" : colors.muted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <Circle cx={12} cy={12} r={3} />
+            <Path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2m0 18v-2M2 12h2m18 0h-2" />
+          </Svg>
         </Pressable>
       </View>
 
@@ -216,7 +232,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
 
         {/* Avatar overlaps banner */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 16, marginTop: -36 }}>
-          <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 12 }}>
+          <View style={{ marginBottom: 12 }}>
             <View>
               {/* ring with gap, replaces CSS outline + outline-offset */}
               <View style={[styles.avatarRing, shadowMd]}>
@@ -233,14 +249,6 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
               )}
             </View>
 
-            <View style={{ flexDirection: "row", gap: 8, paddingBottom: 4 }}>
-              <Pressable style={[styles.roundIconBtn, shadowSm]}>
-                <Text style={{ fontSize: 14, color: colors.muted }}>⤴</Text>
-              </Pressable>
-              <Pressable style={[styles.roundIconBtn, shadowSm]}>
-                <Text style={{ fontSize: 14, color: colors.muted }}>⚙︎</Text>
-              </Pressable>
-            </View>
           </View>
 
           {/* Name & handle */}
@@ -371,8 +379,10 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
             recipes.map((r) => (
               <Pressable
                 key={r.id}
-                onPress={() => onOpenRecipe?.(r.id)}
+                onPress={() => handleOpenRecipe(r)}
                 style={({ pressed }) => [styles.recipeCard, shadowSm, { width: cardWidth }, pressed && { opacity: 0.92 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${r.title}`}
               >
                 <View style={{ height: 112, overflow: "hidden", backgroundColor: colors.sageLight }}>
                   <Image source={{ uri: r.img }} style={styles.fill} resizeMode="cover" />
@@ -386,6 +396,40 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
         </View>
       </View>
     </ScrollView>
+    <Modal
+      visible={selectedRecipe !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setSelectedRecipe(null)}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setSelectedRecipe(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Close recipe details"
+        />
+        {selectedRecipe && (
+          <View style={[styles.detailCard, shadowSm]}>
+            <Image source={{ uri: selectedRecipe.img }} style={styles.detailImage} resizeMode="cover" />
+            <View style={styles.detailContent}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Text style={styles.detailTitle}>{selectedRecipe.title}</Text>
+                <Pressable
+                  onPress={() => setSelectedRecipe(null)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close recipe details"
+                >
+                  <Text style={styles.closeText}>×</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -395,14 +439,12 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
   h1: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },
   subtitle: { fontSize: 14, fontWeight: "500", color: colors.muted, marginTop: 4 },
-  editBtn: { marginTop: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
+  settingsBtn: { marginTop: 4, width: 32, height: 32, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
 
   profileCard: { marginHorizontal: 16, marginBottom: 20, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
 
   avatarRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: colors.clay, backgroundColor: "#fff", padding: 2 },
   avatarInner: { flex: 1, borderRadius: 999, overflow: "hidden" },
-  roundIconBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-
   name: { fontFamily: fonts.heading, fontSize: 20, color: colors.ink, lineHeight: 24 },
   nameInput: { fontFamily: fonts.heading, fontSize: 20, color: colors.ink, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: colors.clay, marginBottom: 2 },
 
@@ -416,4 +458,10 @@ const styles = StyleSheet.create({
   tabUnderline: { position: "absolute", bottom: 0, left: 16, right: 16, height: 2, backgroundColor: colors.sage, borderRadius: 999 },
 
   recipeCard: { borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
+  modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 20, backgroundColor: "rgba(0,0,0,0.45)" },
+  detailCard: { overflow: "hidden", borderRadius: 16, backgroundColor: "#fff" },
+  detailImage: { width: "100%", height: 220, backgroundColor: colors.sageLight },
+  detailContent: { padding: 16 },
+  detailTitle: { flex: 1, marginRight: 12, fontFamily: fonts.heading, fontSize: 22, color: colors.ink },
+  closeText: { fontSize: 28, lineHeight: 30, color: colors.muted },
 });
