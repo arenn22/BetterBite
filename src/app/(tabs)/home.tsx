@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Svg, { Circle, Path } from "react-native-svg";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, shadowSm } from "./theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -103,10 +102,16 @@ function RecipeSection({
   );
 }
 
-function HomeScreen({ onOpen }: { onOpen: (id: number) => void }) {
-  const [loggedToday, setLoggedToday] = useState(false);
+function HomeScreen() {
+  const [openRecipe, setOpenRecipe] = useState<Recipe | null>(null);
+  const allRecipes = Object.values(RECIPES).flat();
+
+  const handleOpenRecipe = (id: number) => {
+    setOpenRecipe(allRecipes.find((recipe) => recipe.id === id) ?? null);
+  };
 
   return (
+    <>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
       {/* HEADER */}
       <View style={styles.homeHeader}>
@@ -115,7 +120,7 @@ function HomeScreen({ onOpen }: { onOpen: (id: number) => void }) {
           <Text style={styles.h1}>Hey, Sofía.</Text>
           <Text style={styles.subtitle}>A little progress tastes good.</Text>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 12 }}>
+        <View style={{ marginLeft: 12 }}>
           <View>
             <View style={styles.avatar}>
               <Image
@@ -127,19 +132,12 @@ function HomeScreen({ onOpen }: { onOpen: (id: number) => void }) {
               <Text style={styles.avatarBadgeText}>Home Cook</Text>
             </View>
           </View>
-          <Pressable style={[styles.iconBtn, shadowSm]}>
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.muted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <Circle cx={12} cy={12} r={3} />
-              <Path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
-              <Path d="M12 2v2m0 18v-2M2 12h2m18 0h-2" />
-            </Svg>
-          </Pressable>
         </View>
       </View>
 
       {/* STREAK CARD */}
       <View style={[styles.streakCard, shadowSm]}>
-        <View style={[styles.rowBetween, { marginBottom: 12 }]}>
+        <View style={{ marginBottom: 12 }}>
           <View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Text style={{ fontSize: 20 }}>🔥</Text>
@@ -147,22 +145,10 @@ function HomeScreen({ onOpen }: { onOpen: (id: number) => void }) {
             </View>
             <Text style={[styles.sectionSub, { marginTop: 2 }]}>Keep your cooking rhythm going.</Text>
           </View>
-          <Pressable
-            onPress={() => setLoggedToday(!loggedToday)}
-            style={({ pressed }) => [
-              styles.logBtn,
-              { backgroundColor: loggedToday ? colors.sageLight : colors.sage },
-              pressed && { transform: [{ scale: 0.95 }] },
-            ]}
-          >
-            <Text style={[styles.logBtnText, { color: loggedToday ? colors.sage : "#fff" }]}>
-              {loggedToday ? "Logged ✓" : "Log today"}
-            </Text>
-          </Pressable>
         </View>
         <View style={styles.rowBetween}>
           {DAYS.map((day, i) => {
-            const active = LOGGED_DAYS[i] || (i === 5 && loggedToday);
+            const active = LOGGED_DAYS[i];
             return (
               <View key={i} style={{ alignItems: "center", gap: 4 }}>
                 <View style={[styles.dayDot, { backgroundColor: active ? colors.terracotta : colors.divider }]}>
@@ -179,46 +165,53 @@ function HomeScreen({ onOpen }: { onOpen: (id: number) => void }) {
         </View>
       </View>
 
-      {/* WEEKLY CHALLENGE */}
-      <View style={styles.challenge}>
-        <View style={styles.blobTR} />
-        <View style={styles.blobBL} />
-        <View style={styles.rowBetween}>
-          <Text style={styles.challengeEyebrow}>This week's challenge</Text>
-          <Text style={{ fontSize: 20 }}>🏆</Text>
-        </View>
-        <Text style={styles.challengeTitle}>One-Pan Dinners</Text>
-        <Text style={styles.challengeBody}>
-          Cook any meal using just one pan, pot, or skillet. Simple wins.
-        </Text>
-        <View style={styles.rowBetween}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={{ flexDirection: "row" }}>
-              {["🧑", "👩", "🧑‍🍳"].map((emoji, i) => (
-                <View key={i} style={[styles.miniAvatar, i > 0 && { marginLeft: -6 }]}>
-                  <Text style={{ fontSize: 12 }}>{emoji}</Text>
-                </View>
-              ))}
-            </View>
-            <Text style={styles.challengeFriends}>3 friends completed this</Text>
-          </View>
-          <Pressable style={({ pressed }) => [styles.joinBtn, pressed && { transform: [{ scale: 0.95 }] }]}>
-            <Text style={styles.joinBtnText}>Join →</Text>
-          </Pressable>
-        </View>
-      </View>
-
       {/* RECIPE SECTIONS */}
-      <RecipeSection icon="🔥" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={RECIPES.recommended} onOpen={onOpen} />
-      <RecipeSection icon="⚡" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={RECIPES.easyWins} onOpen={onOpen} />
-      <RecipeSection icon="🏆" title="Challenge yourself" subtitle="Push your skills further" recipes={RECIPES.challenge} onOpen={onOpen} />
-      <RecipeSection icon="👥" title="From your friends" subtitle="What the community cooked this week" recipes={RECIPES.friends} onOpen={onOpen} />
+      <RecipeSection icon="🔥" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={RECIPES.recommended} onOpen={handleOpenRecipe} />
+      <RecipeSection icon="⚡" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={RECIPES.easyWins} onOpen={handleOpenRecipe} />
+      <RecipeSection icon="🏆" title="Challenge yourself" subtitle="Push your skills further" recipes={RECIPES.challenge} onOpen={handleOpenRecipe} />
+      <RecipeSection icon="👥" title="From your friends" subtitle="What the community cooked this week" recipes={RECIPES.friends} onOpen={handleOpenRecipe} />
     </ScrollView>
+    <Modal
+      visible={openRecipe !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setOpenRecipe(null)}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setOpenRecipe(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Close recipe details"
+        />
+        {openRecipe && (
+          <View style={[styles.detailCard, shadowSm]}>
+            <Image source={{ uri: openRecipe.img }} style={styles.detailImage} resizeMode="cover" />
+            <View style={styles.detailContent}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.detailTitle}>{openRecipe.title}</Text>
+                <Pressable
+                  onPress={() => setOpenRecipe(null)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close recipe details"
+                >
+                  <Text style={styles.closeText}>×</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.detailMeta}>{openRecipe.difficulty}  ·  {openRecipe.time}</Text>
+              {openRecipe.friend && <Text style={styles.detailFriend}>Cooked by {openRecipe.friend}</Text>}
+            </View>
+          </View>
+        )}
+      </View>
+    </Modal>
+    </>
   );
 }
 
 export default function HomeScreenRoute() {
-  return <HomeScreen onOpen={() => undefined} />;
+  return <HomeScreen />;
 }
 
 const styles = StyleSheet.create({
@@ -230,30 +223,14 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 12, fontWeight: "600", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
   h1: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },
   subtitle: { fontSize: 14, fontWeight: "500", color: colors.muted, marginTop: 4 },
-  avatar: { width: 48, height: 48, borderRadius: 24, overflow: "hidden", borderWidth: 2, borderColor: colors.sage, backgroundColor: colors.sageLight },
+  avatar: { width: 64, height: 64, borderRadius: 32, overflow: "hidden", borderWidth: 2, borderColor: colors.clay, backgroundColor: colors.sageLight },
   avatarBadge: { position: "absolute", bottom: -4, right: -4, backgroundColor: colors.sage, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
   avatarBadgeText: { color: "#fff", fontSize: 8, fontWeight: "800" },
-  iconBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
-
   // Streak
   streakCard: { marginHorizontal: 16, marginBottom: 16, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16 },
   streakTitle: { fontFamily: fonts.heading, fontSize: 24, color: colors.ink },
-  logBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  logBtnText: { fontSize: 12, fontWeight: "700" },
   dayDot: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   dayLabel: { fontSize: 9, fontWeight: "600", color: colors.faint, textTransform: "uppercase" },
-
-  // Challenge
-  challenge: { marginHorizontal: 16, marginBottom: 24, backgroundColor: colors.clay, borderRadius: 16, padding: 16, overflow: "hidden" },
-  blobTR: { position: "absolute", top: -24, right: -24, width: 128, height: 128, borderRadius: 64, backgroundColor: "rgba(196,133,95,0.3)" },
-  blobBL: { position: "absolute", bottom: -16, left: -16, width: 96, height: 96, borderRadius: 48, backgroundColor: "rgba(232,196,174,0.4)" },
-  challengeEyebrow: { fontSize: 10, fontWeight: "800", color: "rgba(122,58,24,0.7)", textTransform: "uppercase", letterSpacing: 1.5 },
-  challengeTitle: { fontFamily: fonts.heading, fontSize: 20, color: "#fff", marginTop: 6, marginBottom: 8 },
-  challengeBody: { fontSize: 12, fontWeight: "500", color: "rgba(255,255,255,0.8)", lineHeight: 19, marginBottom: 12 },
-  miniAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.3)", borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", alignItems: "center", justifyContent: "center" },
-  challengeFriends: { fontSize: 12, fontWeight: "600", color: "rgba(255,255,255,0.9)" },
-  joinBtn: { backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  joinBtnText: { color: colors.terracotta, fontSize: 12, fontWeight: "800" },
 
   // Sections / cards
   sectionHead: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 16, marginBottom: 12 },
@@ -267,5 +244,14 @@ const styles = StyleSheet.create({
   pill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
   pillText: { fontSize: 10, fontWeight: "600" },
   recipeTime: { fontSize: 10, fontWeight: "500", color: colors.muted },
+
+  modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 20, backgroundColor: "rgba(0,0,0,0.45)" },
+  detailCard: { overflow: "hidden", borderRadius: 16, backgroundColor: "#fff" },
+  detailImage: { width: "100%", height: 220, backgroundColor: colors.sageLight },
+  detailContent: { padding: 16 },
+  detailTitle: { flex: 1, marginRight: 12, fontFamily: fonts.heading, fontSize: 22, color: colors.ink },
+  closeText: { fontSize: 28, lineHeight: 30, color: colors.muted },
+  detailMeta: { marginTop: 6, fontSize: 13, fontWeight: "600", color: colors.sage },
+  detailFriend: { marginTop: 8, fontSize: 12, fontWeight: "500", color: colors.muted },
 
 });
