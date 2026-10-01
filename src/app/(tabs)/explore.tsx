@@ -1,26 +1,36 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { useMemo, useState } from "react";
 import {
-    Image, Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  Image, Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, fonts, shadowSm } from "./theme";
 
-const FILTERS = [
+const CUISINE_FILTERS = [
   { id: "all", label: "All", emoji: null },
   { id: "friends", label: "Friends", emoji: "👥" },
   { id: "italian", label: "Italian", emoji: "🍝" },
   { id: "mexican", label: "Mexican", emoji: "🌮" },
   { id: "thai", label: "Thai", emoji: "🍜" },
-  { id: "vegan", label: "Vegan", emoji: "🌱" },
-  { id: "glutenfree", label: "Gluten-Free", emoji: "🌾" },
+  { id: "indian", label: "Indian", emoji: "🍛" },
+  { id: "japanese", label: "Japanese", emoji: "🍱" },
+  { id: "french", label: "French", emoji: "🥐" },
 ];
+
+const DIETARY_FILTERS = [
+  { id: "vegan", label: "Vegan", emoji: "🌱" },
+  { id: "vegetarian", label: "Vegetarian", emoji: "🥦" },
+  { id: "glutenfree", label: "Gluten-Free", emoji: "🌾" },
+  { id: "dairyfree", label: "Dairy-Free", emoji: "🥛" },
+  { id: "keto", label: "Keto", emoji: "🥩" },
+];
+
+const ALL_FILTERS = [...CUISINE_FILTERS, ...DIETARY_FILTERS];
 
 interface GridRecipe {
   id: number;
@@ -32,20 +42,19 @@ interface GridRecipe {
   img: string;
   tags: string[];
   likes: number;
-  wide?: boolean;
 }
 
 const ALL_RECIPES: GridRecipe[] = [
   { id: 1, title: "Cacio e Pepe", author: "Marta V.", authorAvatar: "🧑‍🍳", time: "18 min", difficulty: "Medium", img: "https://images.unsplash.com/photo-1707546944460-dda9069b9c1e?w=400&h=300&fit=crop&auto=format", tags: ["italian"], likes: 42 },
-  { id: 2, title: "Pad Thai Noodles", author: "Kenji T.", authorAvatar: "👨‍🍳", time: "25 min", difficulty: "Easy", img: "https://images.unsplash.com/photo-1788601299617-3052a7c8fa70?w=400&h=300&fit=crop&auto=format", tags: ["thai", "vegan"], likes: 67, wide: true },
+  { id: 2, title: "Pad Thai Noodles", author: "Kenji T.", authorAvatar: "👨‍🍳", time: "25 min", difficulty: "Easy", img: "https://images.unsplash.com/photo-1788601299617-3052a7c8fa70?w=400&h=300&fit=crop&auto=format", tags: ["thai", "vegan"], likes: 67 },
   { id: 3, title: "Street Taco Bowl", author: "Rosa M.", authorAvatar: "👩‍🍳", time: "20 min", difficulty: "Easy", img: "https://images.unsplash.com/photo-1533606117812-0783e8e690f1?w=400&h=300&fit=crop&auto=format", tags: ["mexican", "friends"], likes: 31 },
   { id: 4, title: "Shrimp Noodle Stir-fry", author: "Alex D.", authorAvatar: "🧑", time: "20 min", difficulty: "Easy", img: "https://images.unsplash.com/photo-1783196736270-d08d63485303?w=400&h=300&fit=crop&auto=format", tags: ["thai", "glutenfree"], likes: 28 },
   { id: 5, title: "Veggie Grain Bowl", author: "Priya N.", authorAvatar: "👩", time: "15 min", difficulty: "Beginner", img: "https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=400&h=300&fit=crop&auto=format", tags: ["vegan", "glutenfree", "friends"], likes: 55 },
-  { id: 6, title: "Seafood Paella", author: "Carlos R.", authorAvatar: "👨", time: "50 min", difficulty: "Hard", img: "https://images.unsplash.com/photo-1528712518629-67d42968a45e?w=400&h=300&fit=crop&auto=format", tags: ["friends"], likes: 89, wide: true },
+  { id: 6, title: "Seafood Paella", author: "Carlos R.", authorAvatar: "👨", time: "50 min", difficulty: "Hard", img: "https://images.unsplash.com/photo-1528712518629-67d42968a45e?w=400&h=300&fit=crop&auto=format", tags: ["friends"], likes: 89 },
   { id: 7, title: "Yellow Fried Rice", author: "Sun Y.", authorAvatar: "🧑‍🍳", time: "15 min", difficulty: "Easy", img: "https://images.unsplash.com/photo-1615865417491-9941019fbc00?w=400&h=300&fit=crop&auto=format", tags: ["vegan", "glutenfree"], likes: 19 },
   { id: 8, title: "Table-Style Mezze", author: "Layla H.", authorAvatar: "👩", time: "35 min", difficulty: "Medium", img: "https://images.unsplash.com/photo-1681038560284-58214f7ea0ac?w=400&h=300&fit=crop&auto=format", tags: ["vegan", "friends"], likes: 44 },
   { id: 9, title: "Spiced Ramen Bowl", author: "Tomás R.", authorAvatar: "👨‍🍳", time: "35 min", difficulty: "Medium", img: "https://images.unsplash.com/photo-1773817728515-612df7f78e1b?w=400&h=300&fit=crop&auto=format", tags: ["thai", "friends"], likes: 76 },
-  { id: 10, title: "Community Rice Feast", author: "Amara S.", authorAvatar: "🧑", time: "45 min", difficulty: "Medium", img: "https://images.unsplash.com/photo-1776855828611-8fd3ee069df1?w=400&h=300&fit=crop&auto=format", tags: ["glutenfree", "friends"], likes: 103, wide: true },
+  { id: 10, title: "Community Rice Feast", author: "Amara S.", authorAvatar: "🧑", time: "45 min", difficulty: "Medium", img: "https://images.unsplash.com/photo-1776855828611-8fd3ee069df1?w=400&h=300&fit=crop&auto=format", tags: ["glutenfree", "friends"], likes: 103 },
 ];
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -66,7 +75,7 @@ function GridCard({
       onPress={() => onOpen(recipe.id)}
       style={({ pressed }) => [styles.gridCard, shadowSm, { width: cardWidth }, pressed && { opacity: 0.92 }]}
     >
-      <View style={{ height: recipe.wide ? 176 : 128, backgroundColor: colors.sageLight, overflow: "hidden" }}>
+      <View style={{ height: 128, backgroundColor: colors.sageLight, overflow: "hidden" }}>
         <Image source={{ uri: recipe.img }} style={styles.fill} resizeMode="cover" />
       </View>
       <View style={{ padding: 10 }}>
@@ -147,74 +156,34 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
       </View>
 
       {/* FILTER CHIPS */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, marginBottom: 20 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 4, gap: 8 }}
-      >
-        {FILTERS.map((f) => {
-          const active = activeFilter === f.id;
-          return (
-            <Pressable
-              key={f.id}
-              onPress={() => setActiveFilter(f.id)}
-              style={({ pressed }) => [
-                styles.chip,
-                active && styles.chipActive,
-                pressed && { transform: [{ scale: 0.95 }] },
-              ]}
-            >
-              {f.emoji && <Text style={{ fontSize: 14 }}>{f.emoji}</Text>}
-              <Text style={[styles.chipText, { color: active ? "#fff" : colors.ink }]}>{f.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* FEATURED HERO CARD */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
-        <Pressable onPress={() => onOpenRecipe?.(2)} style={styles.hero}>
-          <Image
-            source={{ uri: "https://images.unsplash.com/photo-1542308743-cf8a20da4beb?w=800&h=420&fit=crop&auto=format" }}
-            style={[StyleSheet.absoluteFill, { opacity: 0.7 }]}
-            resizeMode="cover"
-          />
-          <LinearGradient
-            colors={["rgba(196,133,95,0)", "rgba(196,133,95,0.2)", "rgba(122,58,24,0.8)"]}
-            locations={[0, 0.5, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.heroBlob} />
-          <View style={styles.heroInner}>
-            <View style={styles.rowBetween}>
-              <View style={styles.heroBadge}>
-                <Text style={{ fontSize: 12 }}>🏆</Text>
-                <Text style={styles.heroBadgeText}>Challenge Pick</Text>
-              </View>
-              <View style={styles.heroHeart}>
-                <Text style={{ fontSize: 14 }}>🤍</Text>
-              </View>
-            </View>
-            <View>
-              <Text style={styles.heroEyebrow}>Community's Top This Week</Text>
-              <Text style={styles.heroTitle}>One-Pan Chicken & Rice</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ fontSize: 14 }}>👩‍🍳</Text>
-                  <Text style={styles.heroMeta}>by Maya K.</Text>
-                </View>
-                <Text style={{ color: "rgba(255,255,255,0.4)" }}>·</Text>
-                <Text style={styles.heroMeta}>35 min · Medium</Text>
-                <Text style={{ color: "rgba(255,255,255,0.4)" }}>·</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <Text style={{ fontSize: 12 }}>❤️</Text>
-                  <Text style={[styles.heroMeta, { fontWeight: "600" }]}>214</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </Pressable>
+      <View style={{ marginBottom: 20, gap: 8 }}>
+        {[CUISINE_FILTERS, DIETARY_FILTERS].map((filterRow, rowIndex) => (
+          <ScrollView
+            key={rowIndex}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 2, gap: 8 }}
+          >
+            {filterRow.map((f) => {
+              const active = activeFilter === f.id;
+              return (
+                <Pressable
+                  key={f.id}
+                  onPress={() => setActiveFilter(f.id)}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    active && styles.chipActive,
+                    pressed && { transform: [{ scale: 0.95 }] },
+                  ]}
+                >
+                  {f.emoji && <Text style={{ fontSize: 14 }}>{f.emoji}</Text>}
+                  <Text style={[styles.chipText, { color: active ? "#fff" : colors.ink }]}>{f.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ))}
       </View>
 
       {/* SECTION HEADING */}
@@ -222,7 +191,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={{ fontSize: 16 }}>🍽️</Text>
           <Text style={{ fontSize: 14, fontWeight: "800", color: colors.ink }}>
-            {activeFilter === "all" ? "All recipes" : FILTERS.find((f) => f.id === activeFilter)?.label}
+            {activeFilter === "all" ? "All recipes" : ALL_FILTERS.find((f) => f.id === activeFilter)?.label}
           </Text>
         </View>
         <View style={styles.countPill}>
@@ -250,7 +219,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
               <GridCard
                 key={recipe.id}
                 recipe={recipe}
-                cardWidth={recipe.wide ? fullWidth : halfWidth}
+                cardWidth={halfWidth}
                 onOpen={onOpenRecipe ?? (() => {})}
               />
             ))}
@@ -275,16 +244,6 @@ const styles = StyleSheet.create({
   chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   chipActive: { backgroundColor: colors.sage, borderColor: colors.sage },
   chipText: { fontSize: 12, fontWeight: "700" },
-
-  hero: { height: 208, borderRadius: 16, overflow: "hidden", backgroundColor: colors.clay },
-  heroBlob: { position: "absolute", top: -32, right: -32, width: 160, height: 160, borderRadius: 80, backgroundColor: "rgba(196,133,95,0.3)" },
-  heroInner: { ...StyleSheet.absoluteFill, padding: 16, justifyContent: "space-between" },
-  heroBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", borderWidth: 1, borderColor: "rgba(255,255,255,0.3)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  heroBadgeText: { fontSize: 10, fontWeight: "800", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
-  heroHeart: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  heroEyebrow: { fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.7)", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
-  heroTitle: { fontFamily: fonts.heading, fontSize: 24, color: "#fff", marginBottom: 4 },
-  heroMeta: { fontSize: 12, fontWeight: "500", color: "rgba(255,255,255,0.85)" },
 
   countPill: { backgroundColor: colors.divider, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   countText: { fontSize: 12, fontWeight: "600", color: colors.muted },
