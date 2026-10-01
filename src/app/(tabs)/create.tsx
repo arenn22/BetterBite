@@ -1,23 +1,42 @@
+import Slider from "@react-native-community/slider";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
-  Image,
-  KeyboardAvoidingView, Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Image,
+    KeyboardAvoidingView, Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import Svg, { Circle, Ellipse, G, Line, Rect } from "react-native-svg";
 import { colors, fonts, shadowSm } from "./theme";
 
+type SliderProps = {
+  minimumValue: number;
+  maximumValue: number;
+  step: number;
+  value: number;
+  onValueChange: (value: number) => void;
+  minimumTrackTintColor: string;
+  maximumTrackTintColor: string;
+  thumbTintColor: string;
+};
+
+const CompatibleSlider = Slider as unknown as React.ComponentType<SliderProps>;
+
 // ─── Types & constants ───────────────────────────────────────────────────────
 
-const DIFFICULTIES = ["Beginner", "Easy", "Medium", "Hard", "Advanced"] as const;
-type Difficulty = typeof DIFFICULTIES[number];
+type Difficulty = "Beginner" | "Easy" | "Medium" | "Hard" | "Advanced";
+
+const DIFFICULTY_NAMES: Record<number, Difficulty> = {
+  1: "Beginner", 2: "Beginner", 3: "Easy", 4: "Easy",
+  5: "Medium", 6: "Medium", 7: "Hard", 8: "Hard",
+  9: "Advanced", 10: "Advanced",
+};
 
 const DIETARY_TAGS = [
   { id: "vegan", label: "Vegan", emoji: "🌱" },
@@ -194,27 +213,6 @@ function PreviewCard({
   );
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
-
-function ProgressBar({ pct, step, total }: { pct: number; step: number; total: number }) {
-  return (
-    <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-        <Text style={{ fontSize: 10, fontWeight: "700", color: colors.muted }}>Step {step} of {total}</Text>
-        <Text style={{ fontSize: 10, fontWeight: "700", color: colors.clay }}>{pct}% complete</Text>
-      </View>
-      <View style={{ height: 6, backgroundColor: colors.cream, borderRadius: 999, overflow: "hidden" }}>
-        <LinearGradient
-          colors={[colors.clay, colors.terracotta]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{ height: "100%", width: `${pct}%`, borderRadius: 999 }}
-        />
-      </View>
-    </View>
-  );
-}
-
 // ─── Tag chip row ─────────────────────────────────────────────────────────────
 
 function TagChips({
@@ -253,7 +251,7 @@ export default function CreateScreen() {
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const [recipeName, setRecipeName] = useState("");
   const [description, setDescription] = useState("");
-  const [difficulty, setDifficulty] = useState<Difficulty>("Easy");
+  const [difficultyVal, setDifficultyVal] = useState(3);
   const [ingredients, setIngredients] = useState(["", ""]);
   const [steps, setSteps] = useState(["", ""]);
   const [dietary, setDietary] = useState<Set<string>>(new Set());
@@ -268,7 +266,7 @@ export default function CreateScreen() {
   ];
   const doneCount = doneFlags.filter(Boolean).length;
   const pct = Math.round((doneCount / 4) * 100);
-  const currentStep = Math.min(doneCount + 1, 4);
+  const difficulty = DIFFICULTY_NAMES[difficultyVal];
 
   const handlePhoto = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -308,7 +306,7 @@ export default function CreateScreen() {
             setRecipeName(""); setDescription(""); setPhotoSrc(null);
             setIngredients(["", ""]); setSteps(["", ""]);
             setDietary(new Set()); setCuisines(new Set());
-            setDifficulty("Easy");
+            setDifficultyVal(3);
           }}
           style={({ pressed }) => [styles.primaryBtn, pressed && { transform: [{ scale: 0.95 }] }]}
         >
@@ -331,8 +329,6 @@ export default function CreateScreen() {
           <Text style={styles.h1}>Create a recipe</Text>
           <Text style={styles.subtitle}>Turn something you love to cook into the next community favorite.</Text>
         </View>
-
-        <ProgressBar pct={pct} step={currentStep} total={4} />
 
         <View style={{ paddingHorizontal: 16 }}>
           {/* PHOTO UPLOAD */}
@@ -377,51 +373,27 @@ export default function CreateScreen() {
             rows={3}
           />
 
-          {/* DIFFICULTY */}
+          {/* DIFFICULTY SLIDER */}
           <View style={{ marginBottom: 20 }}>
-            <Text style={[styles.label, { marginBottom: 8 }]}>Difficulty</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {DIFFICULTIES.map((d) => {
-                const active = difficulty === d;
-                const col = DIFF_COLOR[d];
-                return (
-                  <Pressable
-                    key={d}
-                    onPress={() => setDifficulty(d)}
-                    style={({ pressed }) => [
-                      styles.diffBtn,
-                      active
-                        ? { backgroundColor: col.bg, borderColor: "transparent" }
-                        : { backgroundColor: "#fff", borderColor: colors.border },
-                      pressed && { transform: [{ scale: 0.95 }] },
-                    ]}
-                  >
-                    <Text
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      style={{ fontSize: 10, fontWeight: "800", color: active ? col.text : colors.faint }}
-                    >
-                      {d}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {/* Visual range rail */}
-            <View style={{ marginTop: 8, flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={{ fontSize: 9, fontWeight: "500", color: colors.faint }}>Simple</Text>
-              <View style={{ flex: 1, height: 4, backgroundColor: colors.divider, borderRadius: 999, overflow: "hidden" }}>
-                <LinearGradient
-                  colors={["#8A9E7A", "#C4855F", "#9B3A1A"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={{
-                    height: "100%",
-                    borderRadius: 999,
-                    width: `${(DIFFICULTIES.indexOf(difficulty) / (DIFFICULTIES.length - 1)) * 100}%`,
-                  }}
-                />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <Text style={styles.label}>Difficulty:</Text>
+              <View style={{ backgroundColor: DIFF_COLOR[difficulty].bg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: DIFF_COLOR[difficulty].text }}>{difficulty}</Text>
               </View>
+              <Text style={{ marginLeft: "auto", fontSize: 12, fontWeight: "500", color: colors.faint }}>{difficultyVal} / 10</Text>
+            </View>
+            <CompatibleSlider
+              minimumValue={1}
+              maximumValue={10}
+              step={1}
+              value={difficultyVal}
+              onValueChange={setDifficultyVal}
+              minimumTrackTintColor="#8A9E7A"
+              maximumTrackTintColor="#F0F0EC"
+              thumbTintColor={colors.sage}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: -2 }}>
+              <Text style={{ fontSize: 9, fontWeight: "500", color: colors.faint }}>Simple</Text>
               <Text style={{ fontSize: 9, fontWeight: "500", color: colors.faint }}>Expert</Text>
             </View>
           </View>
@@ -564,8 +536,6 @@ const styles = StyleSheet.create({
   photoBtn: { width: "100%", borderRadius: 16, borderWidth: 2, borderStyle: "dashed", borderColor: colors.clay, overflow: "hidden" },
   plusCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(217,162,139,0.8)", alignItems: "center", justifyContent: "center" },
   photoLabel: { backgroundColor: "rgba(255,255,255,0.8)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-
-  diffBtn: { flex: 1, paddingVertical: 8, paddingHorizontal: 2, borderRadius: 12, borderWidth: 1, alignItems: "center" },
 
   addRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   addCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colors.sage, alignItems: "center", justifyContent: "center" },
