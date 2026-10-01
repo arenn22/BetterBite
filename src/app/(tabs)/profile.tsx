@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-    Image, Modal, Pressable,
+    Image, Modal, Platform, Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -162,7 +162,8 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
   const [editMode, setEditMode] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<LibraryRecipe | null>(null);
 
-  const cardWidth = (width - 32 - 12) / 2;
+  const layoutWidth = Platform.OS === "web" ? Math.min(width, 430) : width;
+  const cardWidth = (layoutWidth - 32 - 12) / 2;
 
   const tabRecipes: Record<TabId, typeof CREATED_RECIPES> = {
     created: CREATED_RECIPES,
@@ -459,7 +460,7 @@ const styles = StyleSheet.create({
 
   recipeCard: { borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 20, backgroundColor: "rgba(0,0,0,0.45)" },
-  detailCard: { overflow: "hidden", borderRadius: 16, backgroundColor: "#fff" },
+  detailCard: { width: "100%", maxWidth: 390, alignSelf: "center", overflow: "hidden", borderRadius: 16, backgroundColor: "#fff" },
   detailImage: { width: "100%", height: 220, backgroundColor: colors.sageLight },
   detailContent: { padding: 16 },
   detailTitle: { flex: 1, marginRight: 12, fontFamily: fonts.heading, fontSize: 22, color: colors.ink },

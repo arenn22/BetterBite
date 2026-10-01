@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   recipeTime: { fontSize: 10, fontWeight: "500", color: colors.muted },
 
   modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 20, backgroundColor: "rgba(0,0,0,0.45)" },
-  detailCard: { overflow: "hidden", borderRadius: 16, backgroundColor: "#fff" },
+  detailCard: { width: "100%", maxWidth: 390, alignSelf: "center", overflow: "hidden", borderRadius: 16, backgroundColor: "#fff" },
   detailImage: { width: "100%", height: 220, backgroundColor: colors.sageLight },
   detailContent: { padding: 16 },
   detailTitle: { flex: 1, marginRight: 12, fontFamily: fonts.heading, fontSize: 22, color: colors.ink },

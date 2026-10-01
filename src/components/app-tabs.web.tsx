@@ -4,12 +4,13 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "./themed-text";
 import { ThemedView } from "./themed-view";
 
-import { MaxContentWidth, Spacing } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 
 export default function AppTabs() {
   return (
-    <Tabs>
-      <TabSlot style={{ height: '100%' }} />
+    <View style={styles.webShell}>
+    <Tabs style={styles.appFrame}>
+      <TabSlot style={styles.tabSlot} />
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/home" asChild>
@@ -30,6 +31,7 @@ export default function AppTabs() {
         </CustomTabList>
       </TabList>
     </Tabs>
+    </View>
   );
 }
 
@@ -74,6 +76,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     width: "100%",
+    maxWidth: 430,
+    alignSelf: "center",
     padding: Spacing.three,
     justifyContent: "center",
     alignItems: "center",
@@ -87,7 +91,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.two,
-    maxWidth: MaxContentWidth,
+    maxWidth: 430,
   },
   pressed: {
     opacity: 0.7,
@@ -110,5 +114,25 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 26,
     lineHeight: 30,
+  },
+  webShell: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: "#E9EAE5",
+  },
+  appFrame: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 430,
+    alignSelf: "center",
+    backgroundColor: "#F7F7F4",
+    shadowColor: "#30312E",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  tabSlot: {
+    flex: 1,
+    width: "100%",
   },
 });

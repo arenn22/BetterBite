@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import {
-  Image, Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
+    Image,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, fonts, shadowSm } from "./theme";
@@ -101,7 +103,8 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
   const [searchValue, setSearchValue] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
 
-  const fullWidth = width - GRID_PADDING * 2;
+  const layoutWidth = Platform.OS === "web" ? Math.min(width, 430) : width;
+  const fullWidth = layoutWidth - GRID_PADDING * 2;
   const halfWidth = (fullWidth - GRID_GAP) / 2;
 
   const filtered = useMemo(() => {
