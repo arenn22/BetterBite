@@ -1,3 +1,4 @@
+import { getExperienceLevelName } from "@/constants/experience-levels";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
 import { useState } from "react";
@@ -127,6 +128,7 @@ function HomeScreen() {
   const { currentUser } = useAuthContext();
   const allRecipes = Object.values(RECIPES).flat();
   const username = currentUser?.username?.trim() || currentUser?.email.split("@")[0] || "there";
+  const experienceLevel = getExperienceLevelName(currentUser?.experience_level ?? currentUser?.experienceLevel) ?? "Home Cook";
   const streakCount = Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0);
   const loggedDays = getLoggedDays(streakCount, currentUser?.last_streak_post ?? currentUser?.last_post_at);
 
@@ -144,17 +146,15 @@ function HomeScreen() {
           <Text style={styles.h1}>Hey, {username}.</Text>
           <Text style={styles.subtitle}>A little progress tastes good.</Text>
         </View>
-        <View style={{ marginLeft: 12 }}>
-          <View>
-            <View style={styles.avatar}>
-              <Image
-                source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }}
-                style={styles.fill}
-              />
-            </View>
-            <View style={styles.avatarBadge}>
-              <Text style={styles.avatarBadgeText}>Home Cook</Text>
-            </View>
+        <View style={{ marginLeft: 12, alignItems: "center" }}>
+          <View style={styles.avatar}>
+            <Image
+              source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }}
+              style={styles.fill}
+            />
+          </View>
+          <View style={styles.avatarBadge}>
+            <Text numberOfLines={1} style={styles.avatarBadgeText}>{experienceLevel}</Text>
           </View>
         </View>
       </View>
@@ -248,8 +248,8 @@ const styles = StyleSheet.create({
   h1: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },
   subtitle: { fontSize: 14, fontWeight: "500", color: colors.muted, marginTop: 4 },
   avatar: { width: 64, height: 64, borderRadius: 32, overflow: "hidden", borderWidth: 2, borderColor: colors.clay, backgroundColor: colors.sageLight },
-  avatarBadge: { position: "absolute", bottom: -4, right: -4, backgroundColor: colors.sage, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  avatarBadgeText: { color: "#fff", fontSize: 8, fontWeight: "800" },
+  avatarBadge: { maxWidth: 136, marginTop: 6, backgroundColor: colors.sage, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999 },
+  avatarBadgeText: { color: "#fff", fontSize: 8, fontWeight: "800", textAlign: "center" },
   // Streak
   streakCard: { marginHorizontal: 16, marginBottom: 16, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16 },
   streakTitle: { fontFamily: fonts.heading, fontSize: 24, color: colors.ink },

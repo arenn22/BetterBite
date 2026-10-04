@@ -1,3 +1,8 @@
+import { EXPERIENCE_LEVEL_NAMES } from "@/constants/experience-levels";
+import { BottomTabInset } from "@/constants/theme";
+import { useRecipeOptions } from "@/hooks/use-recipe-options";
+import { useAuthContext } from "@/lib/auth/auth-context";
+import { createPost, uploadPostImage } from "@/services/api/posts";
 import Slider from "@expo/ui/community/slider";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,44 +22,39 @@ import { colors, fonts, shadowSm } from "./theme";
 
 // ─── Types & constants ───────────────────────────────────────────────────────
 
-type Difficulty = "Beginner" | "Easy" | "Medium" | "Hard" | "Advanced";
+type Difficulty = (typeof EXPERIENCE_LEVEL_NAMES)[number];
 
-const DIFFICULTY_NAMES: Record<number, Difficulty> = {
-  1: "Beginner", 2: "Beginner", 3: "Easy", 4: "Easy",
-  5: "Medium", 6: "Medium", 7: "Hard", 8: "Hard",
-  9: "Advanced", 10: "Advanced",
+const DIFFICULTY_LEVELS: Record<number, { name: Difficulty; meaning: string; examples: string }> = {
+  1: { name: EXPERIENCE_LEVEL_NAMES[0], meaning: "No heat or single-step prep.", examples: "Sandwiches, cereal, basic salads" },
+  2: { name: EXPERIENCE_LEVEL_NAMES[1], meaning: "Simple boiling and reheating.", examples: "Boxed pasta, boiled eggs, oatmeal" },
+  3: { name: EXPERIENCE_LEVEL_NAMES[2], meaning: "Basic pan-frying and simple chopping.", examples: "Scrambled eggs, grilled cheese, basic stir-fry" },
+  4: { name: EXPERIENCE_LEVEL_NAMES[3], meaning: "Basic oven baking and simple multi-ingredient meals.", examples: "Sheet-pan chicken, baked salmon, simple casseroles" },
+  5: { name: EXPERIENCE_LEVEL_NAMES[4], meaning: "Cooking simple meals entirely from scratch.", examples: "Homemade chili, basic soups, scratch sauce" },
+  6: { name: EXPERIENCE_LEVEL_NAMES[5], meaning: "Confident cooking raw meats and managing multiple steps.", examples: "Pan-seared chicken, burgers, tacos" },
+  7: { name: EXPERIENCE_LEVEL_NAMES[6], meaning: "Handling slow-cooking, roasting, and multi-component meals.", examples: "Lasagna, pot roast, whole roasted chicken" },
+  8: { name: EXPERIENCE_LEVEL_NAMES[7], meaning: "Comfortable with delicate techniques and scratch-made doughs.", examples: "Risotto, pizza dough, classic sauces" },
+  9: { name: EXPERIENCE_LEVEL_NAMES[8], meaning: "Precision cooking, technical baking, and complex recipes.", examples: "Hand-rolled pasta, perfect steaks, soufflés" },
+  10: { name: EXPERIENCE_LEVEL_NAMES[9], meaning: "Mastered complex, multi-hour, or professional-grade dishes.", examples: "Beef Wellington, croissants, French macarons" },
 };
 
-const DIETARY_TAGS = [
-  { id: "vegan", label: "Vegan", emoji: "🌱" },
-  { id: "vegetarian", label: "Vegetarian", emoji: "🥦" },
-  { id: "glutenfree", label: "Gluten-Free", emoji: "🌾" },
-  { id: "dairyfree", label: "Dairy-Free", emoji: "🥛" },
-  { id: "kosher", label: "Kosher", emoji: "✡️" },
-  { id: "halal", label: "Halal", emoji: "☪️" },
-  { id: "keto", label: "Keto", emoji: "🥩" },
-  { id: "paleo", label: "Paleo", emoji: "🍖" },
-];
-
-const CUISINE_TAGS = [
-  { id: "italian", label: "Italian", emoji: "🍝" },
-  { id: "mexican", label: "Mexican", emoji: "🌮" },
-  { id: "thai", label: "Thai", emoji: "🍜" },
-  { id: "indian", label: "Indian", emoji: "🍛" },
-  { id: "japanese", label: "Japanese", emoji: "🍱" },
-  { id: "french", label: "French", emoji: "🥐" },
-  { id: "american", label: "American", emoji: "🍔" },
-  { id: "mediterranean", label: "Mediterranean", emoji: "🫒" },
-  { id: "chinese", label: "Chinese", emoji: "🥟" },
-  { id: "middleeastern", label: "Middle Eastern", emoji: "🧆" },
-];
-
 const DIFF_COLOR: Record<Difficulty, { bg: string; text: string }> = {
-  Beginner: { bg: "#E8EDE5", text: "#687B5D" },
-  Easy: { bg: "#E8EDE5", text: "#687B5D" },
-  Medium: { bg: "#FDF0EA", text: "#C4855F" },
-  Hard: { bg: "#FCE4D6", text: "#B5603A" },
-  Advanced: { bg: "#F8DDD0", text: "#9B3A1A" },
+  "Absolute Beginner": { bg: "#E8EDE5", text: "#687B5D" },
+  Novice: { bg: "#E8EDE5", text: "#687B5D" },
+  "Beginner Cook": { bg: "#E8EDE5", text: "#687B5D" },
+  "Advanced Beginner": { bg: "#E8EDE5", text: "#687B5D" },
+  "Intermediate Cook": { bg: "#FDF0EA", text: "#C4855F" },
+  "Capable Cook": { bg: "#FDF0EA", text: "#C4855F" },
+  "Advanced Intermediate": { bg: "#FCE4D6", text: "#B5603A" },
+  "Experienced Cook": { bg: "#FCE4D6", text: "#B5603A" },
+  "Advanced Cook": { bg: "#F8DDD0", text: "#9B3A1A" },
+  "Expert Chef": { bg: "#F8DDD0", text: "#9B3A1A" },
+};
+
+const OPTION_EMOJIS: Record<string, string> = {
+  vegan: "🌱", vegetarian: "🥦", "gluten-free": "🌾", "dairy-free": "🥛",
+  kosher: "✡️", halal: "☪️", keto: "🥩", paleo: "🍖",
+  italian: "🍝", mexican: "🌮", thai: "🍜", indian: "🍛", japanese: "🍱",
+  french: "🥐", american: "🍔", mediterranean: "🫒", chinese: "🥟", "middle eastern": "🧆",
 };
 
 // ─── Small reusable pieces ───────────────────────────────────────────────────
@@ -203,16 +203,18 @@ function PreviewCard({
 // ─── Tag chip row ─────────────────────────────────────────────────────────────
 
 function TagChips({
-  tags, selected, onToggle,
+  tags, selected, onToggle, kind,
 }: {
-  tags: { id: string; label: string; emoji: string }[];
-  selected: Set<string>;
-  onToggle: (id: string) => void;
+  tags: { id: number; name: string }[];
+  selected: Set<number>;
+  onToggle: (id: number) => void;
+  kind: "dietary" | "cuisine";
 }) {
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
       {tags.map((t) => {
         const active = selected.has(t.id);
+        const emoji = OPTION_EMOJIS[t.name.trim().toLowerCase().replace(/\s+/g, "-")] ?? (kind === "dietary" ? "🥗" : "🍽️");
         return (
           <Pressable
             key={t.id}
@@ -223,8 +225,8 @@ function TagChips({
               pressed && { transform: [{ scale: 0.95 }] },
             ]}
           >
-            <Text style={{ fontSize: 14 }}>{t.emoji}</Text>
-            <Text style={{ fontSize: 12, fontWeight: "700", color: active ? "#fff" : colors.ink }}>{t.label}</Text>
+            <Text style={{ fontSize: 14 }}>{emoji}</Text>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: active ? "#fff" : colors.ink }}>{t.name}</Text>
           </Pressable>
         );
       })}
@@ -235,15 +237,20 @@ function TagChips({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function CreateScreen() {
+  const { currentUser } = useAuthContext();
+  const { dietaryOptions, cuisineOptions, loading: optionsLoading } = useRecipeOptions();
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const [recipeName, setRecipeName] = useState("");
   const [description, setDescription] = useState("");
   const [difficultyVal, setDifficultyVal] = useState(3);
+  const [timeMinutes, setTimeMinutes] = useState("30");
   const [ingredients, setIngredients] = useState(["", ""]);
   const [steps, setSteps] = useState(["", ""]);
-  const [dietary, setDietary] = useState<Set<string>>(new Set());
-  const [cuisines, setCuisines] = useState<Set<string>>(new Set());
+  const [dietary, setDietary] = useState<Set<number>>(new Set());
+  const [cuisines, setCuisines] = useState<Set<number>>(new Set());
   const [published, setPublished] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const doneFlags = [
     photoSrc !== null,
@@ -253,7 +260,10 @@ export default function CreateScreen() {
   ];
   const doneCount = doneFlags.filter(Boolean).length;
   const pct = Math.round((doneCount / 4) * 100);
-  const difficulty = DIFFICULTY_NAMES[difficultyVal];
+  const difficultyLevel = DIFFICULTY_LEVELS[difficultyVal];
+  const difficulty = difficultyLevel.name;
+  const cookingTime = Number(timeMinutes);
+  const canPublish = doneFlags.every(Boolean) && Number.isInteger(cookingTime) && cookingTime > 0;
 
   const handlePhoto = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -270,11 +280,47 @@ export default function CreateScreen() {
   };
   const removeFromList = (list: string[], idx: number) => list.filter((_, i) => i !== idx);
 
-  const toggleTag = (set: Set<string>, id: string): Set<string> => {
+  const toggleTag = (set: Set<number>, id: number): Set<number> => {
     const next = new Set(set);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     return next;
+  };
+
+  const handlePublish = async () => {
+    setPublishError(null);
+    if (!currentUser) {
+      setPublishError("Please sign in before publishing a recipe.");
+      return;
+    }
+    if (!canPublish) {
+      setPublishError("Add a photo, recipe name, at least one ingredient and step, and a valid cooking time.");
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      const imageUrl = await uploadPostImage(photoSrc!, currentUser.id);
+      await createPost({
+        title: recipeName.trim(),
+        description: description.trim(),
+        difficulty: difficultyVal,
+        imageUrl,
+        authorUsername: currentUser.username || currentUser.email.split("@")[0] || "BetterBite member",
+        recipeJson: {
+          ingredients: ingredients.map((ingredient) => ingredient.trim()).filter(Boolean),
+          steps: steps.map((step) => step.trim()).filter(Boolean),
+        },
+        restrictionIds: [...dietary],
+        cuisineIds: [...cuisines],
+        time: cookingTime,
+      });
+      setPublished(true);
+    } catch (error) {
+      setPublishError(error instanceof Error ? error.message : "Unable to publish this recipe. Please try again.");
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   if (published) {
@@ -293,7 +339,7 @@ export default function CreateScreen() {
             setRecipeName(""); setDescription(""); setPhotoSrc(null);
             setIngredients(["", ""]); setSteps(["", ""]);
             setDietary(new Set()); setCuisines(new Set());
-            setDifficultyVal(3);
+            setDifficultyVal(3); setTimeMinutes("30"); setPublishError(null);
           }}
           style={({ pressed }) => [styles.primaryBtn, pressed && { transform: [{ scale: 0.95 }] }]}
         >
@@ -308,7 +354,7 @@ export default function CreateScreen() {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 128 }}
+        contentContainerStyle={{ paddingBottom: 128 + (Platform.OS === "web" ? 104 : BottomTabInset) }}
       >
         {/* HEADER */}
         <View style={{ paddingTop: 16, paddingBottom: 16, paddingHorizontal: 16 }}>
@@ -360,6 +406,22 @@ export default function CreateScreen() {
             rows={3}
           />
 
+          <View style={{ marginBottom: 20 }}>
+            <Text style={styles.label}>Cooking time</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <TextInput
+                accessibilityLabel="Cooking time in minutes"
+                value={timeMinutes}
+                onChangeText={(value) => setTimeMinutes(value.replace(/\D/g, ""))}
+                keyboardType="number-pad"
+                placeholder="30"
+                placeholderTextColor={colors.ghost}
+                style={[styles.input, { flex: 1 }]}
+              />
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted }}>minutes</Text>
+            </View>
+          </View>
+
           {/* DIFFICULTY SLIDER */}
           <View style={{ marginBottom: 20 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -379,6 +441,8 @@ export default function CreateScreen() {
               maximumTrackTintColor="#F0F0EC"
               thumbTintColor={colors.sage}
             />
+            <Text style={{ fontSize: 11, fontWeight: "600", color: colors.ink, marginTop: 4 }}>{difficultyLevel.meaning}</Text>
+            <Text style={{ fontSize: 10, fontWeight: "500", color: colors.muted, marginTop: 2 }}>Examples: {difficultyLevel.examples}</Text>
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: -2 }}>
               <Text style={{ fontSize: 9, fontWeight: "500", color: colors.faint }}>Simple</Text>
               <Text style={{ fontSize: 9, fontWeight: "500", color: colors.faint }}>Expert</Text>
@@ -426,13 +490,25 @@ export default function CreateScreen() {
           {/* DIETARY */}
           <View style={{ marginBottom: 20 }}>
             <Text style={[styles.label, { marginBottom: 8 }]}>Dietary</Text>
-            <TagChips tags={DIETARY_TAGS} selected={dietary} onToggle={(id) => setDietary(toggleTag(dietary, id))} />
+            {optionsLoading ? (
+              <Text style={styles.optionStatus}>Loading dietary options…</Text>
+            ) : dietaryOptions.length ? (
+              <TagChips tags={dietaryOptions} selected={dietary} kind="dietary" onToggle={(id) => setDietary(toggleTag(dietary, id))} />
+            ) : (
+              <Text style={styles.optionStatus}>No dietary options available.</Text>
+            )}
           </View>
 
           {/* CUISINE */}
           <View style={{ marginBottom: 24 }}>
             <Text style={[styles.label, { marginBottom: 8 }]}>Cuisine</Text>
-            <TagChips tags={CUISINE_TAGS} selected={cuisines} onToggle={(id) => setCuisines(toggleTag(cuisines, id))} />
+            {optionsLoading ? (
+              <Text style={styles.optionStatus}>Loading cuisine options…</Text>
+            ) : cuisineOptions.length ? (
+              <TagChips tags={cuisineOptions} selected={cuisines} kind="cuisine" onToggle={(id) => setCuisines(toggleTag(cuisines, id))} />
+            ) : (
+              <Text style={styles.optionStatus}>No cuisine options available.</Text>
+            )}
           </View>
 
           {/* LIVE PREVIEW */}
@@ -475,18 +551,22 @@ export default function CreateScreen() {
         pointerEvents="box-none"
         style={styles.publishWrap}
       >
+        {publishError ? <Text style={styles.publishError}>{publishError}</Text> : null}
         <Pressable
-          onPress={() => recipeName.trim() && setPublished(true)}
+          disabled={isPublishing}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isPublishing }}
+          onPress={() => void handlePublish()}
           style={({ pressed }) => [
             styles.publishBtn,
-            recipeName.trim()
+            !isPublishing
               ? { backgroundColor: colors.sage, shadowColor: colors.sage, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }
               : { backgroundColor: "#C8D4C0" },
             pressed && { transform: [{ scale: 0.98 }] },
           ]}
         >
-          <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>
-            {pct === 100 ? "🎉 Publish recipe" : recipeName.trim() ? "Publish recipe →" : "Add a name to publish"}
+          <Text style={{ color: isPublishing ? colors.sage : "#fff", fontSize: 14, fontWeight: "800" }}>
+            {isPublishing ? "Publishing…" : pct === 100 ? "🎉 Publish recipe" : "Publish recipe →"}
           </Text>
         </Pressable>
       </LinearGradient>
@@ -527,6 +607,7 @@ const styles = StyleSheet.create({
   addRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   addCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colors.sage, alignItems: "center", justifyContent: "center" },
   addText: { fontSize: 12, fontWeight: "700", color: colors.sage },
+  optionStatus: { fontSize: 12, fontWeight: "500", color: colors.muted },
 
   tagChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
 
@@ -535,6 +616,7 @@ const styles = StyleSheet.create({
   successCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.sageLight, alignItems: "center", justifyContent: "center", marginBottom: 20 },
   primaryBtn: { backgroundColor: colors.sage, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16 },
 
-  publishWrap: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 12 },
+  publishWrap: { position: "absolute", left: 0, right: 0, bottom: Platform.OS === "web" ? 104 : BottomTabInset, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 12 },
   publishBtn: { width: "100%", paddingVertical: 16, borderRadius: 16, alignItems: "center" },
+  publishError: { marginBottom: 8, color: "#B42318", fontSize: 12, textAlign: "center" },
 });

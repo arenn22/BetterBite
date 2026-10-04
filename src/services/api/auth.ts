@@ -90,6 +90,8 @@ export async function handleSignInEmail(
       email: data.user.email || email,
       date_joined: date,
       pfp_url: profileData?.pfp_url || DEFAULT_PROFILE_IMAGE,
+      experience_level: (profileData as any)?.experience_level ?? (profileData as any)?.experienceLevel ?? null,
+      experienceLevel: (profileData as any)?.experience_level ?? (profileData as any)?.experienceLevel ?? null,
       streakCount: streakValue,
       streakcount: streakValue,
       last_streak_post: lastStreakPost,
