@@ -14,6 +14,7 @@ export interface Post {
   likes: number;
   title: string;
   description: string;
+  time?: number | string | null;
   difficulty: number;
   image_url: string;
   author_username: string;

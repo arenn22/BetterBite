@@ -1,8 +1,10 @@
 import { getExperienceLevelName } from "@/constants/experience-levels";
 import { useAuthContext } from "@/lib/auth/auth-context";
+import { fetchHomePostSections } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
-import { useState } from "react";
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { Post } from "@/types/models";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, shadowSm } from "./theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -26,59 +28,105 @@ function getLoggedDays(streakCount: number, lastStreakPost?: Date | string | nul
   });
 }
 
-const RECIPES = {
-  recommended: [
-    { id: 1, title: "Golden Garlic Pasta", difficulty: "Easy", time: "20 min", img: "https://images.unsplash.com/photo-1617474020181-e1d42f2245ea?w=400&h=300&fit=crop&auto=format" },
-    { id: 2, title: "Herb Roast Chicken", difficulty: "Medium", time: "55 min", img: "https://images.unsplash.com/photo-1737625854730-56e11fcaff17?w=400&h=300&fit=crop&auto=format" },
-    { id: 3, title: "Tomato Shakshuka", difficulty: "Easy", time: "25 min", img: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&h=300&fit=crop&auto=format" },
-    { id: 4, title: "Smoky Lentil Bowl", difficulty: "Easy", time: "30 min", img: "https://images.unsplash.com/photo-1667473775795-41f69ae72c44?w=400&h=300&fit=crop&auto=format" },
-  ],
-  easyWins: [
-    { id: 5, title: "Fried Egg Toast", difficulty: "Beginner", time: "8 min", img: "https://images.unsplash.com/photo-1465014925804-7b9ede58d0d7?w=400&h=300&fit=crop&auto=format" },
-    { id: 6, title: "Avocado Rice Bowl", difficulty: "Beginner", time: "12 min", img: "https://images.unsplash.com/photo-1617474019977-0e105d1b430e?w=400&h=300&fit=crop&auto=format" },
-    { id: 7, title: "Quick Veggie Stir-fry", difficulty: "Easy", time: "15 min", img: "https://images.unsplash.com/photo-1605522283494-4901a98d458e?w=400&h=300&fit=crop&auto=format" },
-    { id: 8, title: "Tomato Basil Pasta", difficulty: "Easy", time: "18 min", img: "https://images.unsplash.com/photo-1617474019991-689674c2d1ae?w=400&h=300&fit=crop&auto=format" },
-  ],
-  challenge: [
-    { id: 9, title: "Braised Short Ribs", difficulty: "Advanced", time: "3 hrs", img: "https://images.unsplash.com/photo-1714683237282-4a4623333058?w=400&h=300&fit=crop&auto=format" },
-    { id: 10, title: "Steamed Whole Fish", difficulty: "Hard", time: "45 min", img: "https://images.unsplash.com/photo-1528712518629-67d42968a45e?w=400&h=300&fit=crop&auto=format" },
-    { id: 11, title: "Cassoulet", difficulty: "Advanced", time: "4 hrs", img: "https://images.unsplash.com/photo-1767514579388-278d63566fd7?w=400&h=300&fit=crop&auto=format" },
-    { id: 12, title: "Rosemary Focaccia", difficulty: "Hard", time: "2.5 hrs", img: "https://images.unsplash.com/photo-1518737003272-dac7c4760d5e?w=400&h=300&fit=crop&auto=format" },
-  ],
-  friends: [
-    { id: 13, title: "Miso Ramen", difficulty: "Medium", time: "40 min", img: "https://images.unsplash.com/photo-1699251775859-ef6a2f69ef5b?w=400&h=300&fit=crop&auto=format", friend: "Maya K." },
-    { id: 14, title: "Chicken Burrito Bowl", difficulty: "Easy", time: "30 min", img: "https://images.unsplash.com/photo-1788227356559-7e9a7a2846cb?w=400&h=300&fit=crop&auto=format", friend: "Tomás R." },
-    { id: 15, title: "Veggie Noodle Stir-fry", difficulty: "Easy", time: "20 min", img: "https://images.unsplash.com/photo-1591459034470-d1e05d7b05d4?w=400&h=300&fit=crop&auto=format", friend: "Priya N." },
-    { id: 16, title: "Pan-Seared Salmon", difficulty: "Medium", time: "25 min", img: "https://images.unsplash.com/photo-1614955177711-2540ad25432b?w=400&h=300&fit=crop&auto=format", friend: "Lena W." },
-  ],
-};
-
 const DIFFICULTY_COLORS: Record<string, { bg: string; text: string }> = {
-  Beginner: { bg: "#E8EDE5", text: "#687B5D" },
-  Easy: { bg: "#E8EDE5", text: "#687B5D" },
-  Medium: { bg: "#FDF0EA", text: "#C4855F" },
-  Hard: { bg: "#FDEAE0", text: "#C4855F" },
-  Advanced: { bg: "#FCE4D6", text: "#B5603A" },
+  "Absolute Beginner": { bg: "#E8EDE5", text: "#687B5D" },
+  Novice: { bg: "#E8EDE5", text: "#687B5D" },
+  "Beginner Cook": { bg: "#E8EDE5", text: "#687B5D" },
+  "Advanced Beginner": { bg: "#E8EDE5", text: "#687B5D" },
+  "Intermediate Cook": { bg: "#FDF0EA", text: "#C4855F" },
+  "Capable Cook": { bg: "#FDF0EA", text: "#C4855F" },
+  "Advanced Intermediate": { bg: "#FCE4D6", text: "#B5603A" },
+  "Experienced Cook": { bg: "#FCE4D6", text: "#B5603A" },
+  "Advanced Cook": { bg: "#F8DDD0", text: "#9B3A1A" },
+  "Expert Chef": { bg: "#F8DDD0", text: "#9B3A1A" },
 };
 
 interface Recipe {
-  id: number;
+  id: string;
   title: string;
   difficulty: string;
-  time: string;
+  time?: string;
   img: string;
+  likes: number;
+  views: number;
   friend?: string;
 }
 
-function RecipeCard({ recipe, onOpen }: { recipe: Recipe; onOpen: (id: number) => void }) {
-  const diff = DIFFICULTY_COLORS[recipe.difficulty] ?? DIFFICULTY_COLORS.Easy;
+type HomeFeeds = {
+  recommended: Recipe[];
+  easyWins: Recipe[];
+  challenge: Recipe[];
+  friends: Recipe[];
+};
+
+const EMPTY_HOME_FEEDS: HomeFeeds = {
+  recommended: [],
+  easyWins: [],
+  challenge: [],
+  friends: [],
+};
+
+function toHomeRecipe(post: Post, showAuthor = false): Recipe {
+  const fields = post as Post & {
+    like_count?: number | string | null;
+    likes_count?: number | string | null;
+    view_count?: number | string | null;
+    cooking_time?: number | string | null;
+    cooking_minutes?: number | string | null;
+    cook_time?: number | string | null;
+    prep_time?: number | string | null;
+    total_time?: number | string | null;
+    time?: number | string | null;
+  };
+  const difficultyValue = Number(post.difficulty) || 1;
+  const recipeTime = post.recipe && typeof post.recipe === "object" ? post.recipe.time : undefined;
+  const cookingTime = formatCookingTime(fields.time ?? fields.cooking_time ?? fields.cooking_minutes ?? fields.cook_time ?? fields.prep_time ?? fields.total_time ?? recipeTime);
+
+  return {
+    id: post.id,
+    title: post.title || "Untitled recipe",
+    difficulty: getExperienceLevelName(difficultyValue) ?? `Level ${difficultyValue}`,
+    time: cookingTime,
+    img: post.image_url || "",
+    likes: Number(fields.likes ?? fields.like_count ?? fields.likes_count) || 0,
+    views: Number(fields.views ?? fields.view_count) || 0,
+    friend: showAuthor ? post.author_username || "Community cook" : undefined,
+  };
+}
+
+function formatCookingTime(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const text = String(value).trim();
+  const numericValue = Number(text);
+  if (Number.isFinite(numericValue)) {
+    return numericValue > 0 ? `${numericValue} min` : undefined;
+  }
+
+  const clockTime = /^(\d+):([0-5]\d)(?::[0-5]\d)?$/.exec(text);
+  if (clockTime) {
+    const totalMinutes = Number(clockTime[1]) * 60 + Number(clockTime[2]);
+    return totalMinutes > 0 ? `${totalMinutes} min` : undefined;
+  }
+
+  return text;
+}
+
+function RecipeCard({ recipe, onOpen }: { recipe: Recipe; onOpen: (recipe: Recipe) => void }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const diff = DIFFICULTY_COLORS[recipe.difficulty] ?? DIFFICULTY_COLORS["Beginner Cook"];
   return (
     <Pressable
-      onPress={() => onOpen(recipe.id)}
+      onPress={() => onOpen(recipe)}
       style={({ pressed }) => [styles.recipeCard, shadowSm, pressed && { opacity: 0.92 }]}
     >
       <View style={styles.recipeImgWrap}>
-        <Image source={{ uri: recipe.img }} style={styles.fill} resizeMode="cover" />
+        {recipe.img && !imageFailed ? (
+          <Image source={{ uri: recipe.img }} style={styles.fill} resizeMode="cover" onError={() => setImageFailed(true)} />
+        ) : (
+          <View style={[styles.fill, styles.imageFallback]}>
+            <Text style={styles.imageFallbackText}>Image unavailable</Text>
+          </View>
+        )}
         {recipe.friend && (
           <View style={styles.friendTag}>
             <Text style={styles.friendTagText}>{recipe.friend}</Text>
@@ -89,9 +137,13 @@ function RecipeCard({ recipe, onOpen }: { recipe: Recipe; onOpen: (id: number) =
         <Text numberOfLines={2} style={styles.recipeTitle}>{recipe.title}</Text>
         <View style={styles.rowBetween}>
           <View style={[styles.pill, { backgroundColor: diff.bg }]}>
-            <Text style={[styles.pillText, { color: diff.text }]}>{recipe.difficulty}</Text>
+            <Text numberOfLines={1} style={[styles.pillText, { color: diff.text }]}>{recipe.difficulty}</Text>
           </View>
-          <Text style={styles.recipeTime}>{recipe.time}</Text>
+          {recipe.time ? <Text style={styles.recipeTime}>{recipe.time}</Text> : null}
+        </View>
+        <View style={styles.recipeStats}>
+          <Text accessibilityLabel={`${recipe.likes} likes`} style={styles.recipeStat}>♥ {formatCount(recipe.likes)} {recipe.likes === 1 ? "like" : "likes"}</Text>
+          <Text accessibilityLabel={`${recipe.views} views`} style={styles.recipeStat}>◉ {formatCount(recipe.views)} {recipe.views === 1 ? "view" : "views"}</Text>
         </View>
       </View>
     </Pressable>
@@ -99,8 +151,8 @@ function RecipeCard({ recipe, onOpen }: { recipe: Recipe; onOpen: (id: number) =
 }
 
 function RecipeSection({
-  icon, title, subtitle, recipes, onOpen,
-}: { icon: string; title: string; subtitle: string; recipes: Recipe[]; onOpen: (id: number) => void }) {
+  icon, title, subtitle, recipes, loading, onOpen,
+}: { icon: string; title: string; subtitle: string; recipes: Recipe[]; loading: boolean; onOpen: (recipe: Recipe) => void }) {
   return (
     <View style={{ marginBottom: 24 }}>
       <View style={styles.sectionHead}>
@@ -110,31 +162,72 @@ function RecipeSection({
           <Text style={styles.sectionSub}>{subtitle}</Text>
         </View>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 4, gap: 12 }}
-      >
-        {recipes.map((r) => (
-          <RecipeCard key={r.id} recipe={r} onOpen={onOpen} />
-        ))}
-      </ScrollView>
+      {loading ? (
+        <ActivityIndicator color={colors.sage} style={{ height: 150 }} />
+      ) : recipes.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 4, gap: 12 }}
+        >
+          {recipes.map((recipe) => (
+            <RecipeCard key={recipe.id} recipe={recipe} onOpen={onOpen} />
+          ))}
+        </ScrollView>
+      ) : (
+        <Text style={styles.emptySection}>No recipes to show yet.</Text>
+      )}
     </View>
   );
 }
 
+function formatCount(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return value.toLocaleString();
+}
+
 function HomeScreen() {
   const [openRecipe, setOpenRecipe] = useState<Recipe | null>(null);
+  const [homeFeeds, setHomeFeeds] = useState<HomeFeeds>(EMPTY_HOME_FEEDS);
+  const [feedsLoading, setFeedsLoading] = useState(true);
   const { currentUser } = useAuthContext();
-  const allRecipes = Object.values(RECIPES).flat();
   const username = currentUser?.username?.trim() || currentUser?.email.split("@")[0] || "there";
   const experienceLevel = getExperienceLevelName(currentUser?.experience_level ?? currentUser?.experienceLevel) ?? "Home Cook";
   const streakCount = Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0);
   const loggedDays = getLoggedDays(streakCount, currentUser?.last_streak_post ?? currentUser?.last_post_at);
 
-  const handleOpenRecipe = (id: number) => {
-    setOpenRecipe(allRecipes.find((recipe) => recipe.id === id) ?? null);
-  };
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadHomeFeeds() {
+      setFeedsLoading(true);
+      try {
+        const feeds = await fetchHomePostSections();
+
+        if (isActive) {
+          setHomeFeeds({
+            recommended: feeds.recommended.map((post) => toHomeRecipe(post)),
+            easyWins: feeds.easyWins.map((post) => toHomeRecipe(post)),
+            challenge: feeds.challenge.map((post) => toHomeRecipe(post)),
+            friends: feeds.friends.map((post) => toHomeRecipe(post, true)),
+          });
+        }
+      } catch (error) {
+        console.error("Error loading home feeds:", error);
+        if (isActive) setHomeFeeds(EMPTY_HOME_FEEDS);
+      } finally {
+        if (isActive) setFeedsLoading(false);
+      }
+    }
+
+    void loadHomeFeeds();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const handleOpenRecipe = (recipe: Recipe) => setOpenRecipe(recipe);
 
   return (
     <>
@@ -190,10 +283,10 @@ function HomeScreen() {
       </View>
 
       {/* RECIPE SECTIONS */}
-      <RecipeSection icon="🔥" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={RECIPES.recommended} onOpen={handleOpenRecipe} />
-      <RecipeSection icon="⚡" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={RECIPES.easyWins} onOpen={handleOpenRecipe} />
-      <RecipeSection icon="🏆" title="Challenge yourself" subtitle="Push your skills further" recipes={RECIPES.challenge} onOpen={handleOpenRecipe} />
-      <RecipeSection icon="👥" title="From your friends" subtitle="What the community cooked this week" recipes={RECIPES.friends} onOpen={handleOpenRecipe} />
+      <RecipeSection icon="🔥" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={homeFeeds.recommended} loading={feedsLoading} onOpen={handleOpenRecipe} />
+      <RecipeSection icon="⚡" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={homeFeeds.easyWins} loading={feedsLoading} onOpen={handleOpenRecipe} />
+      <RecipeSection icon="🏆" title="Challenge yourself" subtitle="Push your skills further" recipes={homeFeeds.challenge} loading={feedsLoading} onOpen={handleOpenRecipe} />
+      <RecipeSection icon="👥" title="From your friends" subtitle="What the community cooked this week" recipes={homeFeeds.friends} loading={feedsLoading} onOpen={handleOpenRecipe} />
     </ScrollView>
     <Modal
       visible={openRecipe !== null}
@@ -223,7 +316,7 @@ function HomeScreen() {
                   <Text style={styles.closeText}>×</Text>
                 </Pressable>
               </View>
-              <Text style={styles.detailMeta}>{openRecipe.difficulty}  ·  {openRecipe.time}</Text>
+              <Text style={styles.detailMeta}>{openRecipe.difficulty}{openRecipe.time ? `  ·  ${openRecipe.time}` : ""}</Text>
               {openRecipe.friend && <Text style={styles.detailFriend}>Cooked by {openRecipe.friend}</Text>}
             </View>
           </View>
@@ -262,12 +355,17 @@ const styles = StyleSheet.create({
   sectionSub: { fontSize: 12, fontWeight: "500", color: colors.muted, marginTop: 2 },
   recipeCard: { width: 176, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   recipeImgWrap: { height: 112, backgroundColor: colors.sageLight, overflow: "hidden" },
+  imageFallback: { alignItems: "center", justifyContent: "center", backgroundColor: colors.sageLight },
+  imageFallbackText: { fontSize: 10, fontWeight: "500", color: colors.muted },
   friendTag: { position: "absolute", bottom: 8, left: 8, backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   friendTagText: { fontSize: 10, fontWeight: "600", color: colors.ink },
   recipeTitle: { fontSize: 12, fontWeight: "700", color: colors.ink, lineHeight: 15, marginBottom: 6 },
   pill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
   pillText: { fontSize: 10, fontWeight: "600" },
   recipeTime: { fontSize: 10, fontWeight: "500", color: colors.muted },
+  recipeStats: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
+  recipeStat: { fontSize: 9, fontWeight: "600", color: colors.muted },
+  emptySection: { paddingHorizontal: 16, paddingVertical: 20, fontSize: 12, fontWeight: "500", color: colors.muted },
 
   modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 20, backgroundColor: "rgba(0,0,0,0.45)" },
   detailCard: { width: "100%", maxWidth: 390, alignSelf: "center", overflow: "hidden", borderRadius: 16, backgroundColor: "#fff" },

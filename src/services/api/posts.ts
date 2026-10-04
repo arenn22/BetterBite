@@ -1,6 +1,13 @@
 import { supabase } from "../../lib/supabase";
 import type { CreatePostPayload, Post } from "../../types/models";
 
+export type HomePostSections = {
+  recommended: Post[];
+  easyWins: Post[];
+  challenge: Post[];
+  friends: Post[];
+};
+
 export async function createPost(payload: CreatePostPayload): Promise<string> {
   const { data: newPostId, error } = await supabase.rpc('create_post', {
     p_title: payload.title,
@@ -26,19 +33,8 @@ export async function createPost(payload: CreatePostPayload): Promise<string> {
   return newPostId;
 }
 
-export async function fetchPosts(options: { authorId?: string; limit?: number } = {}): Promise<Post[]> {
-  const { authorId, limit = 30 } = options;
-  let query = supabase
-    .from("posts")
-    .select("*")
-    .order("date_created", { ascending: false })
-    .limit(limit);
-  if (authorId) query = query.eq("profile_id", authorId);
-
-  const { data: postRows, error } = await query;
-  if (error) throw error;
-
-  const posts = (postRows || []) as Post[];
+async function hydratePosts(posts: Post[]): Promise<Post[]> {
+  if (!posts.length) return [];
   const profileIds = [...new Set(posts.map((post) => post.profile_id))];
   const { data: profileRows, error: profilesError } = profileIds.length
     ? await supabase
@@ -64,6 +60,21 @@ export async function fetchPosts(options: { authorId?: string; limit?: number } 
   );
 }
 
+export async function fetchPosts(options: { authorId?: string; limit?: number } = {}): Promise<Post[]> {
+  const { authorId, limit = 30 } = options;
+  let query = supabase
+    .from("posts")
+    .select("*")
+    .order("date_created", { ascending: false })
+    .limit(limit);
+  if (authorId) query = query.eq("profile_id", authorId);
+
+  const { data: postRows, error } = await query;
+  if (error) throw error;
+
+  return hydratePosts((postRows || []) as Post[]);
+}
+
 export async function resolvePostImageUrl(
   imageValue: string | undefined,
   bucketName = "post-images",
@@ -72,7 +83,10 @@ export async function resolvePostImageUrl(
   if (!trimmed) return "";
   if (/^data:/i.test(trimmed)) return trimmed;
 
-  const storagePath = getPostImagePath(trimmed, bucketName) ?? trimmed.replace(/^\/+/, "");
+  const resolvedStoragePath = getPostImagePath(trimmed, bucketName);
+  if (/^https?:\/\//i.test(trimmed) && resolvedStoragePath === null) return trimmed;
+
+  const storagePath = resolvedStoragePath ?? trimmed.replace(/^\/+/, "");
   if (!storagePath) return trimmed;
 
   try {
@@ -346,6 +360,56 @@ export async function get_friend_posts() {
   else {
     return (posts || []) as Post[];
   }
+}
+
+export async function fetchHomePostSections(): Promise<HomePostSections> {
+  const [recommended, easyWins, challenge, friends] = await Promise.all([
+    get_recommended_posts(),
+    get_easy_posts(),
+    get_challenge_posts(),
+    get_friend_posts(),
+  ]);
+  const sourceSections = { recommended, easyWins, challenge, friends };
+  const uniquePosts = [...new Map(
+    Object.values(sourceSections).flat().map((post) => [post.id, post]),
+  ).values()];
+  if (!uniquePosts.length) return sourceSections;
+
+  const { data: postRows, error } = await supabase
+    .from("posts")
+    .select("*")
+    .in("id", uniquePosts.map((post) => post.id));
+  if (error) throw error;
+
+  const canonicalPosts = new Map(((postRows || []) as Post[]).map((post) => [post.id, post]));
+  const mergedPosts = uniquePosts.map((post) => {
+    const canonical = canonicalPosts.get(post.id);
+    if (!canonical) return post;
+
+    return {
+      ...canonical,
+      ...post,
+      title: canonical.title || post.title,
+      image_url: canonical.image_url || post.image_url,
+      date_created: canonical.date_created || post.date_created,
+      likes: canonical.likes ?? post.likes,
+      views: canonical.views ?? post.views,
+      time: canonical.time ?? post.time,
+    };
+  });
+  const hydratedPosts = await hydratePosts(mergedPosts);
+  const hydratedById = new Map(hydratedPosts.map((post) => [post.id, post]));
+  const hydrateSection = (posts: Post[]) => posts.flatMap((post) => {
+    const hydratedPost = hydratedById.get(post.id);
+    return hydratedPost ? [hydratedPost] : [];
+  });
+
+  return {
+    recommended: hydrateSection(recommended),
+    easyWins: hydrateSection(easyWins),
+    challenge: hydrateSection(challenge),
+    friends: hydrateSection(friends),
+  };
 }
 
 export async function get_liked_posts() {
