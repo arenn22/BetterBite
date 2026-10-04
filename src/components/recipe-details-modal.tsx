@@ -163,6 +163,21 @@ export function RecipeDetailsModal({
   const averageRating = reviews.length
     ? reviews.reduce((total, review) => total + Number(review.rating || 0), 0) / reviews.length
     : null;
+  const cookedPhotosByProfile = new Map<string, CookedPhotoWithAuthor[]>();
+  for (const photo of cookedPhotos) {
+    const authoredPhotos = cookedPhotosByProfile.get(photo.profile_id) ?? [];
+    authoredPhotos.push(photo);
+    cookedPhotosByProfile.set(photo.profile_id, authoredPhotos);
+  }
+  for (const authoredPhotos of cookedPhotosByProfile.values()) {
+    authoredPhotos.sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+  }
+
+  const getReviewCookPhoto = (review: PostReviewWithAuthor) => {
+    const authoredPhotos = cookedPhotosByProfile.get(review.profile_id) ?? [];
+    const reviewTime = new Date(review.created_at).getTime();
+    return authoredPhotos.find((photo) => new Date(photo.created_at).getTime() <= reviewTime) ?? authoredPhotos[0];
+  };
 
   const chooseCookPhoto = async () => {
     setActionError(null);
@@ -422,6 +437,15 @@ export function RecipeDetailsModal({
                                 <Text style={styles.reviewDate}>{formatDate(review.created_at)}</Text>
                               </View>
                               {review.description ? <Text style={styles.reviewDescription}>{review.description}</Text> : null}
+                              {(() => {
+                                const cookedPhoto = getReviewCookPhoto(review);
+                                return cookedPhoto?.image_url ? (
+                                  <View style={styles.reviewCook}>
+                                    <Image source={{ uri: cookedPhoto.image_url }} style={styles.reviewCookImage} resizeMode="cover" />
+                                    <Text style={styles.reviewCookCaption}>Cooked by {review.author_username}</Text>
+                                  </View>
+                                ) : null;
+                              })()}
                             </View>
                           ))}
                         </View>
@@ -516,6 +540,9 @@ const styles = StyleSheet.create({
   reviewAuthor: { marginBottom: 2, color: colors.ink, fontSize: 11, fontWeight: "700" },
   reviewDate: { color: colors.faint, fontSize: 9 },
   reviewDescription: { marginTop: 8, color: colors.ink, fontSize: 11, lineHeight: 17 },
+  reviewCook: { marginTop: 10, overflow: "hidden", borderRadius: 10, backgroundColor: colors.sageLight },
+  reviewCookImage: { width: "100%", height: 120, backgroundColor: colors.sageLight },
+  reviewCookCaption: { paddingHorizontal: 8, paddingVertical: 5, color: colors.muted, fontSize: 9, fontWeight: "600" },
   emptyState: { alignItems: "center", paddingVertical: 24, paddingHorizontal: 16 },
   emptyTitle: { color: colors.ink, fontFamily: fonts.heading, fontSize: 16, fontWeight: "600", textAlign: "center" },
   emptyMessage: { marginTop: 5, color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: "center" },
