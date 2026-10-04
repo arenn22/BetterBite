@@ -1,10 +1,11 @@
+import { RecipeDetailsModal } from "@/components/recipe-details-modal";
 import { getExperienceLevelName } from "@/constants/experience-levels";
 import { useAuthContext } from "@/lib/auth/auth-context";
-import { fetchHomePostSections } from "@/services/api/posts";
+import { fetchHomePostSections, getLikedPostsByUser, incrementPostViews, likePost } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
 import type { Post } from "@/types/models";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, shadowSm } from "./theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -42,6 +43,7 @@ const DIFFICULTY_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 interface Recipe {
+  post: Post;
   id: string;
   title: string;
   difficulty: string;
@@ -83,6 +85,7 @@ function toHomeRecipe(post: Post, showAuthor = false): Recipe {
   const cookingTime = formatCookingTime(fields.time ?? fields.cooking_time ?? fields.cooking_minutes ?? fields.cook_time ?? fields.prep_time ?? fields.total_time ?? recipeTime);
 
   return {
+    post,
     id: post.id,
     title: post.title || "Untitled recipe",
     difficulty: getExperienceLevelName(difficultyValue) ?? `Level ${difficultyValue}`,
@@ -191,6 +194,8 @@ function HomeScreen() {
   const [openRecipe, setOpenRecipe] = useState<Recipe | null>(null);
   const [homeFeeds, setHomeFeeds] = useState<HomeFeeds>(EMPTY_HOME_FEEDS);
   const [feedsLoading, setFeedsLoading] = useState(true);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [likeLoadingIds, setLikeLoadingIds] = useState<Set<string>>(new Set());
   const { currentUser } = useAuthContext();
   const username = currentUser?.username?.trim() || currentUser?.email.split("@")[0] || "there";
   const experienceLevel = getExperienceLevelName(currentUser?.experience_level ?? currentUser?.experienceLevel) ?? "Home Cook";
@@ -203,7 +208,10 @@ function HomeScreen() {
     async function loadHomeFeeds() {
       setFeedsLoading(true);
       try {
-        const feeds = await fetchHomePostSections();
+        const [feeds, likedPosts] = await Promise.all([
+          fetchHomePostSections(),
+          getLikedPostsByUser(),
+        ]);
 
         if (isActive) {
           setHomeFeeds({
@@ -212,6 +220,7 @@ function HomeScreen() {
             challenge: feeds.challenge.map((post) => toHomeRecipe(post)),
             friends: feeds.friends.map((post) => toHomeRecipe(post, true)),
           });
+          setLikedPostIds(new Set(likedPosts.map((post) => post.id)));
         }
       } catch (error) {
         console.error("Error loading home feeds:", error);
@@ -227,7 +236,48 @@ function HomeScreen() {
     };
   }, []);
 
-  const handleOpenRecipe = (recipe: Recipe) => setOpenRecipe(recipe);
+  const handleOpenRecipe = (recipe: Recipe) => {
+    setOpenRecipe(recipe);
+    void incrementPostViews(recipe.id)
+      .then(() => {
+        setHomeFeeds((previous) => Object.fromEntries(
+          Object.entries(previous).map(([section, recipes]) => [
+            section,
+            recipes.map((item) => item.id === recipe.id ? { ...item, views: item.views + 1, post: { ...item.post, views: item.views + 1 } } : item),
+          ]),
+        ) as HomeFeeds);
+        setOpenRecipe((previous) => previous?.id === recipe.id
+          ? { ...previous, views: previous.views + 1, post: { ...previous.post, views: previous.views + 1 } }
+          : previous);
+      })
+      .catch((error) => console.error("Unable to increment views for post:", error));
+  };
+
+  const handleLikePost = async (postId: string) => {
+    if (!currentUser) throw new Error("Please sign in to like this recipe.");
+    if (likedPostIds.has(postId)) return;
+
+    setLikeLoadingIds((previous) => new Set(previous).add(postId));
+    try {
+      await likePost(postId);
+      setLikedPostIds((previous) => new Set(previous).add(postId));
+      setHomeFeeds((previous) => Object.fromEntries(
+        Object.entries(previous).map(([section, recipes]) => [
+          section,
+          recipes.map((recipe) => recipe.id === postId ? { ...recipe, likes: recipe.likes + 1, post: { ...recipe.post, likes: recipe.likes + 1 } } : recipe),
+        ]),
+      ) as HomeFeeds);
+      setOpenRecipe((previous) => previous?.id === postId
+        ? { ...previous, likes: previous.likes + 1, post: { ...previous.post, likes: previous.likes + 1 } }
+        : previous);
+    } finally {
+      setLikeLoadingIds((previous) => {
+        const next = new Set(previous);
+        next.delete(postId);
+        return next;
+      });
+    }
+  };
 
   return (
     <>
@@ -288,41 +338,18 @@ function HomeScreen() {
       <RecipeSection icon="🏆" title="Challenge yourself" subtitle="Push your skills further" recipes={homeFeeds.challenge} loading={feedsLoading} onOpen={handleOpenRecipe} />
       <RecipeSection icon="👥" title="From your friends" subtitle="What the community cooked this week" recipes={homeFeeds.friends} loading={feedsLoading} onOpen={handleOpenRecipe} />
     </ScrollView>
-    <Modal
+    <RecipeDetailsModal
+      post={openRecipe?.post ?? null}
       visible={openRecipe !== null}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setOpenRecipe(null)}
-    >
-      <View style={styles.modalRoot}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={() => setOpenRecipe(null)}
-          accessibilityRole="button"
-          accessibilityLabel="Close recipe details"
-        />
-        {openRecipe && (
-          <View style={[styles.detailCard, shadowSm]}>
-            <Image source={{ uri: openRecipe.img }} style={styles.detailImage} resizeMode="cover" />
-            <View style={styles.detailContent}>
-              <View style={styles.rowBetween}>
-                <Text style={styles.detailTitle}>{openRecipe.title}</Text>
-                <Pressable
-                  onPress={() => setOpenRecipe(null)}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close recipe details"
-                >
-                  <Text style={styles.closeText}>×</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.detailMeta}>{openRecipe.difficulty}{openRecipe.time ? `  ·  ${openRecipe.time}` : ""}</Text>
-              {openRecipe.friend && <Text style={styles.detailFriend}>Cooked by {openRecipe.friend}</Text>}
-            </View>
-          </View>
-        )}
-      </View>
-    </Modal>
+      difficulty={openRecipe?.difficulty ?? ""}
+      cookingTime={openRecipe?.time}
+      likes={openRecipe?.likes ?? 0}
+      views={openRecipe?.views ?? 0}
+      liked={openRecipe ? likedPostIds.has(openRecipe.id) : false}
+      likeLoading={openRecipe ? likeLoadingIds.has(openRecipe.id) : false}
+      onClose={() => setOpenRecipe(null)}
+      onLike={() => openRecipe ? handleLikePost(openRecipe.id) : Promise.resolve()}
+    />
     </>
   );
 }
@@ -366,14 +393,5 @@ const styles = StyleSheet.create({
   recipeStats: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
   recipeStat: { fontSize: 9, fontWeight: "600", color: colors.muted },
   emptySection: { paddingHorizontal: 16, paddingVertical: 20, fontSize: 12, fontWeight: "500", color: colors.muted },
-
-  modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 20, backgroundColor: "rgba(0,0,0,0.45)" },
-  detailCard: { width: "100%", maxWidth: 390, alignSelf: "center", overflow: "hidden", borderRadius: 16, backgroundColor: "#fff" },
-  detailImage: { width: "100%", height: 220, backgroundColor: colors.sageLight },
-  detailContent: { padding: 16 },
-  detailTitle: { flex: 1, marginRight: 12, fontFamily: fonts.heading, fontSize: 22, color: colors.ink },
-  closeText: { fontSize: 28, lineHeight: 30, color: colors.muted },
-  detailMeta: { marginTop: 6, fontSize: 13, fontWeight: "600", color: colors.sage },
-  detailFriend: { marginTop: 8, fontSize: 12, fontWeight: "500", color: colors.muted },
 
 });

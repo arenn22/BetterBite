@@ -94,6 +94,7 @@ export async function resolvePostImageUrl(
       .from(bucketName)
       .createSignedUrl(storagePath, 60 * 60);
     if (!error && data?.signedUrl) return data.signedUrl;
+    if (error) console.warn(`Could not sign ${bucketName} image URL:`, error.message);
   } catch {
     // Use the public URL fallback below.
   }
@@ -275,6 +276,39 @@ export async function likePost(postId: string): Promise<void> {
   }
 }
 
+export async function incrementPostViews(postId: string): Promise<void> {
+  const { error } = await supabase.rpc("increment_post_views", {
+    p_post_id: postId,
+  });
+
+  if (error) {
+    console.error("Error incrementing post views:", error.message);
+    throw new Error(error.message);
+  }
+}
+
+export async function getPostViews(postId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("get_post_views", {
+    p_post_id: postId,
+  });
+
+  if (error) {
+    console.error("Error fetching post views:", error.message);
+    throw new Error(error.message);
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+  const countValue = result && typeof result === "object"
+    ? (result as Record<string, unknown>).views
+      ?? (result as Record<string, unknown>).view_count
+      ?? (result as Record<string, unknown>).get_post_views
+      ?? Object.values(result as Record<string, unknown>)[0]
+    : result;
+  const count = Number(countValue);
+
+  return Number.isFinite(count) && count >= 0 ? count : 0;
+}
+
 export async function getLikedPostsByUser(): Promise<Post[]> {
   const { data, error } = await supabase.rpc('get_liked_posts');
   if(error) {
@@ -398,7 +432,14 @@ export async function fetchHomePostSections(): Promise<HomePostSections> {
     };
   });
   const hydratedPosts = await hydratePosts(mergedPosts);
-  const hydratedById = new Map(hydratedPosts.map((post) => [post.id, post]));
+  const postsWithViewCounts = await Promise.all(hydratedPosts.map(async (post) => {
+    try {
+      return { ...post, views: await getPostViews(post.id) };
+    } catch {
+      return post;
+    }
+  }));
+  const hydratedById = new Map(postsWithViewCounts.map((post) => [post.id, post]));
   const hydrateSection = (posts: Post[]) => posts.flatMap((post) => {
     const hydratedPost = hydratedById.get(post.id);
     return hydratedPost ? [hydratedPost] : [];

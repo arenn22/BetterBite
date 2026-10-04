@@ -4,52 +4,59 @@ import type { CookedPost, Post, PostReview } from "../../types/models";
 import { resolvePostImageUrl } from "./posts";
 import { fetchUserProfile } from "./profiles";
 
-type CreateCookedPostAndReviewParams = {
+export type CreateCookedPostParams = {
   profile_id: string;
   post_id: string;
-  image_url?: string | null;
+  cooked_image_path?: string | null;
+};
+
+export type CreatePostReviewParams = {
+  post_id: string;
   rating: number;
   description?: string | null;
 };
 
-export async function createCookedPostAndReview(
-  params: CreateCookedPostAndReviewParams
-) {
-  const {
-    profile_id,
-    post_id,
-    image_url = null,
-    rating,
-    description = null,
-  } = params;
-
+export async function createCookedPost(params: CreateCookedPostParams) {
   const { data: cookedPost, error: cookedPostError } =
     await supabase.rpc('create_cooked_post', {
-      p_profile_id: profile_id,
-      p_post_id: post_id,
-      p_image_url: image_url,
+      source_post_id: params.post_id,
+      cooked_image_path: params.cooked_image_path ?? null,
     });
 
+
+
   if (cookedPostError) {
-    throw new Error(
-      `Failed to create cooked post: ${cookedPostError.message}`
-    );
+    throw new Error(`Failed to create cooked post: ${cookedPostError.message}`);
   }
 
+  return cookedPost;
+}
+
+export async function createPostReview(params: CreatePostReviewParams) {
   const { data: review, error: reviewError } = await supabase.rpc(
     'create_post_review',
     {
-      p_profile_id: profile_id,
-      p_post_id: post_id,
-      p_rating: rating,
-      p_description: description,
+      p_post_id: params.post_id,
+      p_rating: params.rating,
+      p_description: params.description ?? null,
     }
   );
 
   if (reviewError) {
-    throw new Error(
-      `Cooked post was created, but the review failed: ${reviewError.message}`
-    );
+    throw new Error(reviewError.message);
+  }
+
+  return review;
+}
+
+export async function createCookedPostAndReview(params: CreateCookedPostParams & CreatePostReviewParams) {
+  const cookedPost = await createCookedPost(params);
+  let review;
+  try {
+    review = await createPostReview(params);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown review error";
+    throw new Error(`Cooked post was created, but the review failed: ${message}`);
   }
 
   return {
@@ -65,7 +72,7 @@ export async function get_cooked_posts() {
     return [];
   }
   else {
-    return (posts || []) as CookedPost[];
+    return ((posts || []) as CookedPost[]).map(normalizeCookedPost);
   }
 }
 
@@ -89,6 +96,48 @@ export type CookedPhotoWithAuthor = CookedPost & {
   author_username: string;
   author_pfp_url: string | null;
 };
+
+function normalizeCookedPost(value: CookedPost): CookedPost {
+  const row = value as CookedPost & {
+    cooked_id?: string | null;
+    cooked_at?: Date | string | null;
+    cooked_image_url?: string | null;
+    cooked_post_id?: string | null;
+    source_post_id?: string | null;
+    user_id?: string | null;
+    image_path?: string | null;
+    cooked_image_path?: string | null;
+    cooked_post_image_path?: string | null;
+    cooked_photo_path?: string | null;
+    cooked_photo_url?: string | null;
+    photo_path?: string | null;
+    photo_url?: string | null;
+    storage_path?: string | null;
+    object_path?: string | null;
+  };
+  const imageValue = [
+    row.cooked_image_path,
+    row.cooked_post_image_path,
+    row.cooked_photo_path,
+    row.cooked_photo_url,
+    row.cooked_image_url,
+    row.image_path,
+    row.photo_path,
+    row.photo_url,
+    row.storage_path,
+    row.object_path,
+    row.image_url,
+  ].find((candidate) => typeof candidate === "string" && candidate.trim().length > 0);
+
+  return {
+    ...row,
+    id: row.id || row.cooked_id || row.cooked_post_id || "",
+    created_at: row.created_at || row.cooked_at || "",
+    post_id: row.post_id || row.source_post_id || "",
+    profile_id: row.profile_id || row.user_id || "",
+    image_url: typeof imageValue === "string" ? imageValue : "",
+  };
+}
 
 export async function fetchPostEngagement(postId: string): Promise<{
   reviews: PostReviewWithAuthor[];
@@ -147,9 +196,7 @@ export async function uploadCookedPostImage(
 
   if (error) throw new Error(`Image upload failed: ${error.message}`);
 
-  return supabase.storage
-    .from("cooked_posts-images")
-    .getPublicUrl(path).data.publicUrl;
+  return path;
 }
 
 export async function getCookedPostsByUser(userId: string): Promise<Post[]> {
