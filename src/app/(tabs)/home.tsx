@@ -1,9 +1,29 @@
+import { useAuthContext } from "@/lib/auth/auth-context";
+import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
 import { useState } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, shadowSm } from "./theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
-const LOGGED_DAYS = [true, true, true, true, true, false, false];
+
+function getLoggedDays(streakCount: number, lastStreakPost?: Date | string | null) {
+  const dateOnlyMatch = typeof lastStreakPost === "string"
+    ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(lastStreakPost)
+    : null;
+  const lastPost = dateOnlyMatch
+    ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+    : lastStreakPost ? new Date(lastStreakPost) : null;
+
+  if (!lastPost || Number.isNaN(lastPost.getTime()) || !Number.isFinite(streakCount) || streakCount <= 0) {
+    return DAYS.map(() => false);
+  }
+
+  const lastPostWeekday = (lastPost.getDay() + 6) % 7;
+  return DAYS.map((_, index) => {
+    const daysBeforeLastPost = (lastPostWeekday - index + DAYS.length) % DAYS.length;
+    return daysBeforeLastPost >= 0 && daysBeforeLastPost < streakCount;
+  });
+}
 
 const RECIPES = {
   recommended: [
@@ -104,7 +124,11 @@ function RecipeSection({
 
 function HomeScreen() {
   const [openRecipe, setOpenRecipe] = useState<Recipe | null>(null);
+  const { currentUser } = useAuthContext();
   const allRecipes = Object.values(RECIPES).flat();
+  const username = currentUser?.username?.trim() || currentUser?.email.split("@")[0] || "there";
+  const streakCount = Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0);
+  const loggedDays = getLoggedDays(streakCount, currentUser?.last_streak_post ?? currentUser?.last_post_at);
 
   const handleOpenRecipe = (id: number) => {
     setOpenRecipe(allRecipes.find((recipe) => recipe.id === id) ?? null);
@@ -117,14 +141,14 @@ function HomeScreen() {
       <View style={styles.homeHeader}>
         <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>Good morning</Text>
-          <Text style={styles.h1}>Hey, Sofía.</Text>
+          <Text style={styles.h1}>Hey, {username}.</Text>
           <Text style={styles.subtitle}>A little progress tastes good.</Text>
         </View>
         <View style={{ marginLeft: 12 }}>
           <View>
             <View style={styles.avatar}>
               <Image
-                source={{ uri: "https://images.unsplash.com/photo-1556910636-c508da52e01c?w=96&h=96&fit=crop&auto=format" }}
+                source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }}
                 style={styles.fill}
               />
             </View>
@@ -141,14 +165,14 @@ function HomeScreen() {
           <View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Text style={{ fontSize: 20 }}>🔥</Text>
-              <Text style={styles.streakTitle}>5 day streak</Text>
+              <Text style={styles.streakTitle}>{streakCount}-day streak</Text>
             </View>
             <Text style={[styles.sectionSub, { marginTop: 2 }]}>Keep your cooking rhythm going.</Text>
           </View>
         </View>
         <View style={styles.rowBetween}>
           {DAYS.map((day, i) => {
-            const active = LOGGED_DAYS[i];
+            const active = loggedDays[i];
             return (
               <View key={i} style={{ alignItems: "center", gap: 4 }}>
                 <View style={[styles.dayDot, { backgroundColor: active ? colors.terracotta : colors.divider }]}>

@@ -11,7 +11,7 @@ export default function TabsLayout() {
 	}
 
 	if (!currentUser) {
-		return <Redirect href="/signup" />;
+		return <Redirect href="/login" />;
 	}
 
 	return <AppTabs />;

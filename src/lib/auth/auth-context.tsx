@@ -1,12 +1,12 @@
 import {
-    fetchUserProfile,
     getCurrentSession,
     handleSignInEmail,
     handleSignInUsername,
     handleSignUp,
     signOut as signOutFromSupabase,
     subscribeToAuthStateChanges,
-} from "@/services/api";
+} from "@/services/api/auth";
+import { fetchUserProfile } from "@/services/api/profiles";
 import { Profile } from "@/types/auth";
 import { createContext, useContext, useEffect, useState } from "react";
 

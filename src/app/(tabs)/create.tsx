@@ -1,4 +1,4 @@
-import Slider from "@react-native-community/slider";
+import Slider from "@expo/ui/community/slider";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
@@ -14,19 +14,6 @@ import {
 } from "react-native";
 import Svg, { Circle, Ellipse, G, Line, Rect } from "react-native-svg";
 import { colors, fonts, shadowSm } from "./theme";
-
-type SliderProps = {
-  minimumValue: number;
-  maximumValue: number;
-  step: number;
-  value: number;
-  onValueChange: (value: number) => void;
-  minimumTrackTintColor: string;
-  maximumTrackTintColor: string;
-  thumbTintColor: string;
-};
-
-const CompatibleSlider = Slider as unknown as React.ComponentType<SliderProps>;
 
 // ─── Types & constants ───────────────────────────────────────────────────────
 
@@ -382,7 +369,7 @@ export default function CreateScreen() {
               </View>
               <Text style={{ marginLeft: "auto", fontSize: 12, fontWeight: "500", color: colors.faint }}>{difficultyVal} / 10</Text>
             </View>
-            <CompatibleSlider
+            <Slider
               minimumValue={1}
               maximumValue={10}
               step={1}

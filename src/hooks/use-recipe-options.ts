@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { fetchCuisines, fetchDietaryRestrictions } from "@/services/api";
+import { fetchCuisines, fetchDietaryRestrictions } from "@/services/api/recipe-options";
 
 type RecipeOption = { id: number; name: string };
 

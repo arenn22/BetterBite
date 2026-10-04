@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { fetchPosts } from "@/services/api";
+import { fetchPosts } from "@/services/api/posts";
 import type { Post } from "@/types/models";
 
 export function usePostFeed(
