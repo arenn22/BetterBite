@@ -49,10 +49,10 @@ const GRID_GAP = 12;
 
 const TIME_FILTERS = [
   { id: "all", label: "Any time", icon: "⏱️" },
-  { id: "under-15", label: "Under 15 min", icon: "⚡" },
-  { id: "15-30", label: "15–30 min", icon: "🕒" },
-  { id: "30-45", label: "30–45 min", icon: "🍳" },
-  { id: "45-plus", label: "45+ min", icon: "🔥" },
+  { id: "max-15", label: "15 min", icon: "⚡", maxMinutes: 15 },
+  { id: "max-30", label: "30 min", icon: "🕒", maxMinutes: 30 },
+  { id: "max-45", label: "45 min", icon: "🍳", maxMinutes: 45 },
+  { id: "max-60", label: "60 min", icon: "🔥", maxMinutes: 60 },
 ] as const;
 
 const DIFFICULTY_FILTERS = EXPERIENCE_LEVEL_NAMES.map((name, index) => ({
@@ -164,10 +164,8 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
       results = results.filter((recipe) => {
         const minutes = Number.parseInt(recipe.time, 10);
         if (!Number.isFinite(minutes)) return false;
-        if (selectedTimeFilter === "under-15") return minutes < 15;
-        if (selectedTimeFilter === "15-30") return minutes >= 15 && minutes <= 30;
-        if (selectedTimeFilter === "30-45") return minutes > 30 && minutes <= 45;
-        return minutes > 45;
+        const maximumTime = TIME_FILTERS.find((filter) => filter.id === selectedTimeFilter)?.maxMinutes;
+        return maximumTime === undefined || minutes <= maximumTime;
       });
     }
     if (searchValue.trim()) {
