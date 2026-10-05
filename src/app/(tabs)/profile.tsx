@@ -1,15 +1,22 @@
+import { RecipeDetailsModal } from "@/components/recipe-details-modal";
 import { RecipeCard } from "@/components/recipes/recipe-card";
-import { RecipePreviewModal } from "@/components/recipes/recipe-preview-modal";
 import { ScreenHeader } from "@/components/screen-header";
-import { useState } from "react";
+import { EXPERIENCE_LEVEL_NAMES, getExperienceLevelName } from "@/constants/experience-levels";
+import { useAuthContext } from "@/lib/auth/auth-context";
+import { toRecipeCardData, updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
+import { getCookedPostsByUser } from "@/services/api/cooked-posts";
+import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost } from "@/services/api/posts";
+import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
+import { fetchFriends } from "@/services/api/social";
+import { useEffect, useState } from "react";
 import {
-  Image, Platform, Pressable,
+  ActivityIndicator, Image, Platform, Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
-  View,
+  View
 } from "react-native";
 import Svg, {
   Circle, Defs,
@@ -20,47 +27,22 @@ import Svg, {
 } from "react-native-svg";
 import { colors, fonts, shadowMd, shadowSm } from "./theme";
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+type ProfileFriend = { id: string; name: string; initials: string; color: string; streak: number; img?: string };
 
-const USER = {
-  name: "Sofía",
-  handle: "@sofia_cooks",
-  initials: "SC",
-  tier: "Home Cook",
-  nextTier: "Sous Chef",
-  tierProgress: 0.62,
-  recipes: 23,
-  friends: 6,
-  streak: 5,
-  img: "https://images.unsplash.com/photo-1556910636-c508da52e01c?w=160&h=160&fit=crop&auto=format",
-};
+const FRIEND_COLORS = ["#D9A28B", colors.sage, "#9B6B2A", "#8A9E7A", "#B5603A", colors.muted];
 
-const FRIENDS: { id: number; name: string; initials: string; color: string; streak: number; img?: string }[] = [
-  { id: 1, name: "Maya", initials: "MK", color: "#D9A28B", streak: 12, img: "https://images.unsplash.com/photo-1625631980683-825234bfb7d5?w=64&h=64&fit=crop&auto=format" },
-  { id: 2, name: "Tomás", initials: "TR", color: "#687B5D", streak: 7 },
-  { id: 3, name: "Priya", initials: "PN", color: "#9B6B2A", streak: 21, img: "https://images.unsplash.com/photo-1625631980722-b728f9cf1036?w=64&h=64&fit=crop&auto=format" },
-  { id: 4, name: "Lena", initials: "LW", color: "#8A9E7A", streak: 0 },
-  { id: 5, name: "Carlos", initials: "CR", color: "#B5603A", streak: 9, img: "https://images.unsplash.com/photo-1625631980777-823fc2938950?w=64&h=64&fit=crop&auto=format" },
-  { id: 6, name: "Sun", initials: "SY", color: "#7A7A72", streak: 2 },
-];
-
-const CREATED_RECIPES = [
-  { id: 1, title: "Golden Garlic Pasta", img: "https://images.unsplash.com/photo-1617474020181-e1d42f2245ea?w=300&h=240&fit=crop&auto=format" },
-  { id: 2, title: "Tomato Shakshuka", img: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=300&h=240&fit=crop&auto=format" },
-  { id: 3, title: "Smoky Lentil Bowl", img: "https://images.unsplash.com/photo-1667473775795-41f69ae72c44?w=300&h=240&fit=crop&auto=format" },
-  { id: 4, title: "Herb Roast Chicken", img: "https://images.unsplash.com/photo-1737625854730-56e11fcaff17?w=300&h=240&fit=crop&auto=format" },
-  { id: 5, title: "Fried Egg Toast", img: "https://images.unsplash.com/photo-1465014925804-7b9ede58d0d7?w=300&h=240&fit=crop&auto=format" },
-  { id: 6, title: "Yellow Fried Rice", img: "https://images.unsplash.com/photo-1615865417491-9941019fbc00?w=300&h=240&fit=crop&auto=format" },
-];
-
-const COOKED_RECIPES = [
-  { id: 7, title: "Pad Thai Noodles", img: "https://images.unsplash.com/photo-1788601299617-3052a7c8fa70?w=300&h=240&fit=crop&auto=format" },
-  { id: 8, title: "Cacio e Pepe", img: "https://images.unsplash.com/photo-1707546944460-dda9069b9c1e?w=300&h=240&fit=crop&auto=format" },
-  { id: 9, title: "Veggie Grain Bowl", img: "https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=300&h=240&fit=crop&auto=format" },
-  { id: 10, title: "Spiced Ramen Bowl", img: "https://images.unsplash.com/photo-1773817728515-612df7f78e1b?w=300&h=240&fit=crop&auto=format" },
-];
-
-type LibraryRecipe = (typeof CREATED_RECIPES)[number];
+function normalizeFriend(value: Record<string, unknown>, index: number): ProfileFriend {
+  const name = String(value.username ?? value.friend_username ?? value.display_name ?? value.name ?? "Friend");
+  const initials = name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  return {
+    id: String(value.id ?? value.profile_id ?? value.friend_id ?? index),
+    name,
+    initials,
+    color: FRIEND_COLORS[index % FRIEND_COLORS.length],
+    streak: Number(value.streakCount ?? value.streakcount ?? value.streak ?? 0) || 0,
+    img: typeof value.pfp_url === "string" ? value.pfp_url : typeof value.friend_pfp_url === "string" ? value.friend_pfp_url : undefined,
+  };
+}
 
 type TabId = "created" | "cooked" | "liked";
 const TABS: { id: TabId; label: string }[] = [
@@ -161,21 +143,62 @@ function EmptyTabState({ tab }: { tab: TabId }) {
 
 export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: string) => void }) {
   const { width } = useWindowDimensions();
+  const { currentUser } = useAuthContext();
   const [activeTab, setActiveTab] = useState<TabId>("created");
   const [editMode, setEditMode] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState<LibraryRecipe | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardData | null>(null);
+  const [createdRecipes, setCreatedRecipes] = useState<RecipeCardData[]>([]);
+  const [cookedRecipes, setCookedRecipes] = useState<RecipeCardData[]>([]);
+  const [likedRecipes, setLikedRecipes] = useState<RecipeCardData[]>([]);
+  const [friends, setFriends] = useState<ProfileFriend[]>([]);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [likeLoading, setLikeLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const userId = currentUser.id;
+    let active = true;
+
+    async function loadProfileData() {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const [created, cooked, liked, friendRows] = await Promise.all([
+          fetchPosts({ authorId: userId }),
+          getCookedPostsByUser(userId),
+          getLikedPostsByUser(),
+          fetchFriends(),
+        ]);
+        if (!active) return;
+        setCreatedRecipes(created.map((post) => toRecipeCardData(post)));
+        setCookedRecipes(cooked.map((post) => toRecipeCardData(post)));
+        setLikedRecipes(liked.map((post) => toRecipeCardData(post)));
+        setLikedPostIds(new Set(liked.map((post) => post.id)));
+        setFriends((Array.isArray(friendRows) ? friendRows : []).map((friend, index) => normalizeFriend(friend as Record<string, unknown>, index)));
+      } catch (error) {
+        if (active) setLoadError(error instanceof Error ? error.message : "Unable to load your profile.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadProfileData();
+    return () => { active = false; };
+  }, [currentUser]);
 
   const layoutWidth = Platform.OS === "web" ? Math.min(width, 430) : width;
   const cardWidth = (layoutWidth - 32 - 12) / 2;
 
-  const tabRecipes: Record<TabId, typeof CREATED_RECIPES> = {
-    created: CREATED_RECIPES,
-    cooked: COOKED_RECIPES,
-    liked: [],
+  const tabRecipes: Record<TabId, RecipeCardData[]> = {
+    created: createdRecipes,
+    cooked: cookedRecipes,
+    liked: likedRecipes,
   };
   const recipes = tabRecipes[activeTab];
 
-  const handleOpenRecipe = (recipe: LibraryRecipe) => {
+  const handleOpenRecipe = (recipe: RecipeCardData) => {
     if (onOpenRecipe) {
       onOpenRecipe(String(recipe.id));
     } else {
@@ -183,10 +206,36 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     }
   };
 
+  const handleLikeRecipe = async () => {
+    if (!selectedRecipe || likedPostIds.has(selectedRecipe.id)) return;
+    setLikeLoading(true);
+    try {
+      await likePost(selectedRecipe.id);
+      setLikedPostIds((current) => new Set(current).add(selectedRecipe.id));
+      setSelectedRecipe((current) => current ? updateRecipeCardData(current, { likes: current.likes + 1 }) : current);
+      setCreatedRecipes((current) => current.map((recipe) => recipe.id === selectedRecipe.id ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe));
+      setCookedRecipes((current) => current.map((recipe) => recipe.id === selectedRecipe.id ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe));
+      setLikedRecipes((current) => current.some((recipe) => recipe.id === selectedRecipe.id) ? current : [...current, updateRecipeCardData(selectedRecipe, { likes: selectedRecipe.likes + 1 })]);
+    } finally {
+      setLikeLoading(false);
+    }
+  };
+
+  const handleOpenAndTrackRecipe = (recipe: RecipeCardData) => {
+    handleOpenRecipe(recipe);
+    void incrementPostViews(recipe.id).then(() => {
+      setSelectedRecipe((current) => current?.id === recipe.id ? updateRecipeCardData(current, { views: current.views + 1 }) : current);
+    }).catch((error) => console.error("Unable to increment views for post:", error));
+  };
+
+  const experienceLevel = Number(currentUser?.experience_level ?? currentUser?.experienceLevel) || 1;
+  const tier = getExperienceLevelName(experienceLevel) ?? "Home Cook";
+  const nextTier = EXPERIENCE_LEVEL_NAMES[experienceLevel] ?? "Max level";
+  const tierProgress = Math.min(1, experienceLevel / EXPERIENCE_LEVEL_NAMES.length);
   const stats = [
-    { label: "Recipes", value: String(USER.recipes) },
-    { label: "Friends", value: String(USER.friends) },
-    { label: "Streak", value: `${USER.streak}🔥` },
+    { label: "Recipes", value: String(createdRecipes.length) },
+    { label: "Friends", value: String(friends.length) },
+    { label: "Streak", value: `${Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0)}🔥` },
   ];
 
   return (
@@ -240,7 +289,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
               {/* ring with gap, replaces CSS outline + outline-offset */}
               <View style={[styles.avatarRing, shadowMd]}>
                 <View style={styles.avatarInner}>
-                  <Image source={{ uri: USER.img }} style={styles.fill} resizeMode="cover" />
+                  <Image source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} resizeMode="cover" />
                 </View>
               </View>
               {editMode && (
@@ -257,33 +306,33 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
           {/* Name & handle */}
           <View style={{ marginBottom: 12 }}>
             {editMode ? (
-              <TextInput defaultValue={USER.name} style={styles.nameInput} />
+              <TextInput defaultValue={currentUser?.username ?? ""} style={styles.nameInput} />
             ) : (
-              <Text style={styles.name}>{USER.name}</Text>
+              <Text style={styles.name}>{currentUser?.username || "BetterBite member"}</Text>
             )}
-            <Text style={{ fontSize: 12, fontWeight: "500", color: colors.faint }}>{USER.handle}</Text>
+            <Text style={{ fontSize: 12, fontWeight: "500", color: colors.faint }}>@{currentUser?.username || "member"}</Text>
           </View>
 
           {/* Tier badge */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <View style={{ backgroundColor: colors.sageLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
-              <Text style={{ fontSize: 12, fontWeight: "800", color: colors.sage }}>{USER.tier}</Text>
+              <Text style={{ fontSize: 12, fontWeight: "800", color: colors.sage }}>{tier}</Text>
             </View>
-            <Text style={{ fontSize: 10, fontWeight: "500", color: colors.faint }}>→ {USER.nextTier}</Text>
+            <Text style={{ fontSize: 10, fontWeight: "500", color: colors.faint }}>→ {nextTier}</Text>
           </View>
 
           {/* Progress */}
           <View style={{ marginBottom: 16 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
               <Text style={{ fontSize: 9, fontWeight: "600", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                Progress to {USER.nextTier}
+                Progress to {nextTier}
               </Text>
               <Text style={{ fontSize: 9, fontWeight: "700", color: colors.sage }}>
-                {Math.round(USER.tierProgress * 100)}%
+                {Math.round(tierProgress * 100)}%
               </Text>
             </View>
             <View style={{ height: 6, backgroundColor: colors.divider, borderRadius: 999, overflow: "hidden" }}>
-              <View style={{ height: "100%", width: `${USER.tierProgress * 100}%`, backgroundColor: colors.sage, borderRadius: 999 }} />
+              <View style={{ height: "100%", width: `${tierProgress * 100}%`, backgroundColor: colors.sage, borderRadius: 999 }} />
             </View>
           </View>
 
@@ -319,7 +368,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 4 }}>
-          {FRIENDS.map((f) => (
+          {friends.map((f) => (
             <View key={f.id} style={{ alignItems: "center", gap: 6 }}>
               <View>
                 <View style={[styles.friendAvatar, { backgroundColor: f.color }]}>
@@ -340,12 +389,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
               </Text>
             </View>
           ))}
-          <View style={{ alignItems: "center", gap: 6 }}>
-            <Pressable style={styles.addFriend}>
-              <Text style={{ fontSize: 18, color: colors.faint }}>+</Text>
-            </Pressable>
-            <Text style={{ fontSize: 9, fontWeight: "600", color: colors.faint }}>Add</Text>
-          </View>
+          {loadError ? <Text style={{ fontSize: 11, color: colors.terracotta }}>{loadError}</Text> : null}
         </ScrollView>
       </View>
 
@@ -376,33 +420,35 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
 
         {/* Grid */}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-          {recipes.length === 0 ? (
+          {loading ? (
+            <ActivityIndicator color={colors.sage} style={{ width: "100%", height: 150 }} />
+          ) : recipes.length === 0 ? (
             <EmptyTabState tab={activeTab} />
           ) : (
             recipes.map((r) => (
               <RecipeCard
                 key={r.id}
-                recipe={{ id: String(r.id), title: r.title, difficulty: "Beginner Cook", imageUrl: r.img, likes: 0, views: 0 }}
+                recipe={r}
                 width={cardWidth}
                 compact
-                onPress={() => handleOpenRecipe(r)}
+                onPress={() => handleOpenAndTrackRecipe(r)}
               />
             ))
           )}
         </View>
       </View>
     </ScrollView>
-    <RecipePreviewModal
-      recipe={selectedRecipe ? {
-        id: String(selectedRecipe.id),
-        title: selectedRecipe.title,
-        difficulty: "Beginner Cook",
-        imageUrl: selectedRecipe.img,
-        likes: 0,
-        views: 0,
-      } : null}
+    <RecipeDetailsModal
+      post={selectedRecipe?.post ?? null}
       visible={selectedRecipe !== null}
+      difficulty={selectedRecipe?.difficulty ?? ""}
+      cookingTime={selectedRecipe?.time}
+      likes={selectedRecipe?.likes ?? 0}
+      views={selectedRecipe?.views ?? 0}
+      liked={selectedRecipe ? likedPostIds.has(selectedRecipe.id) : false}
+      likeLoading={likeLoading}
       onClose={() => setSelectedRecipe(null)}
+      onLike={handleLikeRecipe}
     />
     </>
   );

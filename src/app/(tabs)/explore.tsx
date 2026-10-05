@@ -26,7 +26,7 @@ const GRID_PADDING = 16;
 const GRID_GAP = 12;
 
 const TIME_FILTERS = [
-  { id: "all", label: "Any time", icon: "⏱️" },
+  { id: "all", label: "Any time", icon: "⏱️", maxMinutes: undefined },
   { id: "max-15", label: "15 min", icon: "⚡", maxMinutes: 15 },
   { id: "max-30", label: "30 min", icon: "🕒", maxMinutes: 30 },
   { id: "max-45", label: "45 min", icon: "🍳", maxMinutes: 45 },
