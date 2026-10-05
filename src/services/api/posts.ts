@@ -8,6 +8,14 @@ export type HomePostSections = {
   friends: Post[];
 };
 
+export type FilteredPostsOptions = {
+  dietaryRestrictionIds?: number[];
+  cuisineIds?: number[];
+  maxTime?: number | null;
+  difficulties?: number[];
+  friendsOnly?: boolean;
+};
+
 export async function createPost(payload: CreatePostPayload): Promise<string> {
   const { data: newPostId, error } = await supabase.rpc('create_post', {
     p_title: payload.title,
@@ -73,6 +81,39 @@ export async function fetchPosts(options: { authorId?: string; limit?: number } 
   if (error) throw error;
 
   return hydratePosts((postRows || []) as Post[]);
+}
+
+export async function fetchFilteredPosts(
+  filters: FilteredPostsOptions = {},
+): Promise<Post[]> {
+  const args: {
+    p_dietary_restriction_ids?: number[];
+    p_cuisine_ids?: number[];
+    p_max_time?: number;
+    p_difficulties?: number[];
+    p_friends_only?: boolean;
+  } = {};
+
+  if (filters.dietaryRestrictionIds?.length) {
+    args.p_dietary_restriction_ids = filters.dietaryRestrictionIds;
+  }
+  if (filters.cuisineIds?.length) {
+    args.p_cuisine_ids = filters.cuisineIds;
+  }
+  if (filters.maxTime != null) {
+    args.p_max_time = filters.maxTime;
+  }
+  if (filters.difficulties?.length) {
+    args.p_difficulties = filters.difficulties;
+  }
+  if (filters.friendsOnly) {
+    args.p_friends_only = true;
+  }
+
+  const { data, error } = await supabase.rpc("get_filtered_posts", args);
+  if (error) throw error;
+
+  return (data || []) as Post[];
 }
 
 export async function resolvePostImageUrl(

@@ -14,9 +14,8 @@ export function RecipeCard({
   width?: number;
   compact?: boolean;
 }) {
-  const [background, foreground] = [
-    DIFFICULTY_COLORS[recipe.difficulty] ?? DIFFICULTY_COLORS["Beginner Cook"],
-  ];
+  const difficultyColors =
+    DIFFICULTY_COLORS[recipe.difficulty] ?? DIFFICULTY_COLORS["Beginner Cook"];
 
   return (
     <Pressable
@@ -43,8 +42,8 @@ export function RecipeCard({
         <Text numberOfLines={2} style={styles.title}>{recipe.title}</Text>
         {!compact ? (
           <View style={styles.metaRow}>
-            <View style={[styles.pill, { backgroundColor: background.bg }]}>
-              <Text numberOfLines={1} style={[styles.pillText, { color: foreground.text }]}>{recipe.difficulty}</Text>
+            <View style={[styles.pill, { backgroundColor: difficultyColors.bg }]}>
+              <Text numberOfLines={1} style={[styles.pillText, { color: difficultyColors.text }]}>{recipe.difficulty}</Text>
             </View>
             {recipe.time ? <Text style={styles.time}>{recipe.time}</Text> : null}
           </View>
