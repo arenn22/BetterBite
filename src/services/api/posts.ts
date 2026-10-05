@@ -113,7 +113,7 @@ export async function fetchFilteredPosts(
   const { data, error } = await supabase.rpc("get_filtered_posts", args);
   if (error) throw error;
 
-  return (data || []) as Post[];
+  return hydratePosts((data || []) as Post[]);
 }
 
 export async function resolvePostImageUrl(
