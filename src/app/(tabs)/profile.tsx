@@ -44,6 +44,10 @@ function normalizeFriend(value: Record<string, unknown>, index: number): Profile
   };
 }
 
+function uniqueRecipeCards(recipes: RecipeCardData[]): RecipeCardData[] {
+  return [...new Map(recipes.map((recipe) => [recipe.id, recipe])).values()];
+}
+
 type TabId = "created" | "cooked" | "liked";
 const TABS: { id: TabId; label: string }[] = [
   { id: "created", label: "Created" },
@@ -172,9 +176,9 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
           fetchFriends(),
         ]);
         if (!active) return;
-        setCreatedRecipes(created.map((post) => toRecipeCardData(post)));
-        setCookedRecipes(cooked.map((post) => toRecipeCardData(post)));
-        setLikedRecipes(liked.map((post) => toRecipeCardData(post)));
+        setCreatedRecipes(uniqueRecipeCards(created.map((post) => toRecipeCardData(post))));
+        setCookedRecipes(uniqueRecipeCards(cooked.map((post) => toRecipeCardData(post))));
+        setLikedRecipes(uniqueRecipeCards(liked.map((post) => toRecipeCardData(post))));
         setLikedPostIds(new Set(liked.map((post) => post.id)));
         setFriends((Array.isArray(friendRows) ? friendRows : []).map((friend, index) => normalizeFriend(friend as Record<string, unknown>, index)));
       } catch (error) {
