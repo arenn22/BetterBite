@@ -1,8 +1,11 @@
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { RecipePreviewModal } from "@/components/recipes/recipe-preview-modal";
 import { ScreenHeader } from "@/components/screen-header";
+import { useRecipeOptions } from "@/hooks/use-recipe-options";
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -14,27 +17,6 @@ import {
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, fonts, shadowSm } from "./theme";
-
-const CUISINE_FILTERS = [
-  { id: "all", label: "All", emoji: null },
-  { id: "friends", label: "Friends", emoji: "👥" },
-  { id: "italian", label: "Italian", emoji: "🍝" },
-  { id: "mexican", label: "Mexican", emoji: "🌮" },
-  { id: "thai", label: "Thai", emoji: "🍜" },
-  { id: "indian", label: "Indian", emoji: "🍛" },
-  { id: "japanese", label: "Japanese", emoji: "🍱" },
-  { id: "french", label: "French", emoji: "🥐" },
-];
-
-const DIETARY_FILTERS = [
-  { id: "vegan", label: "Vegan", emoji: "🌱" },
-  { id: "vegetarian", label: "Vegetarian", emoji: "🥦" },
-  { id: "glutenfree", label: "Gluten-Free", emoji: "🌾" },
-  { id: "dairyfree", label: "Dairy-Free", emoji: "🥛" },
-  { id: "keto", label: "Keto", emoji: "🥩" },
-];
-
-const ALL_FILTERS = [...CUISINE_FILTERS, ...DIETARY_FILTERS];
 
 interface GridRecipe {
   id: number;
@@ -64,12 +46,24 @@ const ALL_RECIPES: GridRecipe[] = [
 const GRID_PADDING = 16;
 const GRID_GAP = 12;
 
+function normalizeFilterTag(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: string) => void }) {
   const { width } = useWindowDimensions();
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchValue, setSearchValue] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<GridRecipe | null>(null);
+  const { dietaryOptions, cuisineOptions, loading: filtersLoading } = useRecipeOptions();
+
+  const filterOptions = useMemo(() => [
+    { id: "all", label: "All recipes", tag: "all", group: "all" as const },
+    ...cuisineOptions.map((option) => ({ id: `cuisine-${option.id}`, label: option.name, tag: normalizeFilterTag(option.name), group: "cuisine" as const })),
+    ...dietaryOptions.map((option) => ({ id: `dietary-${option.id}`, label: option.name, tag: normalizeFilterTag(option.name), group: "dietary" as const })),
+  ], [cuisineOptions, dietaryOptions]);
 
   const layoutWidth = Platform.OS === "web" ? Math.min(width, 430) : width;
   const fullWidth = layoutWidth - GRID_PADDING * 2;
@@ -97,8 +91,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     >
       <ScreenHeader eyebrow="The community table" title="Explore" subtitle="Real recipes from your BetterBite community." />
 
-      {/* SEARCH */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+      <View style={styles.searchRow}>
         <View style={[styles.search, shadowSm, searchFocused && styles.searchFocused]}>
           <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={colors.muted} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
             <Circle cx={11} cy={11} r={8} />
@@ -119,37 +112,17 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
             </Pressable>
           )}
         </View>
-      </View>
-
-      {/* FILTER CHIPS */}
-      <View style={{ marginBottom: 20, gap: 8 }}>
-        {[CUISINE_FILTERS, DIETARY_FILTERS].map((filterRow, rowIndex) => (
-          <ScrollView
-            key={rowIndex}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 2, gap: 8 }}
-          >
-            {filterRow.map((f) => {
-              const active = activeFilter === f.id;
-              return (
-                <Pressable
-                  key={f.id}
-                  onPress={() => setActiveFilter(f.id)}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    active && styles.chipActive,
-                    pressed && { transform: [{ scale: 0.95 }] },
-                  ]}
-                >
-                  {f.emoji && <Text style={{ fontSize: 14 }}>{f.emoji}</Text>}
-                  <Text style={[styles.chipText, { color: active ? "#fff" : colors.ink }]}>{f.label}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        ))}
+        <Pressable
+          onPress={() => setFilterOpen(true)}
+          style={({ pressed }) => [styles.filterButton, activeFilter !== "all" && styles.filterButtonActive, pressed && { opacity: 0.8 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Open recipe filters"
+          accessibilityState={{ expanded: filterOpen }}
+        >
+          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={activeFilter !== "all" ? "#fff" : colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M4 6h16M7 12h10M10 18h4" />
+          </Svg>
+        </Pressable>
       </View>
 
       {/* SECTION HEADING */}
@@ -157,7 +130,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={{ fontSize: 16 }}>🍽️</Text>
           <Text style={{ fontSize: 14, fontWeight: "800", color: colors.ink }}>
-            {activeFilter === "all" ? "All recipes" : ALL_FILTERS.find((f) => f.id === activeFilter)?.label}
+            {filterOptions.find((filter) => filter.tag === activeFilter)?.label ?? "All recipes"}
           </Text>
         </View>
         <View style={styles.countPill}>
@@ -215,30 +188,75 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
         visible={selectedRecipe !== null}
         onClose={() => setSelectedRecipe(null)}
       />
+      <Modal visible={filterOpen} transparent animationType="fade" onRequestClose={() => setFilterOpen(false)}>
+        <View style={styles.filterModalRoot}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setFilterOpen(false)} accessibilityRole="button" accessibilityLabel="Close recipe filters" />
+          <View style={[styles.filterMenu, shadowSm]}>
+            <View style={styles.filterMenuHeader}>
+              <Text style={styles.filterMenuTitle}>Filter recipes</Text>
+              <Pressable onPress={() => setFilterOpen(false)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close recipe filters">
+                <Text style={styles.closeText}>×</Text>
+              </Pressable>
+            </View>
+            {filtersLoading ? (
+              <ActivityIndicator color={colors.sage} style={styles.filterLoading} />
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterList}>
+                <Pressable
+                  onPress={() => { setActiveFilter("all"); setFilterOpen(false); }}
+                  style={[styles.filterOption, activeFilter === "all" && styles.filterOptionActive]}
+                >
+                  <Text style={[styles.filterOptionText, activeFilter === "all" && styles.filterOptionTextActive]}>All recipes</Text>
+                </Pressable>
+                {(["cuisine", "dietary"] as const).map((group) => {
+                  const options = filterOptions.filter((filter) => filter.group === group);
+                  return (
+                    <View key={group} style={styles.filterGroup}>
+                      <Text style={styles.filterGroupTitle}>{group === "cuisine" ? "Cuisine" : "Dietary"}</Text>
+                      {options.map((filter) => (
+                        <Pressable
+                          key={filter.id}
+                          onPress={() => { setActiveFilter(filter.tag); setFilterOpen(false); }}
+                          style={[styles.filterOption, activeFilter === filter.tag && styles.filterOptionActive]}
+                        >
+                          <Text style={[styles.filterOptionText, activeFilter === filter.tag && styles.filterOptionTextActive]}>{filter.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  eyebrow: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
-  h1: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },
-  subtitle: { fontSize: 14, fontWeight: "500", color: colors.muted, marginTop: 4 },
-
-  search: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, marginBottom: 20 },
+  search: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
   searchFocused: { borderColor: colors.sage, shadowColor: colors.sage, shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } },
   searchInput: { flex: 1, fontSize: 14, fontWeight: "500", color: colors.ink, padding: 0 },
-
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
-  chipActive: { backgroundColor: colors.sage, borderColor: colors.sage },
-  chipText: { fontSize: 12, fontWeight: "700" },
+  filterButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
+  filterButtonActive: { backgroundColor: colors.sage, borderColor: colors.sage },
+  filterModalRoot: { flex: 1, justifyContent: "flex-start", paddingTop: 150, paddingHorizontal: 16, backgroundColor: "rgba(48,49,46,0.3)" },
+  filterMenu: { width: "100%", maxHeight: "70%", borderRadius: 16, backgroundColor: "#fff", overflow: "hidden" },
+  filterMenuHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  filterMenuTitle: { fontSize: 16, fontWeight: "800", color: colors.ink },
+  closeText: { fontSize: 26, lineHeight: 28, color: colors.muted },
+  filterLoading: { height: 160 },
+  filterList: { padding: 16, gap: 8 },
+  filterGroup: { gap: 8, marginTop: 8 },
+  filterGroupTitle: { marginBottom: 2, fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.2 },
+  filterOption: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.bg },
+  filterOptionActive: { backgroundColor: colors.sage },
+  filterOptionText: { fontSize: 13, fontWeight: "600", color: colors.ink },
+  filterOptionTextActive: { color: "#fff" },
 
   countPill: { backgroundColor: colors.divider, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   countText: { fontSize: 12, fontWeight: "600", color: colors.muted },
 
-  gridCard: { borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
-  gridTitle: { fontSize: 12, fontWeight: "700", color: colors.ink, lineHeight: 16, marginBottom: 6 },
-  author: { fontSize: 10, fontWeight: "500", color: colors.muted },
-  time: { fontSize: 10, fontWeight: "500", color: colors.faint },
-  diff: { fontSize: 10, fontWeight: "700", marginTop: 6 },
 });
