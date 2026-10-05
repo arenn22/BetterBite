@@ -5,7 +5,7 @@ import { getExperienceLevelName } from "@/constants/experience-levels";
 import { useHomeFeeds } from "@/hooks/use-home-feeds";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
-import { incrementPostViews, likePost } from "@/services/api/posts";
+import { incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
 import { useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -59,22 +59,29 @@ function HomeScreen() {
       .catch((error) => console.error("Unable to increment views for post:", error));
   };
 
-  const handleLikePost = async (postId: string) => {
+  const handleLikePost = async (postId: string, currentlyLiked: boolean) => {
     if (!currentUser) throw new Error("Please sign in to like this recipe.");
-    if (likedPostIds.has(postId)) return;
 
     setLikeLoadingIds((previous) => new Set(previous).add(postId));
     try {
-      await likePost(postId);
-      setLikedPostIds((previous) => new Set(previous).add(postId));
+      if (currentlyLiked) await unlikePost(postId);
+      else await likePost(postId);
+
+      setLikedPostIds((previous) => {
+        const next = new Set(previous);
+        if (currentlyLiked) next.delete(postId);
+        else next.add(postId);
+        return next;
+      });
+      const likesChange = currentlyLiked ? -1 : 1;
       setHomeFeeds((previous) => ({
-        recommended: previous.recommended.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe),
-        easyWins: previous.easyWins.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe),
-        challenge: previous.challenge.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe),
-        friends: previous.friends.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe),
+        recommended: previous.recommended.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: Math.max(0, recipe.likes + likesChange) }) : recipe),
+        easyWins: previous.easyWins.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: Math.max(0, recipe.likes + likesChange) }) : recipe),
+        challenge: previous.challenge.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: Math.max(0, recipe.likes + likesChange) }) : recipe),
+        friends: previous.friends.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: Math.max(0, recipe.likes + likesChange) }) : recipe),
       }));
       setOpenRecipe((previous) => previous?.id === postId
-        ? updateRecipeCardData(previous, { likes: previous.likes + 1 })
+        ? updateRecipeCardData(previous, { likes: Math.max(0, previous.likes + likesChange) })
         : previous);
     } finally {
       setLikeLoadingIds((previous) => {
@@ -150,7 +157,7 @@ function HomeScreen() {
       liked={openRecipe ? likedPostIds.has(openRecipe.id) : false}
       likeLoading={openRecipe ? likeLoadingIds.has(openRecipe.id) : false}
       onClose={() => setOpenRecipe(null)}
-      onLike={() => openRecipe ? handleLikePost(openRecipe.id) : Promise.resolve()}
+      onLike={(currentlyLiked) => openRecipe ? handleLikePost(openRecipe.id, currentlyLiked) : Promise.resolve()}
     />
     </>
   );

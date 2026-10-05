@@ -5,7 +5,7 @@ import { EXPERIENCE_LEVEL_NAMES, getExperienceLevelName } from "@/constants/expe
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { toRecipeCardData, updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { getCookedPostsByUser } from "@/services/api/cooked-posts";
-import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost } from "@/services/api/posts";
+import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE, getXpPercentageLeftToNextLevel } from "@/services/api/profiles";
 import { fetchFriends } from "@/services/api/social";
 import { useEffect, useState } from "react";
@@ -236,16 +236,34 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     }
   };
 
-  const handleLikeRecipe = async () => {
-    if (!selectedRecipe || likedPostIds.has(selectedRecipe.id)) return;
+  const handleLikeRecipe = async (currentlyLiked: boolean) => {
+    if (!selectedRecipe || likedPostIds.has(selectedRecipe.id) !== currentlyLiked) return;
     setLikeLoading(true);
     try {
-      await likePost(selectedRecipe.id);
-      setLikedPostIds((current) => new Set(current).add(selectedRecipe.id));
-      setSelectedRecipe((current) => current ? updateRecipeCardData(current, { likes: current.likes + 1 }) : current);
-      setCreatedRecipes((current) => current.map((recipe) => recipe.id === selectedRecipe.id ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe));
-      setCookedRecipes((current) => current.map((recipe) => recipe.id === selectedRecipe.id ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe));
-      setLikedRecipes((current) => current.some((recipe) => recipe.id === selectedRecipe.id) ? current : [...current, updateRecipeCardData(selectedRecipe, { likes: selectedRecipe.likes + 1 })]);
+      if (currentlyLiked) await unlikePost(selectedRecipe.id);
+      else await likePost(selectedRecipe.id);
+
+      const likesChange = currentlyLiked ? -1 : 1;
+      setLikedPostIds((current) => {
+        const next = new Set(current);
+        if (currentlyLiked) next.delete(selectedRecipe.id);
+        else next.add(selectedRecipe.id);
+        return next;
+      });
+      setSelectedRecipe((current) => current
+        ? updateRecipeCardData(current, { likes: Math.max(0, current.likes + likesChange) })
+        : current);
+      setCreatedRecipes((current) => current.map((recipe) => recipe.id === selectedRecipe.id
+        ? updateRecipeCardData(recipe, { likes: Math.max(0, recipe.likes + likesChange) })
+        : recipe));
+      setCookedRecipes((current) => current.map((recipe) => recipe.id === selectedRecipe.id
+        ? updateRecipeCardData(recipe, { likes: Math.max(0, recipe.likes + likesChange) })
+        : recipe));
+      setLikedRecipes((current) => currentlyLiked
+        ? current.filter((recipe) => recipe.id !== selectedRecipe.id)
+        : current.some((recipe) => recipe.id === selectedRecipe.id)
+          ? current
+          : [...current, updateRecipeCardData(selectedRecipe, { likes: selectedRecipe.likes + 1 })]);
     } finally {
       setLikeLoading(false);
     }

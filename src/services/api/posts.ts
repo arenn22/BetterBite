@@ -317,6 +317,17 @@ export async function likePost(postId: string): Promise<void> {
   }
 }
 
+export async function unlikePost(postId: string): Promise<void> {
+  const { error } = await supabase.rpc("unlike_post", {
+    target_post_id: postId,
+  });
+
+  if (error) {
+    console.error("Error unliking post:", error.message);
+    throw new Error(error.message);
+  }
+}
+
 export async function incrementPostViews(postId: string): Promise<void> {
   const { error } = await supabase.rpc("increment_post_views", {
     p_post_id: postId,

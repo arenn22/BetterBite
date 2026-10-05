@@ -39,7 +39,7 @@ type RecipeDetailsModalProps = {
   liked: boolean;
   likeLoading: boolean;
   onClose: () => void;
-  onLike: () => Promise<void>;
+  onLike: (currentlyLiked: boolean) => Promise<void>;
 };
 
 function asTextList(value: unknown): string[] {
@@ -265,9 +265,9 @@ export function RecipeDetailsModal({
   const handleLike = async () => {
     setActionError(null);
     try {
-      await onLike();
+      await onLike(liked);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Could not like this recipe.");
+      setActionError(error instanceof Error ? error.message : "Could not update this like.");
     }
   };
 
@@ -301,11 +301,11 @@ export function RecipeDetailsModal({
                 </View>
                 <Pressable
                   onPress={() => void handleLike()}
-                  disabled={liked || likeLoading}
+                  disabled={likeLoading}
                   style={[styles.likeButton, liked && styles.likeButtonActive]}
                   accessibilityRole="button"
-                  accessibilityLabel={liked ? `Liked, ${likes} likes` : `Like post, ${likes} likes`}
-                  accessibilityState={{ disabled: liked || likeLoading }}
+                  accessibilityLabel={liked ? `Unlike post, ${likes} likes` : `Like post, ${likes} likes`}
+                  accessibilityState={{ disabled: likeLoading }}
                 >
                   <Text style={styles.likeIcon}>{liked ? "♥" : "♡"}</Text>
                   <Text style={styles.likeCount}>{likes.toLocaleString()}</Text>
