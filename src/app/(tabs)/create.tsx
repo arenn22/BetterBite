@@ -1,12 +1,15 @@
+import { ScreenHeader } from "@/components/screen-header";
+import { SectionLabel } from "@/components/section-label";
 import { EXPERIENCE_LEVEL_NAMES } from "@/constants/experience-levels";
 import { BottomTabInset } from "@/constants/theme";
+import { useListEditor } from "@/hooks/use-list-editor";
 import { useRecipeOptions } from "@/hooks/use-recipe-options";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { createPost, uploadPostImage } from "@/services/api/posts";
 import Slider from "@expo/ui/community/slider";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
     Image,
     KeyboardAvoidingView, Platform,
@@ -58,10 +61,6 @@ const OPTION_EMOJIS: Record<string, string> = {
 };
 
 // ─── Small reusable pieces ───────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.sectionLabel}>{children}</Text>;
-}
 
 function StyledInput({
   label, value, onChange, placeholder, multiline = false, rows = 3,
@@ -244,8 +243,10 @@ export default function CreateScreen() {
   const [description, setDescription] = useState("");
   const [difficultyVal, setDifficultyVal] = useState(3);
   const [timeMinutes, setTimeMinutes] = useState("30");
-  const [ingredients, setIngredients] = useState(["", ""]);
-  const [steps, setSteps] = useState(["", ""]);
+  const ingredientsEditor = useListEditor(["", ""]);
+  const stepsEditor = useListEditor(["", ""]);
+  const { values: ingredients } = ingredientsEditor;
+  const { values: steps } = stepsEditor;
   const [dietary, setDietary] = useState<Set<number>>(new Set());
   const [cuisines, setCuisines] = useState<Set<number>>(new Set());
   const [published, setPublished] = useState(false);
@@ -272,13 +273,6 @@ export default function CreateScreen() {
     });
     if (!res.canceled && res.assets[0]) setPhotoSrc(res.assets[0].uri);
   };
-
-  const updateList = (list: string[], idx: number, val: string) => {
-    const next = [...list];
-    next[idx] = val;
-    return next;
-  };
-  const removeFromList = (list: string[], idx: number) => list.filter((_, i) => i !== idx);
 
   const toggleTag = (set: Set<number>, id: number): Set<number> => {
     const next = new Set(set);
@@ -337,7 +331,7 @@ export default function CreateScreen() {
           onPress={() => {
             setPublished(false);
             setRecipeName(""); setDescription(""); setPhotoSrc(null);
-            setIngredients(["", ""]); setSteps(["", ""]);
+            ingredientsEditor.reset(); stepsEditor.reset();
             setDietary(new Set()); setCuisines(new Set());
             setDifficultyVal(3); setTimeMinutes("30"); setPublishError(null);
           }}
@@ -356,12 +350,7 @@ export default function CreateScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 128 + (Platform.OS === "web" ? 104 : BottomTabInset) }}
       >
-        {/* HEADER */}
-        <View style={{ paddingTop: 16, paddingBottom: 16, paddingHorizontal: 16 }}>
-          <Text style={styles.eyebrow}>Share the table</Text>
-          <Text style={styles.h1}>Create a recipe</Text>
-          <Text style={styles.subtitle}>Turn something you love to cook into the next community favorite.</Text>
-        </View>
+        <ScreenHeader eyebrow="Share the table" title="Create a recipe" subtitle="Turn something you love to cook into the next community favorite." />
 
         <View style={{ paddingHorizontal: 16 }}>
           {/* PHOTO UPLOAD */}
@@ -457,12 +446,12 @@ export default function CreateScreen() {
                 key={i}
                 index={i}
                 value={val}
-                onChange={(v) => setIngredients(updateList(ingredients, i, v))}
-                onRemove={() => ingredients.length > 1 && setIngredients(removeFromList(ingredients, i))}
+                onChange={(v) => ingredientsEditor.update(i, v)}
+                onRemove={() => ingredientsEditor.remove(i)}
                 placeholder={`e.g. ${["2 cloves garlic", "1 cup flour", "3 tbsp olive oil", "Salt to taste"][i % 4]}`}
               />
             ))}
-            <Pressable onPress={() => setIngredients([...ingredients, ""])} style={styles.addRow}>
+            <Pressable onPress={() => ingredientsEditor.add()} style={styles.addRow}>
               <View style={styles.addCircle}><Text style={{ color: colors.sage, fontSize: 12 }}>+</Text></View>
               <Text style={styles.addText}>Add ingredient</Text>
             </Pressable>
@@ -476,12 +465,12 @@ export default function CreateScreen() {
                 key={i}
                 index={i}
                 value={val}
-                onChange={(v) => setSteps(updateList(steps, i, v))}
-                onRemove={() => steps.length > 1 && setSteps(removeFromList(steps, i))}
+                onChange={(v) => stepsEditor.update(i, v)}
+                onRemove={() => stepsEditor.remove(i)}
                 placeholder={`Step ${i + 1}…`}
               />
             ))}
-            <Pressable onPress={() => setSteps([...steps, ""])} style={styles.addRow}>
+            <Pressable onPress={() => stepsEditor.add()} style={styles.addRow}>
               <View style={styles.addCircle}><Text style={{ color: colors.sage, fontSize: 12 }}>+</Text></View>
               <Text style={styles.addText}>Add step</Text>
             </Pressable>

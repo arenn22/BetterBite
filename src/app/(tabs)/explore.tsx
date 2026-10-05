@@ -1,14 +1,16 @@
+import { RecipeCard } from "@/components/recipes/recipe-card";
+import { RecipePreviewModal } from "@/components/recipes/recipe-preview-modal";
+import { ScreenHeader } from "@/components/screen-header";
 import { useMemo, useState } from "react";
 import {
-    Image,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, fonts, shadowSm } from "./theme";
@@ -59,49 +61,15 @@ const ALL_RECIPES: GridRecipe[] = [
   { id: 10, title: "Community Rice Feast", author: "Amara S.", authorAvatar: "🧑", time: "45 min", difficulty: "Medium", img: "https://images.unsplash.com/photo-1776855828611-8fd3ee069df1?w=400&h=300&fit=crop&auto=format", tags: ["glutenfree", "friends"], likes: 103 },
 ];
 
-const DIFFICULTY_COLORS: Record<string, string> = {
-  Beginner: "#687B5D",
-  Easy: "#687B5D",
-  Medium: "#C4855F",
-  Hard: "#B5603A",
-};
-
 const GRID_PADDING = 16;
 const GRID_GAP = 12;
 
-function GridCard({
-  recipe, cardWidth, onOpen,
-}: { recipe: GridRecipe; cardWidth: number; onOpen: (id: number) => void }) {
-  return (
-    <Pressable
-      onPress={() => onOpen(recipe.id)}
-      style={({ pressed }) => [styles.gridCard, shadowSm, { width: cardWidth }, pressed && { opacity: 0.92 }]}
-    >
-      <View style={{ height: 128, backgroundColor: colors.sageLight, overflow: "hidden" }}>
-        <Image source={{ uri: recipe.img }} style={styles.fill} resizeMode="cover" />
-      </View>
-      <View style={{ padding: 10 }}>
-        <Text numberOfLines={2} style={styles.gridTitle}>{recipe.title}</Text>
-        <View style={styles.rowBetween}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Text style={{ fontSize: 12 }}>{recipe.authorAvatar}</Text>
-            <Text style={styles.author}>{recipe.author}</Text>
-          </View>
-          <Text style={styles.time}>{recipe.time}</Text>
-        </View>
-        <Text style={[styles.diff, { color: DIFFICULTY_COLORS[recipe.difficulty] ?? colors.sage }]}>
-          {recipe.difficulty}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: number) => void }) {
+export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: string) => void }) {
   const { width } = useWindowDimensions();
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchValue, setSearchValue] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState<GridRecipe | null>(null);
 
   const layoutWidth = Platform.OS === "web" ? Math.min(width, 430) : width;
   const fullWidth = layoutWidth - GRID_PADDING * 2;
@@ -127,12 +95,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ paddingBottom: 32 }}
     >
-      {/* HEADER */}
-      <View style={{ paddingTop: 16, paddingBottom: 16, paddingHorizontal: 16 }}>
-        <Text style={styles.eyebrow}>The community table</Text>
-        <Text style={styles.h1}>Explore</Text>
-        <Text style={styles.subtitle}>Real recipes from your BetterBite community.</Text>
-      </View>
+      <ScreenHeader eyebrow="The community table" title="Explore" subtitle="Real recipes from your BetterBite community." />
 
       {/* SEARCH */}
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
@@ -219,22 +182,44 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: nu
         ) : (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}>
             {filtered.map((recipe) => (
-              <GridCard
+              <RecipeCard
                 key={recipe.id}
-                recipe={recipe}
-                cardWidth={halfWidth}
-                onOpen={onOpenRecipe ?? (() => {})}
+                recipe={{
+                  id: String(recipe.id),
+                  title: recipe.title,
+                  difficulty: recipe.difficulty,
+                  time: recipe.time,
+                  imageUrl: recipe.img,
+                  likes: recipe.likes,
+                  views: 0,
+                  author: recipe.author,
+                }}
+                width={halfWidth}
+                onPress={() => onOpenRecipe ? onOpenRecipe(String(recipe.id)) : setSelectedRecipe(recipe)}
               />
             ))}
           </View>
         )}
       </View>
+      <RecipePreviewModal
+        recipe={selectedRecipe ? {
+          id: String(selectedRecipe.id),
+          title: selectedRecipe.title,
+          difficulty: selectedRecipe.difficulty,
+          time: selectedRecipe.time,
+          imageUrl: selectedRecipe.img,
+          likes: selectedRecipe.likes,
+          views: 0,
+          author: selectedRecipe.author,
+        } : null}
+        visible={selectedRecipe !== null}
+        onClose={() => setSelectedRecipe(null)}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: { width: "100%", height: "100%" },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   eyebrow: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
   h1: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },

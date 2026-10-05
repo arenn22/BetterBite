@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { ScreenHeader } from "@/components/screen-header";
+import { SectionLabel } from "@/components/section-label";
+import { useFriendSearch } from "@/hooks/use-friend-search";
+import { useState } from "react";
 import {
     Image,
     Pressable,
@@ -68,10 +71,6 @@ function TierBadge({ tier }: { tier: string }) {
 	return <View style={[styles.tierBadge, { backgroundColor: tierColor.bg }]}><Text style={[styles.tierText, { color: tierColor.text }]}>{tier}</Text></View>;
 }
 
-function SectionLabel({ children }: { children: string }) {
-	return <Text style={styles.sectionLabel}>{children}</Text>;
-}
-
 function ProfileDetails({ friend }: { friend: Friend }) {
 	return (
 		<View style={styles.profileDetails}>
@@ -93,21 +92,14 @@ export default function SocialScreen() {
 	const [openProfile, setOpenProfile] = useState<number | null>(null);
 	const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-	const searchResults = useMemo(() => {
-		const query = searchQuery.trim().toLowerCase();
-		return query ? SUGGESTED.filter((user) => user.name.toLowerCase().includes(query)) : null;
-	}, [searchQuery]);
+	const searchResults = useFriendSearch(SUGGESTED, searchQuery);
 	const leaderboard = [FRIENDS[2], FRIENDS[0], FRIENDS[4]];
 	const podium = [leaderboard[1], leaderboard[0], leaderboard[2]];
 	const rankLabels = ["🥇", "🥈", "🥉"];
 
 	return (
 		<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-			<View style={styles.header}>
-				<Text style={styles.eyebrow}>Your crew</Text>
-				<Text style={styles.title}>Social</Text>
-				<Text style={styles.subtitle}>Add friends, manage requests, and check in with your people.</Text>
-			</View>
+			<ScreenHeader eyebrow="Your crew" title="Social" subtitle="Add friends, manage requests, and check in with your people." />
 
 			<View style={[styles.panel, shadowSm]}>
 				<View style={styles.panelHeader}><View style={styles.headingRow}><Text style={styles.headingIcon}>🏆</Text><Text style={styles.heading}>Top 3 this week</Text></View><Pressable onPress={() => setShowLeaderboard((value) => !value)}><Text style={styles.link}>{showLeaderboard ? "Hide" : "See full leaderboard"} →</Text></Pressable></View>

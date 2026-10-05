@@ -1,11 +1,14 @@
 import { RecipeDetailsModal } from "@/components/recipe-details-modal";
+import { RecipeSection } from "@/components/recipes/recipe-section";
+import { ScreenHeader } from "@/components/screen-header";
 import { getExperienceLevelName } from "@/constants/experience-levels";
+import { useHomeFeeds } from "@/hooks/use-home-feeds";
 import { useAuthContext } from "@/lib/auth/auth-context";
-import { fetchHomePostSections, getLikedPostsByUser, incrementPostViews, likePost } from "@/services/api/posts";
+import { updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
+import { incrementPostViews, likePost } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
-import type { Post } from "@/types/models";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, shadowSm } from "./theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -29,172 +32,9 @@ function getLoggedDays(streakCount: number, lastStreakPost?: Date | string | nul
   });
 }
 
-const DIFFICULTY_COLORS: Record<string, { bg: string; text: string }> = {
-  "Absolute Beginner": { bg: "#E8EDE5", text: "#687B5D" },
-  Novice: { bg: "#E8EDE5", text: "#687B5D" },
-  "Beginner Cook": { bg: "#E8EDE5", text: "#687B5D" },
-  "Advanced Beginner": { bg: "#E8EDE5", text: "#687B5D" },
-  "Intermediate Cook": { bg: "#FDF0EA", text: "#C4855F" },
-  "Capable Cook": { bg: "#FDF0EA", text: "#C4855F" },
-  "Advanced Intermediate": { bg: "#FCE4D6", text: "#B5603A" },
-  "Experienced Cook": { bg: "#FCE4D6", text: "#B5603A" },
-  "Advanced Cook": { bg: "#F8DDD0", text: "#9B3A1A" },
-  "Expert Chef": { bg: "#F8DDD0", text: "#9B3A1A" },
-};
-
-interface Recipe {
-  post: Post;
-  id: string;
-  title: string;
-  difficulty: string;
-  time?: string;
-  img: string;
-  likes: number;
-  views: number;
-  friend?: string;
-}
-
-type HomeFeeds = {
-  recommended: Recipe[];
-  easyWins: Recipe[];
-  challenge: Recipe[];
-  friends: Recipe[];
-};
-
-const EMPTY_HOME_FEEDS: HomeFeeds = {
-  recommended: [],
-  easyWins: [],
-  challenge: [],
-  friends: [],
-};
-
-function toHomeRecipe(post: Post, showAuthor = false): Recipe {
-  const fields = post as Post & {
-    like_count?: number | string | null;
-    likes_count?: number | string | null;
-    view_count?: number | string | null;
-    cooking_time?: number | string | null;
-    cooking_minutes?: number | string | null;
-    cook_time?: number | string | null;
-    prep_time?: number | string | null;
-    total_time?: number | string | null;
-    time?: number | string | null;
-  };
-  const difficultyValue = Number(post.difficulty) || 1;
-  const recipeTime = post.recipe && typeof post.recipe === "object" ? post.recipe.time : undefined;
-  const cookingTime = formatCookingTime(fields.time ?? fields.cooking_time ?? fields.cooking_minutes ?? fields.cook_time ?? fields.prep_time ?? fields.total_time ?? recipeTime);
-
-  return {
-    post,
-    id: post.id,
-    title: post.title || "Untitled recipe",
-    difficulty: getExperienceLevelName(difficultyValue) ?? `Level ${difficultyValue}`,
-    time: cookingTime,
-    img: post.image_url || "",
-    likes: Number(fields.likes ?? fields.like_count ?? fields.likes_count) || 0,
-    views: Number(fields.views ?? fields.view_count) || 0,
-    friend: showAuthor ? post.author_username || "Community cook" : undefined,
-  };
-}
-
-function formatCookingTime(value: unknown): string | undefined {
-  if (value === null || value === undefined || value === "") return undefined;
-  const text = String(value).trim();
-  const numericValue = Number(text);
-  if (Number.isFinite(numericValue)) {
-    return numericValue > 0 ? `${numericValue} min` : undefined;
-  }
-
-  const clockTime = /^(\d+):([0-5]\d)(?::[0-5]\d)?$/.exec(text);
-  if (clockTime) {
-    const totalMinutes = Number(clockTime[1]) * 60 + Number(clockTime[2]);
-    return totalMinutes > 0 ? `${totalMinutes} min` : undefined;
-  }
-
-  return text;
-}
-
-function RecipeCard({ recipe, onOpen }: { recipe: Recipe; onOpen: (recipe: Recipe) => void }) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const diff = DIFFICULTY_COLORS[recipe.difficulty] ?? DIFFICULTY_COLORS["Beginner Cook"];
-  return (
-    <Pressable
-      onPress={() => onOpen(recipe)}
-      style={({ pressed }) => [styles.recipeCard, shadowSm, pressed && { opacity: 0.92 }]}
-    >
-      <View style={styles.recipeImgWrap}>
-        {recipe.img && !imageFailed ? (
-          <Image source={{ uri: recipe.img }} style={styles.fill} resizeMode="cover" onError={() => setImageFailed(true)} />
-        ) : (
-          <View style={[styles.fill, styles.imageFallback]}>
-            <Text style={styles.imageFallbackText}>Image unavailable</Text>
-          </View>
-        )}
-        {recipe.friend && (
-          <View style={styles.friendTag}>
-            <Text style={styles.friendTagText}>{recipe.friend}</Text>
-          </View>
-        )}
-      </View>
-      <View style={{ padding: 10 }}>
-        <Text numberOfLines={2} style={styles.recipeTitle}>{recipe.title}</Text>
-        <View style={styles.rowBetween}>
-          <View style={[styles.pill, { backgroundColor: diff.bg }]}>
-            <Text numberOfLines={1} style={[styles.pillText, { color: diff.text }]}>{recipe.difficulty}</Text>
-          </View>
-          {recipe.time ? <Text style={styles.recipeTime}>{recipe.time}</Text> : null}
-        </View>
-        <View style={styles.recipeStats}>
-          <Text accessibilityLabel={`${recipe.likes} likes`} style={styles.recipeStat}>♥ {formatCount(recipe.likes)} {recipe.likes === 1 ? "like" : "likes"}</Text>
-          <Text accessibilityLabel={`${recipe.views} views`} style={styles.recipeStat}>◉ {formatCount(recipe.views)} {recipe.views === 1 ? "view" : "views"}</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function RecipeSection({
-  icon, title, subtitle, recipes, loading, onOpen,
-}: { icon: string; title: string; subtitle: string; recipes: Recipe[]; loading: boolean; onOpen: (recipe: Recipe) => void }) {
-  return (
-    <View style={{ marginBottom: 24 }}>
-      <View style={styles.sectionHead}>
-        <Text style={{ fontSize: 20, marginTop: 2 }}>{icon}</Text>
-        <View>
-          <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={styles.sectionSub}>{subtitle}</Text>
-        </View>
-      </View>
-      {loading ? (
-        <ActivityIndicator color={colors.sage} style={{ height: 150 }} />
-      ) : recipes.length ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 4, gap: 12 }}
-        >
-          {recipes.map((recipe) => (
-            <RecipeCard key={recipe.id} recipe={recipe} onOpen={onOpen} />
-          ))}
-        </ScrollView>
-      ) : (
-        <Text style={styles.emptySection}>No recipes to show yet.</Text>
-      )}
-    </View>
-  );
-}
-
-function formatCount(value: number) {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return value.toLocaleString();
-}
-
 function HomeScreen() {
-  const [openRecipe, setOpenRecipe] = useState<Recipe | null>(null);
-  const [homeFeeds, setHomeFeeds] = useState<HomeFeeds>(EMPTY_HOME_FEEDS);
-  const [feedsLoading, setFeedsLoading] = useState(true);
-  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [openRecipe, setOpenRecipe] = useState<RecipeCardData | null>(null);
+  const { homeFeeds, setHomeFeeds, feedsLoading, likedPostIds, setLikedPostIds } = useHomeFeeds();
   const [likeLoadingIds, setLikeLoadingIds] = useState<Set<string>>(new Set());
   const { currentUser } = useAuthContext();
   const username = currentUser?.username?.trim() || currentUser?.email.split("@")[0] || "there";
@@ -202,52 +42,18 @@ function HomeScreen() {
   const streakCount = Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0);
   const loggedDays = getLoggedDays(streakCount, currentUser?.last_streak_post ?? currentUser?.last_post_at);
 
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadHomeFeeds() {
-      setFeedsLoading(true);
-      try {
-        const [feeds, likedPosts] = await Promise.all([
-          fetchHomePostSections(),
-          getLikedPostsByUser(),
-        ]);
-
-        if (isActive) {
-          setHomeFeeds({
-            recommended: feeds.recommended.map((post) => toHomeRecipe(post)),
-            easyWins: feeds.easyWins.map((post) => toHomeRecipe(post)),
-            challenge: feeds.challenge.map((post) => toHomeRecipe(post)),
-            friends: feeds.friends.map((post) => toHomeRecipe(post, true)),
-          });
-          setLikedPostIds(new Set(likedPosts.map((post) => post.id)));
-        }
-      } catch (error) {
-        console.error("Error loading home feeds:", error);
-        if (isActive) setHomeFeeds(EMPTY_HOME_FEEDS);
-      } finally {
-        if (isActive) setFeedsLoading(false);
-      }
-    }
-
-    void loadHomeFeeds();
-    return () => {
-      isActive = false;
-    };
-  }, []);
-
-  const handleOpenRecipe = (recipe: Recipe) => {
+  const handleOpenRecipe = (recipe: RecipeCardData) => {
     setOpenRecipe(recipe);
     void incrementPostViews(recipe.id)
       .then(() => {
-        setHomeFeeds((previous) => Object.fromEntries(
-          Object.entries(previous).map(([section, recipes]) => [
-            section,
-            recipes.map((item) => item.id === recipe.id ? { ...item, views: item.views + 1, post: { ...item.post, views: item.views + 1 } } : item),
-          ]),
-        ) as HomeFeeds);
+        setHomeFeeds((previous) => ({
+          recommended: previous.recommended.map((item) => item.id === recipe.id ? updateRecipeCardData(item, { views: item.views + 1 }) : item),
+          easyWins: previous.easyWins.map((item) => item.id === recipe.id ? updateRecipeCardData(item, { views: item.views + 1 }) : item),
+          challenge: previous.challenge.map((item) => item.id === recipe.id ? updateRecipeCardData(item, { views: item.views + 1 }) : item),
+          friends: previous.friends.map((item) => item.id === recipe.id ? updateRecipeCardData(item, { views: item.views + 1 }) : item),
+        }));
         setOpenRecipe((previous) => previous?.id === recipe.id
-          ? { ...previous, views: previous.views + 1, post: { ...previous.post, views: previous.views + 1 } }
+          ? updateRecipeCardData(previous, { views: previous.views + 1 })
           : previous);
       })
       .catch((error) => console.error("Unable to increment views for post:", error));
@@ -261,14 +67,14 @@ function HomeScreen() {
     try {
       await likePost(postId);
       setLikedPostIds((previous) => new Set(previous).add(postId));
-      setHomeFeeds((previous) => Object.fromEntries(
-        Object.entries(previous).map(([section, recipes]) => [
-          section,
-          recipes.map((recipe) => recipe.id === postId ? { ...recipe, likes: recipe.likes + 1, post: { ...recipe.post, likes: recipe.likes + 1 } } : recipe),
-        ]),
-      ) as HomeFeeds);
+      setHomeFeeds((previous) => ({
+        recommended: previous.recommended.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe),
+        easyWins: previous.easyWins.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe),
+        challenge: previous.challenge.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe),
+        friends: previous.friends.map((recipe) => recipe.id === postId ? updateRecipeCardData(recipe, { likes: recipe.likes + 1 }) : recipe),
+      }));
       setOpenRecipe((previous) => previous?.id === postId
-        ? { ...previous, likes: previous.likes + 1, post: { ...previous.post, likes: previous.likes + 1 } }
+        ? updateRecipeCardData(previous, { likes: previous.likes + 1 })
         : previous);
     } finally {
       setLikeLoadingIds((previous) => {
@@ -282,25 +88,21 @@ function HomeScreen() {
   return (
     <>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-      {/* HEADER */}
-      <View style={styles.homeHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.eyebrow}>Good morning</Text>
-          <Text style={styles.h1}>Hey, {username}.</Text>
-          <Text style={styles.subtitle}>A little progress tastes good.</Text>
-        </View>
-        <View style={{ marginLeft: 12, alignItems: "center" }}>
-          <View style={styles.avatar}>
-            <Image
-              source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }}
-              style={styles.fill}
-            />
+      <ScreenHeader
+        eyebrow="Good morning"
+        title={`Hey, ${username}.`}
+        subtitle="A little progress tastes good."
+        action={(
+          <View style={{ marginLeft: 12, alignItems: "center" }}>
+            <View style={styles.avatar}>
+              <Image source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} />
+            </View>
+            <View style={styles.avatarBadge}>
+              <Text numberOfLines={1} style={styles.avatarBadgeText}>{experienceLevel}</Text>
+            </View>
           </View>
-          <View style={styles.avatarBadge}>
-            <Text numberOfLines={1} style={styles.avatarBadgeText}>{experienceLevel}</Text>
-          </View>
-        </View>
-      </View>
+        )}
+      />
 
       {/* STREAK CARD */}
       <View style={[styles.streakCard, shadowSm]}>
