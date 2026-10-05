@@ -357,7 +357,7 @@ export async function getLikedPostsByUser(): Promise<Post[]> {
     return [];
   }
   else {
-    return (data || []) as Post[];
+    return hydratePosts((data || []) as Post[]);
   }
 }
 

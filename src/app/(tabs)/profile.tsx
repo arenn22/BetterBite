@@ -6,7 +6,7 @@ import { useAuthContext } from "@/lib/auth/auth-context";
 import { toRecipeCardData, updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { getCookedPostsByUser } from "@/services/api/cooked-posts";
 import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost } from "@/services/api/posts";
-import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
+import { DEFAULT_PROFILE_IMAGE, getXpPercentageLeftToNextLevel } from "@/services/api/profiles";
 import { fetchFriends } from "@/services/api/social";
 import { useEffect, useState } from "react";
 import {
@@ -159,6 +159,8 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   const [likeLoading, setLikeLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [xpPercentageLeft, setXpPercentageLeft] = useState<number | null>(null);
+  const [xpProgressLoading, setXpProgressLoading] = useState(true);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -189,6 +191,30 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     }
 
     void loadProfileData();
+    return () => { active = false; };
+  }, [currentUser]);
+
+  useEffect(() => {
+    let active = true;
+    if (!currentUser) {
+      setXpPercentageLeft(null);
+      setXpProgressLoading(false);
+      return () => { active = false; };
+    }
+
+    setXpProgressLoading(true);
+    void getXpPercentageLeftToNextLevel()
+      .then((percentage) => {
+        if (active) setXpPercentageLeft(percentage);
+      })
+      .catch((error) => {
+        console.error("Unable to load XP progress:", error);
+        if (active) setXpPercentageLeft(null);
+      })
+      .finally(() => {
+        if (active) setXpProgressLoading(false);
+      });
+
     return () => { active = false; };
   }, [currentUser]);
 
@@ -235,7 +261,8 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   const experienceLevel = Number(currentUser?.experience_level ?? currentUser?.experienceLevel) || 1;
   const tier = getExperienceLevelName(experienceLevel) ?? "Home Cook";
   const nextTier = EXPERIENCE_LEVEL_NAMES[experienceLevel] ?? "Max level";
-  const tierProgress = Math.min(1, experienceLevel / EXPERIENCE_LEVEL_NAMES.length);
+  const progressToNextLevel = xpPercentageLeft === null ? null : 100 - xpPercentageLeft;
+  const tierProgress = (progressToNextLevel ?? 0) / 100;
   const stats = [
     { label: "Recipes", value: String(createdRecipes.length) },
     { label: "Friends", value: String(friends.length) },
@@ -332,7 +359,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
                 Progress to {nextTier}
               </Text>
               <Text style={{ fontSize: 9, fontWeight: "700", color: colors.sage }}>
-                {Math.round(tierProgress * 100)}%
+                {xpProgressLoading ? "…" : progressToNextLevel === null ? "--" : `${progressToNextLevel.toFixed(2)}%`}
               </Text>
             </View>
             <View style={{ height: 6, backgroundColor: colors.divider, borderRadius: 999, overflow: "hidden" }}>

@@ -16,7 +16,51 @@ export type CreatePostReviewParams = {
   description?: string | null;
 };
 
-export async function createCookedPost(params: CreateCookedPostParams) {
+function parseCookedPostId(value: unknown): number | null {
+  const result = Array.isArray(value) ? value[0] : value;
+  if (result === null || result === undefined) return null;
+
+  if (typeof result === "object") {
+    const row = result as Record<string, unknown>;
+    const nestedResult = row.create_cooked_post;
+    const candidate = row.id ?? row.cooked_id ?? row.cooked_post_id ?? nestedResult;
+    return candidate === undefined ? null : parseCookedPostId(candidate);
+  }
+
+  if (typeof result !== "number" && typeof result !== "string") return null;
+
+  const id = Number(result);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+async function findCookedPostId(
+  profileId: string,
+  postId: string,
+  imagePath: string,
+): Promise<number> {
+  const { data, error } = await supabase.rpc("get_cooked_posts");
+  if (error) {
+    console.error("Error resolving newly-created cooked post:", error.message);
+    throw new Error(error.message);
+  }
+
+  const match = ((data || []) as CookedPost[])
+    .map(normalizeCookedPost)
+    .find((post) =>
+      post.profile_id === profileId
+      && post.post_id === postId
+      && post.image_url === imagePath,
+    );
+  const cookedPostId = match ? parseCookedPostId(match.id) : null;
+
+  if (cookedPostId === null) {
+    throw new Error("Cooked post was created, but its row ID could not be resolved.");
+  }
+
+  return cookedPostId;
+}
+
+export async function createCookedPost(params: CreateCookedPostParams): Promise<number> {
   const { data: cookedPost, error: cookedPostError } =
     await supabase.rpc('create_cooked_post', {
       source_post_id: params.post_id,
@@ -29,7 +73,37 @@ export async function createCookedPost(params: CreateCookedPostParams) {
     throw new Error(`Failed to create cooked post: ${cookedPostError.message}`);
   }
 
-  return cookedPost;
+  const returnedId = parseCookedPostId(cookedPost);
+  if (returnedId !== null) return returnedId;
+  if (!params.cooked_image_path) {
+    throw new Error("Cooked post was created, but the RPC did not return its row ID.");
+  }
+
+  return findCookedPostId(params.profile_id, params.post_id, params.cooked_image_path);
+}
+
+export async function getCookedPostXp(cookedPostId: number): Promise<number | null> {
+  if (!Number.isSafeInteger(cookedPostId) || cookedPostId <= 0) {
+    throw new Error("A valid cooked post ID is required to fetch its XP award.");
+  }
+
+  const { data, error } = await supabase.rpc("get_cooked_post_xp", {
+    p_cooked_post_id: cookedPostId,
+  });
+
+  if (error) {
+    console.error("Error fetching cooked post XP:", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data === null) return null;
+
+  const xp = Number(data);
+  if (!Number.isSafeInteger(xp)) {
+    throw new Error("The cooked post XP RPC returned an invalid XP award.");
+  }
+
+  return xp;
 }
 
 export async function createPostReview(params: CreatePostReviewParams) {

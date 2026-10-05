@@ -4,6 +4,27 @@ import type { Profile } from "../../types/auth";
 export const DEFAULT_PROFILE_IMAGE =
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80";
 
+export async function getXpPercentageLeftToNextLevel(): Promise<number | null> {
+  const { data, error } = await supabase.rpc(
+    "get_xp_percentage_left_to_next_level",
+    {},
+  );
+
+  if (error) {
+    console.error("Error fetching XP progress:", error.message);
+    throw new Error(error.message);
+  }
+
+  if (data === null) return null;
+
+  const percentage = Number(data);
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+    throw new Error("The XP progress RPC returned an invalid percentage.");
+  }
+
+  return percentage;
+}
+
 export async function updateCuisinePreferences(
   userId: string,
   cuisineIds: number[],

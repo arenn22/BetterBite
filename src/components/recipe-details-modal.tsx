@@ -20,6 +20,7 @@ import {
     createCookedPost,
     createPostReview,
     fetchPostEngagement,
+    getCookedPostXp,
     uploadCookedPostImage,
     type CookedPhotoWithAuthor,
     type PostReviewWithAuthor,
@@ -197,12 +198,39 @@ export function RecipeDetailsModal({
     setActionMessage(null);
     try {
       const imagePath = await uploadCookedPostImage(cookImageUri, currentUser.id, post.id);
-      await createCookedPost({ profile_id: currentUser.id, post_id: post.id, cooked_image_path: imagePath });
-      const engagement = await fetchPostEngagement(post.id);
-      setCookedPhotos(engagement.cookedPhotos);
-      setReviews(engagement.reviews);
+      const cookedPostId = await createCookedPost({
+        profile_id: currentUser.id,
+        post_id: post.id,
+        cooked_image_path: imagePath,
+      });
       setCookImageUri(null);
-      setActionMessage("Your cook photo has been shared.");
+
+      let successMessage = "Your cook photo has been shared.";
+      let followUpError: string | null = null;
+      try {
+        const xp = await getCookedPostXp(cookedPostId);
+        successMessage = xp === null
+          ? "Your cook photo has been shared. No XP award was recorded."
+          : `Your cook photo has been shared. You earned ${xp} XP!`;
+      } catch (error) {
+        followUpError = error instanceof Error ? error.message : "Could not load the XP award.";
+      }
+
+      try {
+        const engagement = await fetchPostEngagement(post.id);
+        setCookedPhotos(engagement.cookedPhotos);
+        setReviews(engagement.reviews);
+      } catch (error) {
+        followUpError = [
+          followUpError,
+          error instanceof Error ? error.message : "Could not refresh community activity.",
+        ].filter(Boolean).join(" ");
+      }
+
+      setActionMessage(successMessage);
+      if (followUpError) {
+        setActionError(`Your cook photo was shared, but follow-up details could not be loaded: ${followUpError}`);
+      }
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Could not share your cook photo.");
     } finally {
