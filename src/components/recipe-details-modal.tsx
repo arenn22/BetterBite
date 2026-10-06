@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
   detailCard: { maxHeight: "100%", overflow: "hidden", borderRadius: 20, backgroundColor: colors.bg },
   dragHandle: { alignSelf: "center", width: 40, height: 4, marginTop: 8, marginBottom: 4, borderRadius: 2, backgroundColor: colors.border },
   detailHero: { height: 220, backgroundColor: colors.sageLight, overflow: "hidden" },
-  heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.12)" },
+  heroShade: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.12)" },
   heroFallback: { alignItems: "center", justifyContent: "center" },
   heroFallbackText: { color: colors.muted, fontSize: 12, fontWeight: "600" },
   closeButton: { position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.48)" },

@@ -6,6 +6,14 @@ export interface PendingFriendRequest {
   sender_id?: string;
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  profile_id: string;
+  username: string;
+  pfp_url: string | null;
+  score: number;
+}
+
 export interface Post {
   id: string;
   profile_id: string;

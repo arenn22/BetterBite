@@ -1,7 +1,22 @@
 import { ScreenHeader } from "@/components/screen-header";
 import { SectionLabel } from "@/components/section-label";
-import { fetchFriendRequests, fetchFriends, respondToFriendRequest, searchUsers, sendFriendRequest } from "@/services/api/social";
-import type { PendingFriendRequest, SearchUserResult } from "@/types/auth";
+import {
+	fetchFriendRequests,
+	fetchFriends,
+	getLifetimeCookedPostsLeaderboardFromEveryone,
+	getLifetimeCookedPostsLeaderboardFromFriends,
+	getLifetimeCreatedPostsLeaderboardFromEveryone,
+	getLifetimeCreatedPostsLeaderboardFromFriends,
+	getLifetimeXPLeaderboardFromEveryone,
+	getLifetimeXPLeaderboardFromFriends,
+	getStreakLeaderboardFromEveryone,
+	getStreakLeaderboardFromFriends,
+	respondToFriendRequest,
+	searchUsers,
+	sendFriendRequest,
+} from "@/services/api/social";
+import type { SearchUserResult } from "@/types/auth";
+import type { LeaderboardEntry, PendingFriendRequest } from "@/types/models";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -31,6 +46,8 @@ type Friend = {
 
 type Request = PendingFriendRequest & { name: string; initials: string; color: string; mutuals: number };
 type SuggestedUser = SearchUserResult & { initials: string; color: string; tier?: string };
+type LeaderboardMetric = "streak" | "xp" | "cookedPosts" | "createdPosts";
+type LeaderboardAudience = "everyone" | "friends";
 
 const TIER_COLORS: Record<string, { bg: string; text: string }> = {
 	Beginner: { bg: "#F0F0EC", text: "#7A7A72" },
@@ -40,16 +57,46 @@ const TIER_COLORS: Record<string, { bg: string; text: string }> = {
 	Master: { bg: "#F5EAD6", text: "#9B6B2A" },
 };
 
-const FRIENDS: Friend[] = [
-	{ id: "1", name: "Maya K.", initials: "MK", color: "#D9A28B", tier: "Chef", streak: 12, recipes: 47, level: 8, recentImgs: ["https://images.unsplash.com/photo-1617474020181-e1d42f2245ea?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1788601299617-3052a7c8fa70?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1783196736270-d08d63485303?w=120&h=120&fit=crop&auto=format"], img: "https://images.unsplash.com/photo-1625631980683-825234bfb7d5?w=96&h=96&fit=crop&auto=format" },
-	{ id: "2", name: "Tomás R.", initials: "TR", color: colors.sage, tier: "Home Cook", streak: 7, recipes: 23, level: 4, recentImgs: ["https://images.unsplash.com/photo-1773817728515-612df7f78e1b?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1667473775795-41f69ae72c44?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1528712518629-67d42968a45e?w=120&h=120&fit=crop&auto=format"] },
-	{ id: "3", name: "Priya N.", initials: "PN", color: "#9B6B2A", tier: "Sous Chef", streak: 21, recipes: 61, level: 10, recentImgs: ["https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1615865417491-9941019fbc00?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1617474019977-0e105d1b430e?w=120&h=120&fit=crop&auto=format"], img: "https://images.unsplash.com/photo-1625631980722-b728f9cf1036?w=96&h=96&fit=crop&auto=format" },
-	{ id: "4", name: "Lena W.", initials: "LW", color: "#8A9E7A", tier: "Home Cook", streak: 5, recipes: 18, level: 3, recentImgs: ["https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1465014925804-7b9ede58d0d7?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1614955177711-2540ad25432b?w=120&h=120&fit=crop&auto=format"] },
-	{ id: "5", name: "Carlos R.", initials: "CR", color: "#B5603A", tier: "Chef", streak: 9, recipes: 35, level: 6, recentImgs: ["https://images.unsplash.com/photo-1714683237282-4a4623333058?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1767514579388-278d63566fd7?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1699251775859-ef6a2f69ef5b?w=120&h=120&fit=crop&auto=format"], img: "https://images.unsplash.com/photo-1625631980777-823fc2938950?w=96&h=96&fit=crop&auto=format" },
-	{ id: "6", name: "Sun Y.", initials: "SY", color: colors.muted, tier: "Beginner", streak: 2, recipes: 6, level: 1, recentImgs: ["https://images.unsplash.com/photo-1617474019991-689674c2d1ae?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1605522283494-4901a98d458e?w=120&h=120&fit=crop&auto=format", "https://images.unsplash.com/photo-1591459034470-d1e05d7b05d4?w=120&h=120&fit=crop&auto=format"] },
+const FRIEND_COLORS = ["#D9A28B", colors.sage, "#9B6B2A", "#8A9E7A", "#B5603A", colors.muted];
+
+const LEADERBOARD_FETCHERS: Record<LeaderboardMetric, Record<LeaderboardAudience, () => Promise<LeaderboardEntry[]>>> = {
+	streak: {
+		everyone: getStreakLeaderboardFromEveryone,
+		friends: getStreakLeaderboardFromFriends,
+	},
+	xp: {
+		everyone: getLifetimeXPLeaderboardFromEveryone,
+		friends: getLifetimeXPLeaderboardFromFriends,
+	},
+	cookedPosts: {
+		everyone: getLifetimeCookedPostsLeaderboardFromEveryone,
+		friends: getLifetimeCookedPostsLeaderboardFromFriends,
+	},
+	createdPosts: {
+		everyone: getLifetimeCreatedPostsLeaderboardFromEveryone,
+		friends: getLifetimeCreatedPostsLeaderboardFromFriends,
+	},
+};
+
+const LEADERBOARD_METRICS: { value: LeaderboardMetric; label: string }[] = [
+	{ value: "streak", label: "Streak" },
+	{ value: "xp", label: "Lifetime XP" },
+	{ value: "cookedPosts", label: "Cooked posts" },
+	{ value: "createdPosts", label: "Created posts" },
 ];
 
-const FRIEND_COLORS = ["#D9A28B", colors.sage, "#9B6B2A", "#8A9E7A", "#B5603A", colors.muted];
+function leaderboardScoreLabel(metric: LeaderboardMetric): string {
+	switch (metric) {
+		case "streak":
+			return "days";
+		case "xp":
+			return "XP";
+		case "cookedPosts":
+			return "cooked";
+		case "createdPosts":
+			return "posts";
+	}
+}
 
 function initialsFor(name: string) {
 	return name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
@@ -105,6 +152,12 @@ export default function SocialScreen() {
 	const [searchLoading, setSearchLoading] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [showLeaderboard, setShowLeaderboard] = useState(false);
+	const [leaderboardMetric, setLeaderboardMetric] = useState<LeaderboardMetric>("streak");
+	const [leaderboardAudience, setLeaderboardAudience] = useState<LeaderboardAudience>("friends");
+	const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+	const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+	const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+	const [leaderboardRefresh, setLeaderboardRefresh] = useState(0);
 
 	useEffect(() => {
 		let active = true;
@@ -124,6 +177,27 @@ export default function SocialScreen() {
 		void loadSocialData();
 		return () => { active = false; };
 	}, []);
+
+	useEffect(() => {
+		let active = true;
+		setLeaderboardLoading(true);
+		setLeaderboardError(null);
+
+		void LEADERBOARD_FETCHERS[leaderboardMetric][leaderboardAudience]()
+			.then((entries) => {
+				if (active) setLeaderboardEntries(entries);
+			})
+			.catch((error: unknown) => {
+				if (!active) return;
+				setLeaderboardEntries([]);
+				setLeaderboardError(error instanceof Error ? error.message : "Unable to load the leaderboard.");
+			})
+			.finally(() => {
+				if (active) setLeaderboardLoading(false);
+			});
+
+		return () => { active = false; };
+	}, [leaderboardMetric, leaderboardAudience, leaderboardRefresh]);
 
 	useEffect(() => {
 		const query = searchQuery.trim();
@@ -167,8 +241,9 @@ export default function SocialScreen() {
 		}
 	};
 
-	const leaderboard = [FRIENDS[2], FRIENDS[0], FRIENDS[4]];
-	const podium = [leaderboard[1], leaderboard[0], leaderboard[2]];
+	const selectedMetricLabel = LEADERBOARD_METRICS.find((item) => item.value === leaderboardMetric)?.label ?? "Streak";
+	const podiumEntries = [leaderboardEntries[1], leaderboardEntries[0], leaderboardEntries[2]]
+		.filter((entry): entry is LeaderboardEntry => entry !== undefined);
 	const rankLabels = ["🥇", "🥈", "🥉"];
 
 	return (
@@ -177,9 +252,24 @@ export default function SocialScreen() {
 			{actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
 
 			<View style={[styles.panel, shadowSm]}>
-				<View style={styles.panelHeader}><View style={styles.headingRow}><Text style={styles.headingIcon}>🏆</Text><Text style={styles.heading}>Top 3 this week</Text></View><Pressable onPress={() => setShowLeaderboard((value) => !value)}><Text style={styles.link}>{showLeaderboard ? "Hide" : "See full leaderboard"} →</Text></Pressable></View>
-				<View style={styles.podiumRow}>{podium.map((friend, index) => <View key={friend.id} style={[styles.podiumEntry, index !== 1 && styles.podiumLower]}><Text style={styles.rank}>{rankLabels[friend.id === "3" ? 0 : friend.id === "1" ? 1 : 2]}</Text><Avatar friend={friend} size={index === 1 ? 56 : 40} /><Text style={styles.podiumName}>{friend.name.split(" ")[0]}</Text><Text style={styles.points}>{friend.recipes * 4} pts</Text><View style={[styles.podiumBlock, index === 1 ? styles.firstBlock : index === 0 ? styles.secondBlock : styles.thirdBlock]} /></View>)}</View>
-				{showLeaderboard && <View style={styles.leaderboard}>{[...FRIENDS].sort((a, b) => b.recipes - a.recipes).map((friend, index) => <View key={friend.id} style={styles.leaderRow}><Text style={styles.leaderRank}>{index + 1}</Text><Avatar friend={friend} size={32} /><Text style={styles.leaderName}>{friend.name}</Text><TierBadge tier={friend.tier} /><Text style={styles.points}>{friend.recipes * 4} pts</Text></View>)}</View>}
+				<View style={styles.panelHeader}><View style={styles.headingRow}><Text style={styles.headingIcon}>🏆</Text><Text style={styles.heading}>Top {selectedMetricLabel} · {leaderboardAudience}</Text></View><Pressable onPress={() => setShowLeaderboard((value) => !value)}><Text style={styles.link}>{showLeaderboard ? "Hide" : "See full leaderboard"} →</Text></Pressable></View>
+				{showLeaderboard && <View style={styles.leaderboardControls}>
+					<Text style={styles.controlLabel}>Rank by</Text>
+					<View style={styles.controlOptions}>{LEADERBOARD_METRICS.map((metric) => <Pressable key={metric.value} accessibilityRole="button" accessibilityState={{ selected: leaderboardMetric === metric.value }} onPress={() => setLeaderboardMetric(metric.value)} style={[styles.controlButton, leaderboardMetric === metric.value && styles.controlButtonSelected]}><Text style={[styles.controlText, leaderboardMetric === metric.value && styles.controlTextSelected]}>{metric.label}</Text></Pressable>)}</View>
+					<Text style={styles.controlLabel}>Show</Text>
+					<View style={styles.controlOptions}>{(["friends", "everyone"] as const).map((audience) => <Pressable key={audience} accessibilityRole="button" accessibilityState={{ selected: leaderboardAudience === audience }} onPress={() => setLeaderboardAudience(audience)} style={[styles.controlButton, leaderboardAudience === audience && styles.controlButtonSelected]}><Text style={[styles.controlText, leaderboardAudience === audience && styles.controlTextSelected]}>{audience === "friends" ? "Friends" : "Everyone"}</Text></Pressable>)}</View>
+				</View>}
+				{leaderboardLoading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : leaderboardError ? <View style={styles.leaderboardMessage}><Text style={styles.leaderboardError}>{leaderboardError}</Text><Pressable onPress={() => setLeaderboardRefresh((value) => value + 1)}><Text style={styles.link}>Try again</Text></Pressable></View> : leaderboardEntries.length === 0 ? <Text style={styles.emptyText}>No leaderboard entries yet.</Text> : <>
+					<View style={styles.podiumRow}>{podiumEntries.map((entry, index) => {
+						const avatar = { initials: initialsFor(entry.username), color: FRIEND_COLORS[index % FRIEND_COLORS.length], img: entry.pfp_url ?? undefined };
+						const blockStyle = entry.rank === 1 ? styles.firstBlock : entry.rank === 2 ? styles.secondBlock : styles.thirdBlock;
+						return <View key={entry.profile_id} style={[styles.podiumEntry, index !== 1 && styles.podiumLower]}><Text style={styles.rank}>{rankLabels[entry.rank - 1] ?? `#${entry.rank}`}</Text><Avatar friend={avatar} size={entry.rank === 1 ? 56 : 40} /><Text numberOfLines={1} style={styles.podiumName}>{entry.username}</Text><Text style={styles.points}>{entry.score.toLocaleString()} {leaderboardScoreLabel(leaderboardMetric)}</Text><View style={[styles.podiumBlock, blockStyle]} /></View>;
+					})}</View>
+					{showLeaderboard && <View style={styles.leaderboard}>{leaderboardEntries.map((entry, index) => {
+						const avatar = { initials: initialsFor(entry.username), color: FRIEND_COLORS[index % FRIEND_COLORS.length], img: entry.pfp_url ?? undefined };
+						return <View key={entry.profile_id} style={styles.leaderRow}><Text style={styles.leaderRank}>{entry.rank}</Text><Avatar friend={avatar} size={32} /><Text style={styles.leaderName}>{entry.username}</Text><Text style={styles.points}>{entry.score.toLocaleString()} {leaderboardScoreLabel(leaderboardMetric)}</Text></View>;
+					})}</View>}
+				</>}
 			</View>
 
 			<View style={styles.section}><SectionLabel>Add friends</SectionLabel><View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search users" placeholderTextColor={colors.faint} style={styles.searchInput} />{searchQuery.length > 0 && <Pressable onPress={() => setSearchQuery("")}><Text style={styles.clear}>✕</Text></Pressable>}</View><View style={[styles.listPanel, shadowSm]}>{searchLoading ? <Text style={styles.emptyText}>Searching users…</Text> : searchQuery.trim() && searchResults.length === 0 ? <Text style={styles.emptyText}>No users found for "{searchQuery}"</Text> : searchQuery.trim() ? searchResults.map((user, index) => { const added = addedIds.has(user.id); return <View key={user.id} style={[styles.userRow, index < searchResults.length - 1 && styles.rowBorder]}><Pressable onPress={() => router.push(`/profile/${user.id}`)} style={styles.profileLink}><View style={[styles.avatar, { backgroundColor: user.color }]}>{user.pfp_url ? <Image source={{ uri: user.pfp_url }} style={styles.fill} /> : <Text style={styles.avatarText}>{user.initials}</Text>}</View><View style={styles.userInfo}><Text style={styles.userName}>{user.username}</Text>{user.tier ? <TierBadge tier={user.tier} /> : null}</View></Pressable><Pressable onPress={() => void handleSendRequest(user)} disabled={added} style={[styles.actionButton, added ? styles.sentButton : styles.addButton]}><Text style={[styles.actionText, added && styles.sentText]}>{added ? "Sent ✓" : "+ Add"}</Text></Pressable></View>}) : <Text style={styles.suggestedFooter}>Search by username to find friends.</Text>}</View></View>
@@ -219,6 +309,15 @@ const styles = StyleSheet.create({
 	secondBlock: { height: 16, backgroundColor: colors.sageLight },
 	thirdBlock: { height: 12, backgroundColor: "#F0F0EC" },
 	leaderboard: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.cream, gap: 8 },
+	leaderboardControls: { gap: 8, marginBottom: 16 },
+	controlLabel: { fontSize: 10, fontWeight: "700", color: colors.muted, textTransform: "uppercase" },
+	controlOptions: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 4 },
+	controlButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
+	controlButtonSelected: { backgroundColor: colors.sageLight, borderColor: colors.sage },
+	controlText: { fontSize: 10, fontWeight: "700", color: colors.muted },
+	controlTextSelected: { color: colors.sage },
+	leaderboardMessage: { alignItems: "center", gap: 4 },
+	leaderboardError: { padding: 12, textAlign: "center", fontSize: 12, color: colors.terracotta },
 	leaderRow: { flexDirection: "row", alignItems: "center", gap: 8 },
 	leaderRank: { width: 16, textAlign: "center", fontSize: 12, fontWeight: "800", color: colors.faint },
 	leaderName: { flex: 1, fontSize: 12, fontWeight: "700", color: colors.ink },

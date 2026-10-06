@@ -1,10 +1,11 @@
 import { RecipeCard } from "@/components/recipes/recipe-card";
-import { RecipePreviewModal } from "@/components/recipes/recipe-preview-modal";
+import { RecipeDetailsModal } from "@/components/recipe-details-modal";
 import { ScreenHeader } from "@/components/screen-header";
 import { EXPERIENCE_LEVEL_NAMES } from "@/constants/experience-levels";
 import { useRecipeOptions } from "@/hooks/use-recipe-options";
-import { toRecipeCardData, type RecipeCardData } from "@/lib/recipes";
-import { fetchFilteredPosts } from "@/services/api/posts";
+import { useAuthContext } from "@/lib/auth/auth-context";
+import { toRecipeCardData, updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
+import { fetchFilteredPosts, getLikedPostsByUser, incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
 import type { Post } from "@/types/models";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
@@ -99,10 +100,25 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardData | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [likeLoadingIds, setLikeLoadingIds] = useState<Set<string>>(new Set());
   const [postsLoading, setPostsLoading] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const { dietaryOptions, cuisineOptions, loading: filtersLoading } = useRecipeOptions();
+  const { currentUser } = useAuthContext();
+
+  useEffect(() => {
+    let active = true;
+    void getLikedPostsByUser()
+      .then((likedPosts) => {
+        if (active) setLikedPostIds(new Set(likedPosts.map((post) => post.id)));
+      })
+      .catch((error: unknown) => {
+        if (active) console.error("Unable to load liked posts:", error);
+      });
+    return () => { active = false; };
+  }, []);
 
   const cuisineFilters = useMemo(() => cuisineOptions.map((option) => ({
     id: option.id,
@@ -143,6 +159,55 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   const halfWidth = (fullWidth - GRID_GAP) / 2;
 
   const maximumTime = TIME_FILTERS.find((filter) => filter.id === selectedTimeFilter)?.maxMinutes;
+
+  const handleOpenRecipe = (recipe: RecipeCardData) => {
+    if (onOpenRecipe) {
+      onOpenRecipe(recipe.id);
+      return;
+    }
+
+    setSelectedRecipe(recipe);
+    void incrementPostViews(recipe.id)
+      .then(() => {
+        setPosts((previous) => previous.map((post) => post.id === recipe.id
+          ? { ...post, views: Number(post.views || 0) + 1 }
+          : post));
+        setSelectedRecipe((previous) => previous?.id === recipe.id
+          ? updateRecipeCardData(previous, { views: previous.views + 1 })
+          : previous);
+      })
+      .catch((error) => console.error("Unable to increment views for post:", error));
+  };
+
+  const handleLikePost = async (postId: string, currentlyLiked: boolean) => {
+    if (!currentUser) throw new Error("Please sign in to like this recipe.");
+
+    setLikeLoadingIds((previous) => new Set(previous).add(postId));
+    try {
+      if (currentlyLiked) await unlikePost(postId);
+      else await likePost(postId);
+
+      setLikedPostIds((previous) => {
+        const next = new Set(previous);
+        if (currentlyLiked) next.delete(postId);
+        else next.add(postId);
+        return next;
+      });
+      const likesChange = currentlyLiked ? -1 : 1;
+      setPosts((previous) => previous.map((post) => post.id === postId
+        ? { ...post, likes: Math.max(0, Number(post.likes || 0) + likesChange) }
+        : post));
+      setSelectedRecipe((previous) => previous?.id === postId
+        ? updateRecipeCardData(previous, { likes: Math.max(0, previous.likes + likesChange) })
+        : previous);
+    } finally {
+      setLikeLoadingIds((previous) => {
+        const next = new Set(previous);
+        next.delete(postId);
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -191,6 +256,8 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     }
     return results;
   }, [posts, searchValue]);
+
+  const selectedAuthorId = selectedRecipe?.post?.profile_id;
 
   return (
     <ScrollView
@@ -274,22 +341,33 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
           </View>
         ) : (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}>
-            {filtered.map((recipe) => (
-              <RecipeCard
-                key={recipe.id}
-                recipe={recipe}
-                width={halfWidth}
-                onPress={() => onOpenRecipe ? onOpenRecipe(recipe.id) : setSelectedRecipe(recipe)}
-                onAuthorPress={recipe.post?.profile_id ? () => router.push(`/profile/${recipe.post.profile_id}`) : undefined}
-              />
-            ))}
+            {filtered.map((recipe) => {
+              const authorId = recipe.post?.profile_id;
+              return (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  width={halfWidth}
+                  onPress={() => handleOpenRecipe(recipe)}
+                  onAuthorPress={authorId ? () => router.push(`/profile/${authorId}`) : undefined}
+                />
+              );
+            })}
           </View>
         )}
       </View>
-      <RecipePreviewModal
-        recipe={selectedRecipe}
+      <RecipeDetailsModal
+        post={selectedRecipe?.post ?? null}
         visible={selectedRecipe !== null}
+        difficulty={selectedRecipe?.difficulty ?? ""}
+        cookingTime={selectedRecipe?.time}
+        likes={selectedRecipe?.likes ?? 0}
+        views={selectedRecipe?.views ?? 0}
+        liked={selectedRecipe ? likedPostIds.has(selectedRecipe.id) : false}
+        likeLoading={selectedRecipe ? likeLoadingIds.has(selectedRecipe.id) : false}
         onClose={() => setSelectedRecipe(null)}
+        onLike={(currentlyLiked) => selectedRecipe ? handleLikePost(selectedRecipe.id, currentlyLiked) : Promise.resolve()}
+        onAuthorPress={selectedAuthorId ? () => router.push(`/profile/${selectedAuthorId}`) : undefined}
       />
       <Modal visible={filterOpen} transparent animationType="fade" onRequestClose={() => setFilterOpen(false)}>
         <View style={styles.filterModalRoot}>
