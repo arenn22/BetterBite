@@ -7,8 +7,9 @@ import { useAuthContext } from "@/lib/auth/auth-context";
 import { toRecipeCardData, updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { getCookedPostsByUser } from "@/services/api/cooked-posts";
 import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
-import { DEFAULT_PROFILE_IMAGE, getXpPercentageLeftToNextLevel } from "@/services/api/profiles";
+import { DEFAULT_PROFILE_IMAGE, fetchUserProfile, getXpPercentageLeftToNextLevel } from "@/services/api/profiles";
 import { fetchFriends } from "@/services/api/social";
+import type { Profile } from "@/types/auth";
 import { router, type Href } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -79,12 +80,15 @@ function EmptyTabState({ tab }: { tab: TabId }) {
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
-export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: string) => void }) {
+export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: (id: string) => void; userId?: string }) {
   const { width } = useWindowDimensions();
   const { currentUser } = useAuthContext();
+  const isOwner = userId === undefined;
+  const profileId = userId ?? currentUser?.id;
   const openUserProfile = (userId: string) => router.push(`/profile/${userId}` as Href);
   const [activeTab, setActiveTab] = useState<TabId>("created");
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardData | null>(null);
+  const [viewedProfile, setViewedProfile] = useState<Profile | null>(null);
   const [createdRecipes, setCreatedRecipes] = useState<RecipeCardData[]>([]);
   const [cookedRecipes, setCookedRecipes] = useState<RecipeCardData[]>([]);
   const [likedRecipes, setLikedRecipes] = useState<RecipeCardData[]>([]);
@@ -97,28 +101,41 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   const [xpProgressLoading, setXpProgressLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUser) return;
-    const userId = currentUser.id;
     let active = true;
 
     async function loadProfileData() {
       setLoading(true);
       setLoadError(null);
+      if (!profileId) {
+        setLoading(false);
+        return;
+      }
       try {
-        const [created, cooked, liked, friendRows] = await Promise.all([
-          fetchPosts({ authorId: userId }),
-          getCookedPostsByUser(userId),
+        const [profile, created, cooked, liked, friendRows] = await Promise.all([
+          isOwner ? Promise.resolve(currentUser) : fetchUserProfile(profileId),
+          fetchPosts({ authorId: profileId }),
+          getCookedPostsByUser(profileId),
           getLikedPostsByUser(),
-          fetchFriends(),
+          isOwner ? fetchFriends() : Promise.resolve([]),
         ]);
         if (!active) return;
+        if (!profile) {
+          setViewedProfile(null);
+          setCreatedRecipes([]);
+          setCookedRecipes([]);
+          setLikedRecipes([]);
+          setFriends([]);
+          setLoadError("This profile could not be found.");
+          return;
+        }
+        setViewedProfile(profile);
         setCreatedRecipes(uniqueRecipeCards(created.map((post) => toRecipeCardData(post))));
         setCookedRecipes(uniqueRecipeCards(cooked.map((post) => toRecipeCardData(post))));
-        setLikedRecipes(uniqueRecipeCards(liked.map((post) => toRecipeCardData(post))));
+        setLikedRecipes(isOwner ? uniqueRecipeCards(liked.map((post) => toRecipeCardData(post))) : []);
         setLikedPostIds(new Set(liked.map((post) => post.id)));
         setFriends((Array.isArray(friendRows) ? friendRows : []).map((friend, index) => normalizeFriend(friend as Record<string, unknown>, index)));
       } catch (error) {
-        if (active) setLoadError(error instanceof Error ? error.message : "Unable to load your profile.");
+        if (active) setLoadError(error instanceof Error ? error.message : "Unable to load this profile.");
       } finally {
         if (active) setLoading(false);
       }
@@ -126,11 +143,11 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
 
     void loadProfileData();
     return () => { active = false; };
-  }, [currentUser]);
+  }, [currentUser, isOwner, profileId]);
 
   useEffect(() => {
     let active = true;
-    if (!currentUser) {
+    if (!isOwner || !currentUser) {
       setXpPercentageLeft(null);
       setXpProgressLoading(false);
       return () => { active = false; };
@@ -150,7 +167,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
       });
 
     return () => { active = false; };
-  }, [currentUser]);
+  }, [currentUser, isOwner]);
 
   const layoutWidth = Platform.OS === "web" ? Math.min(width, 430) : width;
   const cardWidth = (layoutWidth - 32 - 12) / 2;
@@ -210,17 +227,21 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     }).catch((error) => console.error("Unable to increment views for post:", error));
   };
 
-  const experienceLevel = Number(currentUser?.experience_level ?? currentUser?.experienceLevel) || 1;
+  const profile = isOwner ? currentUser : viewedProfile;
+  const experienceLevel = Number(profile?.experience_level ?? profile?.experienceLevel) || 1;
   const tier = getExperienceLevelName(experienceLevel) ?? "Home Cook";
   const nextTier = EXPERIENCE_LEVEL_NAMES[experienceLevel] ?? "Max level";
   const progressToNextLevel = xpPercentageLeft === null ? null : 100 - xpPercentageLeft;
   const tierProgress = (progressToNextLevel ?? 0) / 100;
   const stats = [
     { label: "Recipes", value: String(createdRecipes.length) },
-    { label: "Friends", value: String(friends.length) },
-    { label: "Streak", value: `${Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0)}🔥` },
+    { label: "Friends", value: isOwner ? String(friends.length) : "--" },
+    { label: "Streak", value: `${Number(profile?.streakCount ?? profile?.streakcount ?? 0)}🔥` },
   ];
   const selectedAuthorId = selectedRecipe?.post?.profile_id;
+
+  if (loading) return <ActivityIndicator color={colors.sage} style={{ flex: 1, paddingTop: 80 }} />;
+  if (!profile) return <Text style={{ padding: 24, color: colors.terracotta, textAlign: "center" }}>{loadError ?? "This profile could not be found."}</Text>;
 
   return (
     <>
@@ -230,10 +251,10 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
       contentContainerStyle={{ paddingBottom: 40 }}
     >
       <ScreenHeader
-        eyebrow="Your account"
+        eyebrow={isOwner ? "Your account" : "Community profile"}
         title="Profile"
         subtitle="Your food, friends, and progress."
-        action={(
+        action={isOwner ? (
           <Pressable
             onPress={() => router.push("/settings" as Href)}
             style={({ pressed }) => [
@@ -247,6 +268,15 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
               <Circle cx={12} cy={12} r={3} />
               <Path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2m0 18v-2M2 12h2m18 0h-2" />
             </Svg>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Text style={styles.backBtnText}>‹ Back</Text>
           </Pressable>
         )}
       />
@@ -265,7 +295,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
               {/* ring with gap, replaces CSS outline + outline-offset */}
               <View style={[styles.avatarRing, shadowMd]}>
                 <View style={styles.avatarInner}>
-                  <Image source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} resizeMode="cover" />
+                  <Image source={{ uri: profile.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} resizeMode="cover" />
                 </View>
               </View>
             </View>
@@ -274,8 +304,8 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
 
           {/* Name & handle */}
           <View style={{ marginBottom: 12 }}>
-            <Text style={styles.name}>{currentUser?.username || "BetterBite member"}</Text>
-            <Text style={{ fontSize: 12, fontWeight: "500", color: colors.faint }}>@{currentUser?.username || "member"}</Text>
+            <Text style={styles.name}>{profile.username || "BetterBite member"}</Text>
+            <Text style={{ fontSize: 12, fontWeight: "500", color: colors.faint }}>@{profile.username || "member"}</Text>
           </View>
 
           {/* Tier badge */}
@@ -324,7 +354,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
       </View>
 
       {/* YOUR FRIENDS */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
+      {isOwner && friends.length > 0 ? <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <Text style={styles.sectionLabel}>Your friends</Text>
           <Pressable>
@@ -356,11 +386,11 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
           ))}
           {loadError ? <Text style={{ fontSize: 11, color: colors.terracotta }}>{loadError}</Text> : null}
         </ScrollView>
-      </View>
+      </View> : null}
 
       {/* RECIPE LIBRARY */}
       <View style={{ paddingHorizontal: 16 }}>
-        <Text style={[styles.sectionLabel, { marginBottom: 12 }]}>Your recipe library</Text>
+        <Text style={[styles.sectionLabel, { marginBottom: 12 }]}>{isOwner ? "Your recipe library" : "Recipe library"}</Text>
 
         {/* Tabs */}
         <View style={{ flexDirection: "row", marginBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
@@ -424,9 +454,15 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   );
 }
 
+export default function ProfileScreenRoute() {
+  return <ProfileScreenContent />;
+}
+
 const styles = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
   settingsBtn: { marginTop: 4, width: 32, height: 32, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  backBtn: { marginTop: 4, minHeight: 32, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  backBtnText: { fontSize: 12, fontWeight: "700", color: colors.muted },
 
   profileCard: { marginHorizontal: 16, marginBottom: 20, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
 
