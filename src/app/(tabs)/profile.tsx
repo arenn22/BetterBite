@@ -15,7 +15,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View
 } from "react-native";
@@ -151,7 +150,6 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   const { currentUser } = useAuthContext();
   const openUserProfile = (userId: string) => router.push(`/profile/${userId}` as Href);
   const [activeTab, setActiveTab] = useState<TabId>("created");
-  const [editMode, setEditMode] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardData | null>(null);
   const [createdRecipes, setCreatedRecipes] = useState<RecipeCardData[]>([]);
   const [cookedRecipes, setCookedRecipes] = useState<RecipeCardData[]>([]);
@@ -303,16 +301,15 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
         subtitle="Your food, friends, and progress."
         action={(
           <Pressable
-            onPress={() => setEditMode(!editMode)}
+            onPress={() => router.push("/settings" as Href)}
             style={({ pressed }) => [
               styles.settingsBtn,
-              editMode && { backgroundColor: colors.sage, borderColor: colors.sage },
               pressed && { transform: [{ scale: 0.95 }] },
             ]}
             accessibilityRole="button"
-            accessibilityLabel={editMode ? "Close profile editing" : "Settings"}
+            accessibilityLabel="Settings"
           >
-            <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={editMode ? "#fff" : colors.muted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={colors.muted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <Circle cx={12} cy={12} r={3} />
               <Path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2m0 18v-2M2 12h2m18 0h-2" />
             </Svg>
@@ -325,13 +322,6 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
         {/* Banner */}
         <View style={{ height: 112, overflow: "hidden" }}>
           <BotanicalBanner />
-          {editMode && (
-            <Pressable style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.2)" }]}>
-              <View style={{ backgroundColor: "rgba(0,0,0,0.3)", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999 }}>
-                <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>Change banner</Text>
-              </View>
-            </Pressable>
-          )}
         </View>
 
         {/* Avatar overlaps banner */}
@@ -344,24 +334,13 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
                   <Image source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} resizeMode="cover" />
                 </View>
               </View>
-              {editMode && (
-                <View style={[styles.avatarRing, { position: "absolute", borderColor: "transparent", backgroundColor: "transparent" }]}>
-                  <View style={[styles.avatarInner, { backgroundColor: "rgba(0,0,0,0.3)", alignItems: "center", justifyContent: "center" }]}>
-                    <Text style={{ fontSize: 12 }}>📷</Text>
-                  </View>
-                </View>
-              )}
             </View>
 
           </View>
 
           {/* Name & handle */}
           <View style={{ marginBottom: 12 }}>
-            {editMode ? (
-              <TextInput defaultValue={currentUser?.username ?? ""} style={styles.nameInput} />
-            ) : (
-              <Text style={styles.name}>{currentUser?.username || "BetterBite member"}</Text>
-            )}
+            <Text style={styles.name}>{currentUser?.username || "BetterBite member"}</Text>
             <Text style={{ fontSize: 12, fontWeight: "500", color: colors.faint }}>@{currentUser?.username || "member"}</Text>
           </View>
 
@@ -520,7 +499,6 @@ const styles = StyleSheet.create({
   avatarRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: colors.clay, backgroundColor: "#fff", padding: 2 },
   avatarInner: { flex: 1, borderRadius: 999, overflow: "hidden" },
   name: { fontFamily: fonts.heading, fontSize: 20, color: colors.ink, lineHeight: 24 },
-  nameInput: { fontFamily: fonts.heading, fontSize: 20, color: colors.ink, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: colors.clay, marginBottom: 2 },
 
   sectionLabel: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5 },
 
