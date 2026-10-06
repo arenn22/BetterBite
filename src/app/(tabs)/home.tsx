@@ -7,6 +7,7 @@ import { useAuthContext } from "@/lib/auth/auth-context";
 import { updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
+import { router } from "expo-router";
 import { useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, shadowSm } from "./theme";
@@ -142,10 +143,10 @@ function HomeScreen() {
       </View>
 
       {/* RECIPE SECTIONS */}
-      <RecipeSection icon="🔥" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={homeFeeds.recommended} loading={feedsLoading} onOpen={handleOpenRecipe} />
-      <RecipeSection icon="⚡" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={homeFeeds.easyWins} loading={feedsLoading} onOpen={handleOpenRecipe} />
-      <RecipeSection icon="🏆" title="Challenge yourself" subtitle="Push your skills further" recipes={homeFeeds.challenge} loading={feedsLoading} onOpen={handleOpenRecipe} />
-      <RecipeSection icon="👥" title="From your friends" subtitle="What the community cooked this week" recipes={homeFeeds.friends} loading={feedsLoading} onOpen={handleOpenRecipe} />
+      <RecipeSection icon="🔥" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={homeFeeds.recommended} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={(recipe) => recipe.post?.profile_id && router.push(`/profile/${recipe.post.profile_id}`)} />
+      <RecipeSection icon="⚡" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={homeFeeds.easyWins} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={(recipe) => recipe.post?.profile_id && router.push(`/profile/${recipe.post.profile_id}`)} />
+      <RecipeSection icon="🏆" title="Challenge yourself" subtitle="Push your skills further" recipes={homeFeeds.challenge} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={(recipe) => recipe.post?.profile_id && router.push(`/profile/${recipe.post.profile_id}`)} />
+      <RecipeSection icon="👥" title="From your friends" subtitle="What the community cooked this week" recipes={homeFeeds.friends} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={(recipe) => recipe.post?.profile_id && router.push(`/profile/${recipe.post.profile_id}`)} />
     </ScrollView>
     <RecipeDetailsModal
       post={openRecipe?.post ?? null}
@@ -158,6 +159,7 @@ function HomeScreen() {
       likeLoading={openRecipe ? likeLoadingIds.has(openRecipe.id) : false}
       onClose={() => setOpenRecipe(null)}
       onLike={(currentlyLiked) => openRecipe ? handleLikePost(openRecipe.id, currentlyLiked) : Promise.resolve()}
+      onAuthorPress={openRecipe?.post?.profile_id ? () => router.push(`/profile/${openRecipe.post.profile_id}`) : undefined}
     />
     </>
   );

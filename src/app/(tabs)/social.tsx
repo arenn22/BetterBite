@@ -2,6 +2,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { SectionLabel } from "@/components/section-label";
 import { fetchFriendRequests, fetchFriends, respondToFriendRequest, searchUsers, sendFriendRequest } from "@/services/api/social";
 import type { PendingFriendRequest, SearchUserResult } from "@/types/auth";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -94,27 +95,12 @@ function TierBadge({ tier }: { tier: string }) {
 	return <View style={[styles.tierBadge, { backgroundColor: tierColor.bg }]}><Text style={[styles.tierText, { color: tierColor.text }]}>{tier}</Text></View>;
 }
 
-function ProfileDetails({ friend }: { friend: Friend }) {
-	return (
-		<View style={styles.profileDetails}>
-			<View style={styles.statsRow}>
-				{[{ label: "Recipes", value: friend.recipes }, { label: "Level", value: friend.level }, { label: "Streak", value: `${friend.streak}🔥` }].map((stat) => (
-					<View key={stat.label} style={styles.statBox}><Text style={styles.statValue}>{stat.value}</Text><Text style={styles.statLabel}>{stat.label}</Text></View>
-				))}
-			</View>
-			<Text style={styles.recentLabel}>Recent cooks</Text>
-			<View style={styles.recentRow}>{friend.recentImgs.map((src, index) => <Image key={index} source={{ uri: src }} style={styles.recentImage} />)}</View>
-		</View>
-	);
-}
-
 export default function SocialScreen() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 	const [searchResults, setSearchResults] = useState<SuggestedUser[]>([]);
 	const [requests, setRequests] = useState<Request[]>([]);
 	const [friends, setFriends] = useState<Friend[]>([]);
-	const [openProfile, setOpenProfile] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [searchLoading, setSearchLoading] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
@@ -196,11 +182,11 @@ export default function SocialScreen() {
 				{showLeaderboard && <View style={styles.leaderboard}>{[...FRIENDS].sort((a, b) => b.recipes - a.recipes).map((friend, index) => <View key={friend.id} style={styles.leaderRow}><Text style={styles.leaderRank}>{index + 1}</Text><Avatar friend={friend} size={32} /><Text style={styles.leaderName}>{friend.name}</Text><TierBadge tier={friend.tier} /><Text style={styles.points}>{friend.recipes * 4} pts</Text></View>)}</View>}
 			</View>
 
-			<View style={styles.section}><SectionLabel>Add friends</SectionLabel><View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search users" placeholderTextColor={colors.faint} style={styles.searchInput} />{searchQuery.length > 0 && <Pressable onPress={() => setSearchQuery("")}><Text style={styles.clear}>✕</Text></Pressable>}</View><View style={[styles.listPanel, shadowSm]}>{searchLoading ? <Text style={styles.emptyText}>Searching users…</Text> : searchQuery.trim() && searchResults.length === 0 ? <Text style={styles.emptyText}>No users found for "{searchQuery}"</Text> : searchQuery.trim() ? searchResults.map((user, index) => { const added = addedIds.has(user.id); return <View key={user.id} style={[styles.userRow, index < searchResults.length - 1 && styles.rowBorder]}><View style={[styles.avatar, { backgroundColor: user.color }]}>{user.pfp_url ? <Image source={{ uri: user.pfp_url }} style={styles.fill} /> : <Text style={styles.avatarText}>{user.initials}</Text>}</View><View style={styles.userInfo}><Text style={styles.userName}>{user.username}</Text>{user.tier ? <TierBadge tier={user.tier} /> : null}</View><Pressable onPress={() => void handleSendRequest(user)} disabled={added} style={[styles.actionButton, added ? styles.sentButton : styles.addButton]}><Text style={[styles.actionText, added && styles.sentText]}>{added ? "Sent ✓" : "+ Add"}</Text></Pressable></View>}) : <Text style={styles.suggestedFooter}>Search by username to find friends.</Text>}</View></View>
+			<View style={styles.section}><SectionLabel>Add friends</SectionLabel><View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search users" placeholderTextColor={colors.faint} style={styles.searchInput} />{searchQuery.length > 0 && <Pressable onPress={() => setSearchQuery("")}><Text style={styles.clear}>✕</Text></Pressable>}</View><View style={[styles.listPanel, shadowSm]}>{searchLoading ? <Text style={styles.emptyText}>Searching users…</Text> : searchQuery.trim() && searchResults.length === 0 ? <Text style={styles.emptyText}>No users found for "{searchQuery}"</Text> : searchQuery.trim() ? searchResults.map((user, index) => { const added = addedIds.has(user.id); return <View key={user.id} style={[styles.userRow, index < searchResults.length - 1 && styles.rowBorder]}><Pressable onPress={() => router.push(`/profile/${user.id}`)} style={styles.profileLink}><View style={[styles.avatar, { backgroundColor: user.color }]}>{user.pfp_url ? <Image source={{ uri: user.pfp_url }} style={styles.fill} /> : <Text style={styles.avatarText}>{user.initials}</Text>}</View><View style={styles.userInfo}><Text style={styles.userName}>{user.username}</Text>{user.tier ? <TierBadge tier={user.tier} /> : null}</View></Pressable><Pressable onPress={() => void handleSendRequest(user)} disabled={added} style={[styles.actionButton, added ? styles.sentButton : styles.addButton]}><Text style={[styles.actionText, added && styles.sentText]}>{added ? "Sent ✓" : "+ Add"}</Text></Pressable></View>}) : <Text style={styles.suggestedFooter}>Search by username to find friends.</Text>}</View></View>
 
 			<View style={styles.section}><View style={styles.sectionTitleRow}><SectionLabel>Friend requests</SectionLabel>{requests.length > 0 && <View style={styles.requestCount}><Text style={styles.requestCountText}>{requests.length}</Text></View>}</View>{loading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : requests.length === 0 ? <View style={[styles.emptyPanel, shadowSm]}><Text style={styles.emptyEmoji}>👐</Text><Text style={styles.emptyText}>No pending requests</Text></View> : <View style={[styles.listPanel, shadowSm]}>{requests.map((request, index) => <View key={request.id} style={[styles.userRow, index < requests.length - 1 && styles.rowBorder]}><View style={[styles.avatar, { backgroundColor: request.color }]}><Text style={styles.avatarText}>{request.initials}</Text></View><View style={styles.userInfo}><Text style={styles.userName}>{request.name}</Text><Text style={styles.mutuals}>{request.mutuals ? `${request.mutuals} mutual friends` : "Wants to connect with you"}</Text></View><Pressable onPress={() => void handleRequestResponse(request, false)} style={[styles.smallAction, styles.rejectButton]}><Text style={styles.rejectText}>Reject</Text></Pressable><Pressable onPress={() => void handleRequestResponse(request, true)} style={[styles.smallAction, styles.acceptButton]}><Text style={styles.acceptText}>Accept</Text></Pressable></View>)}</View>}</View>
 
-			<View style={styles.section}><View style={styles.sectionTitleRow}><SectionLabel>Your friends</SectionLabel><Text style={styles.friendCount}>{friends.length} friends</Text></View>{loading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : friends.length === 0 ? <View style={[styles.emptyPanel, shadowSm]}><Text style={styles.emptyText}>No friends yet</Text></View> : <View style={[styles.listPanel, shadowSm]}>{friends.map((friend, index) => { const isOpen = openProfile === friend.id; return <View key={friend.id}><Pressable onPress={() => setOpenProfile(isOpen ? null : friend.id)} style={[styles.userRow, index < friends.length - 1 && !isOpen && styles.rowBorder, isOpen && styles.openRow]}><Avatar friend={friend} /><View style={styles.userInfo}><View style={styles.nameTierRow}><Text style={styles.userName}>{friend.name}</Text><TierBadge tier={friend.tier} /></View><Text style={styles.mutuals}>🔥 {friend.streak} day streak</Text></View><View style={[styles.viewButton, isOpen && styles.viewButtonOpen]}><Text style={[styles.viewText, isOpen && styles.viewTextOpen]}>{isOpen ? "Close" : "View"}</Text></View></Pressable>{isOpen && <ProfileDetails friend={friend} />}</View>})}</View>}</View>
+			<View style={styles.section}><View style={styles.sectionTitleRow}><SectionLabel>Your friends</SectionLabel><Text style={styles.friendCount}>{friends.length} friends</Text></View>{loading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : friends.length === 0 ? <View style={[styles.emptyPanel, shadowSm]}><Text style={styles.emptyText}>No friends yet</Text></View> : <View style={[styles.listPanel, shadowSm]}>{friends.map((friend, index) => <Pressable key={friend.id} onPress={() => router.push(`/profile/${friend.id}`)} style={[styles.userRow, index < friends.length - 1 && styles.rowBorder]}><Avatar friend={friend} /><View style={styles.userInfo}><View style={styles.nameTierRow}><Text style={styles.userName}>{friend.name}</Text><TierBadge tier={friend.tier} /></View><Text style={styles.mutuals}>🔥 {friend.streak} day streak</Text></View></Pressable>)}</View>}</View>
 		</ScrollView>
 	);
 }
@@ -247,6 +233,7 @@ const styles = StyleSheet.create({
 	avatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", overflow: "hidden" },
 	avatarText: { color: "#fff", fontSize: 11, fontWeight: "800" },
 	userInfo: { flex: 1, minWidth: 0 },
+	profileLink: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
 	userName: { fontSize: 14, fontWeight: "700", color: colors.ink, lineHeight: 18 },
 	nameTierRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
 	tierBadge: { alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
@@ -270,11 +257,6 @@ const styles = StyleSheet.create({
 	acceptButton: { backgroundColor: colors.sage },
 	acceptText: { color: "#fff", fontSize: 11, fontWeight: "700" },
 	friendCount: { marginTop: -10, fontSize: 10, fontWeight: "600", color: colors.muted },
-	viewButton: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
-	viewButtonOpen: { backgroundColor: colors.sageLight, borderColor: colors.sage },
-	viewText: { fontSize: 10, fontWeight: "700", color: colors.muted },
-	viewTextOpen: { color: colors.sage },
-	profileDetails: { padding: 16, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.cream },
 	statsRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
 	statBox: { flex: 1, alignItems: "center", padding: 10, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border },
 	statValue: { fontSize: 14, fontWeight: "800", color: colors.ink },

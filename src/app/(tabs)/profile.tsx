@@ -8,6 +8,7 @@ import { getCookedPostsByUser } from "@/services/api/cooked-posts";
 import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE, getXpPercentageLeftToNextLevel } from "@/services/api/profiles";
 import { fetchFriends } from "@/services/api/social";
+import { router, type Href } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator, Image, Platform, Pressable,
@@ -148,6 +149,7 @@ function EmptyTabState({ tab }: { tab: TabId }) {
 export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: string) => void }) {
   const { width } = useWindowDimensions();
   const { currentUser } = useAuthContext();
+  const openUserProfile = (userId: string) => router.push(`/profile/${userId}` as Href);
   const [activeTab, setActiveTab] = useState<TabId>("created");
   const [editMode, setEditMode] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardData | null>(null);
@@ -286,6 +288,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     { label: "Friends", value: String(friends.length) },
     { label: "Streak", value: `${Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0)}🔥` },
   ];
+  const selectedAuthorId = selectedRecipe?.post?.profile_id;
 
   return (
     <>
@@ -475,13 +478,17 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
             <EmptyTabState tab={activeTab} />
           ) : (
             recipes.map((r) => (
-              <RecipeCard
-                key={r.id}
-                recipe={r}
-                width={cardWidth}
-                compact
-                onPress={() => handleOpenAndTrackRecipe(r)}
-              />
+              (() => {
+                const authorId = r.post?.profile_id;
+                return <RecipeCard
+                  key={r.id}
+                  recipe={r}
+                  width={cardWidth}
+                  compact
+                  onPress={() => handleOpenAndTrackRecipe(r)}
+                  onAuthorPress={authorId ? () => openUserProfile(authorId) : undefined}
+                />;
+              })()
             ))
           )}
         </View>
@@ -498,6 +505,7 @@ export default function ProfileScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
       likeLoading={likeLoading}
       onClose={() => setSelectedRecipe(null)}
       onLike={handleLikeRecipe}
+      onAuthorPress={selectedAuthorId ? () => openUserProfile(selectedAuthorId) : undefined}
     />
     </>
   );

@@ -40,6 +40,7 @@ type RecipeDetailsModalProps = {
   likeLoading: boolean;
   onClose: () => void;
   onLike: (currentlyLiked: boolean) => Promise<void>;
+  onAuthorPress?: () => void;
 };
 
 function asTextList(value: unknown): string[] {
@@ -105,6 +106,7 @@ export function RecipeDetailsModal({
   likeLoading,
   onClose,
   onLike,
+  onAuthorPress,
 }: RecipeDetailsModalProps) {
   const { currentUser } = useAuthContext();
   const [communityTab, setCommunityTab] = useState<CommunityTab>("cooks");
@@ -314,7 +316,7 @@ export function RecipeDetailsModal({
 
               <View style={styles.detailContent}>
                 <Text style={styles.detailTitle}>{post.title || "Untitled recipe"}</Text>
-                <View style={styles.authorRow}>
+                <Pressable onPress={onAuthorPress} disabled={!onAuthorPress} style={styles.authorRow} accessibilityRole={onAuthorPress ? "button" : undefined}>
                   {post.author_pfp_url ? (
                     <Image source={{ uri: post.author_pfp_url }} style={styles.authorAvatar} />
                   ) : (
@@ -333,7 +335,7 @@ export function RecipeDetailsModal({
                   {cookingTime ? <Text style={styles.authorName}>{cookingTime}</Text> : null}
                   <Text style={styles.metaDivider}>·</Text>
                   <Text style={styles.authorName}>{views.toLocaleString()} views</Text>
-                </View>
+                </Pressable>
                 {post.description?.trim() ? <Text style={styles.description}>{post.description.trim()}</Text> : null}
 
                 {ingredients.length > 0 ? (

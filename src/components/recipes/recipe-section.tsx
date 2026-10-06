@@ -11,6 +11,7 @@ export function RecipeSection({
   recipes,
   loading,
   onOpen,
+  onAuthorPress,
 }: {
   icon: string;
   title: string;
@@ -18,6 +19,7 @@ export function RecipeSection({
   recipes: RecipeCardData[];
   loading: boolean;
   onOpen: (recipe: RecipeCardData) => void;
+  onAuthorPress?: (recipe: RecipeCardData) => void;
 }) {
   return (
     <View style={styles.section}>
@@ -32,7 +34,7 @@ export function RecipeSection({
         <ActivityIndicator color={colors.sage} style={styles.loading} />
       ) : recipes.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards}>
-          {recipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} onPress={() => onOpen(recipe)} />)}
+          {recipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} onPress={() => onOpen(recipe)} onAuthorPress={onAuthorPress ? () => onAuthorPress(recipe) : undefined} />)}
         </ScrollView>
       ) : (
         <Text style={styles.empty}>No recipes to show yet.</Text>

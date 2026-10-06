@@ -6,11 +6,13 @@ import { DIFFICULTY_COLORS, formatCount, type RecipeCardData } from "@/lib/recip
 export function RecipeCard({
   recipe,
   onPress,
+  onAuthorPress,
   width,
   compact = false,
 }: {
   recipe: RecipeCardData;
   onPress: () => void;
+  onAuthorPress?: () => void;
   width?: number;
   compact?: boolean;
 }) {
@@ -33,9 +35,15 @@ export function RecipeCard({
           </View>
         )}
         {recipe.author ? (
-          <View style={styles.authorTag}>
+          <Pressable
+            onPress={onAuthorPress ? (event) => { event.stopPropagation(); onAuthorPress(); } : undefined}
+            disabled={!onAuthorPress}
+            style={styles.authorTag}
+            accessibilityRole={onAuthorPress ? "button" : undefined}
+            accessibilityLabel={onAuthorPress ? `Open ${recipe.author}'s profile` : undefined}
+          >
             <Text style={styles.authorTagText}>{recipe.author}</Text>
-          </View>
+          </Pressable>
         ) : null}
       </View>
       <View style={styles.body}>

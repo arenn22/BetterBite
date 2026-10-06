@@ -6,6 +6,7 @@ import { useRecipeOptions } from "@/hooks/use-recipe-options";
 import { toRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { fetchFilteredPosts } from "@/services/api/posts";
 import type { Post } from "@/types/models";
+import { router } from "expo-router";
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   ActivityIndicator,
@@ -279,6 +280,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
                 recipe={recipe}
                 width={halfWidth}
                 onPress={() => onOpenRecipe ? onOpenRecipe(recipe.id) : setSelectedRecipe(recipe)}
+                onAuthorPress={recipe.post?.profile_id ? () => router.push(`/profile/${recipe.post.profile_id}`) : undefined}
               />
             ))}
           </View>
