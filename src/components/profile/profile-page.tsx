@@ -2,7 +2,6 @@ import { RecipeCard } from "@/components/recipes/recipe-card";
 import { BotanicalBanner } from "@/components/profile/botanical-banner";
 import { ScreenHeader } from "@/components/screen-header";
 import { EXPERIENCE_LEVEL_NAMES, getExperienceLevelName } from "@/constants/experience-levels";
-import { BotanicalBanner } from "@/app/(tabs)/profile";
 import { toRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { getCookedPostsByUser } from "@/services/api/cooked-posts";
 import { fetchPosts } from "@/services/api/posts";
