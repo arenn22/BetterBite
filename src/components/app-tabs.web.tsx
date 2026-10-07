@@ -35,6 +35,9 @@ export default function AppTabs() {
               <TabTrigger name="profile" href="/profile" asChild>
                 <Pressable />
               </TabTrigger>
+              <TabTrigger name="settings" href="/settings" asChild>
+                <Pressable />
+              </TabTrigger>
             </View>
           </TabList>
         </Tabs>
@@ -151,6 +154,7 @@ const styles = StyleSheet.create({
     width: 1,
     height: 1,
     overflow: "hidden",
+    pointerEvents: "none",
   },
   pressed: {
     opacity: 0.7,

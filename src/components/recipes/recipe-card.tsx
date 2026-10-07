@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, shadowSm } from "@/app/(tabs)/theme";
 import { DIFFICULTY_COLORS, formatCount, type RecipeCardData } from "@/lib/recipes";
@@ -73,9 +73,9 @@ const styles = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
   card: { position: "relative", borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   cardPressable: { width: "100%" },
-  horizontalCard: { width: 176 },
-  imageWrap: { height: 112, backgroundColor: colors.sageLight, overflow: "hidden" },
-  compactImage: { height: 112 },
+  horizontalCard: { width: Platform.OS === "web" ? 196 : 176 },
+  imageWrap: { height: Platform.OS === "web" ? 124 : 112, backgroundColor: colors.sageLight, overflow: "hidden" },
+  compactImage: { height: Platform.OS === "web" ? 124 : 112 },
   imageFallback: { alignItems: "center", justifyContent: "center" },
   fallbackText: { fontSize: 10, fontWeight: "500", color: colors.muted },
   authorTag: { position: "absolute", top: 82, left: 8, backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },

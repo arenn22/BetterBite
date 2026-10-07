@@ -169,8 +169,10 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
     return () => { active = false; };
   }, [currentUser, isOwner]);
 
-  const layoutWidth = Platform.OS === "web" ? Math.min(width, 430) : width;
-  const cardWidth = (layoutWidth - 32 - 12) / 2;
+  const layoutWidth = Platform.OS === "web" ? width : width;
+  const cardWidth = Platform.OS === "web"
+    ? Math.min(280, (layoutWidth - 32 - 12) / 2)
+    : (layoutWidth - 32 - 12) / 2;
 
   const tabRecipes: Record<TabId, RecipeCardData[]> = {
     created: createdRecipes,
