@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { getImageContentType } from "./image-mime";
 import type { Profile } from "../../types/auth";
 
 export const DEFAULT_PROFILE_IMAGE =
@@ -73,7 +74,7 @@ export async function updateProfilePhoto(userId: string, imageUri: string): Prom
   const { error: uploadError } = await supabase.storage
     .from("post-images")
     .upload(path, blob, {
-      contentType: blob.type || "image/jpeg",
+      contentType: getImageContentType(blob.type, imageUri),
       upsert: true,
     });
 

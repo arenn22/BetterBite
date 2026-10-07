@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { getImageContentType } from "./image-mime";
 import type { CreatePostPayload, Post } from "../../types/models";
 
 export type HomePostSections = {
@@ -191,7 +192,7 @@ export async function uploadPostImage(imageUri: string, userId: string): Promise
   const { error } = await supabase.storage
     .from("post-images")
     .upload(path, blob, {
-      contentType: blob.type || "image/jpeg",
+      contentType: getImageContentType(blob.type, imageUri),
       upsert: true,
     });
 
