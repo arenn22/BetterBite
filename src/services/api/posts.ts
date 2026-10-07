@@ -189,10 +189,12 @@ export async function uploadPostImage(imageUri: string, userId: string): Promise
   const filename = imageUri.split("/").pop() || `${Date.now()}.jpg`;
   const path = `${userId}/${Date.now()}-${filename}`;
   const blob = await (await fetch(imageUri)).blob();
+  const contentType = getImageContentType(blob.type, imageUri);
+  const imageBlob = blob.slice(0, blob.size, contentType);
   const { error } = await supabase.storage
     .from("post-images")
-    .upload(path, blob, {
-      contentType: getImageContentType(blob.type, imageUri),
+    .upload(path, imageBlob, {
+      contentType,
       upsert: true,
     });
 

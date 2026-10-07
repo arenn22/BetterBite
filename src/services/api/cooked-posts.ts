@@ -264,10 +264,11 @@ export async function uploadCookedPostImage(
   const blob = await (await fetch(imageUri)).blob();
   const contentType = getImageContentType(blob.type, imageUri);
   const extension = getImageFileExtension(contentType);
+  const imageBlob = blob.slice(0, blob.size, contentType);
   const path = `${userId}/${postId}/${Crypto.randomUUID()}-${Date.now()}.${extension}`;
   const { error } = await supabase.storage
     .from("cooked_posts-images")
-    .upload(path, blob, {
+    .upload(path, imageBlob, {
       contentType,
       upsert: false,
     });
