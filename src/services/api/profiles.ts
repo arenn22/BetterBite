@@ -101,10 +101,10 @@ export async function updateProfilePhoto(userId: string, imageUri: string): Prom
 }
 
 export async function set_my_dietary_restrictions(restrictionIds: number[]) {
-  const {error} = await supabase.rpc('set_my_dietary_restrictions', { p_restriction_ids: restrictionIds });
-  if(error) {
-    console.error("Error setting dietary restrictions:", error.message);
-  }
+  const { error } = await supabase.rpc("set_my_dietary_restrictions", {
+    p_restriction_ids: restrictionIds,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function set_my_experience_level(difficulty: number) {
@@ -155,3 +155,20 @@ export async function updateProfileUsername(userId: string, username: string): P
 
   if (error) throw error;
 }
+
+export async function updatePassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateNotificationPreferences(
+  notifyStreaks: boolean,
+  notifyFriendActivity: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc("set_my_notification_preferences", {
+    p_notify_streaks: notifyStreaks,
+    p_notify_friend_activity: notifyFriendActivity,
+  });
+  if (error) throw new Error(error.message);
+}
+

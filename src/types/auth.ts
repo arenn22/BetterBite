@@ -9,6 +9,8 @@ export interface Profile {
 	experienceLevel?: number | null;
 	dietary_restrictions?: number[] | null;
 	dietaryRestrictions?: number[] | null;
+	notify_streaks?: boolean | null;
+	notify_friend_activity?: boolean | null;
 	streakCount?: number | null;
 	last_streak_post?: Date | string | null;
 	streakcount?: number | null;
