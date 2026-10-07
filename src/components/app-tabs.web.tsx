@@ -167,6 +167,8 @@ const styles = StyleSheet.create({
   appFrame: {
     flex: 1,
     minWidth: 0,
+    width: "auto",
+    paddingHorizontal: 32,
     backgroundColor: colors.bg,
   },
   tabSlot: {

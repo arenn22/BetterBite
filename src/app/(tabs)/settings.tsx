@@ -153,7 +153,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   content: { paddingBottom: 40 },
-  page: { width: "100%", maxWidth: 430, alignSelf: "center" },
+  page: { width: "100%", maxWidth: 1080, alignSelf: "center" },
   back: { marginTop: 8, color: colors.sage, fontSize: 12, fontWeight: "800" },
   section: { marginHorizontal: 16, marginBottom: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", overflow: "hidden" },
   sectionTitle: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5 },
