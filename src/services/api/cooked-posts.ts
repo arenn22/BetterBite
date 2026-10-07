@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import * as Crypto from "expo-crypto";
 import type { Profile } from "../../types/auth";
 import type { CookedPost, Post, PostReview } from "../../types/models";
 import { resolvePostImageUrl } from "./posts";
@@ -260,7 +261,7 @@ export async function uploadCookedPostImage(
   postId: string,
 ): Promise<string> {
   const blob = await (await fetch(imageUri)).blob();
-  const path = `${userId}/${postId}/${crypto.randomUUID()}-${Date.now()}.jpg`;
+  const path = `${userId}/${postId}/${Crypto.randomUUID()}-${Date.now()}.jpg`;
   const { error } = await supabase.storage
     .from("cooked_posts-images")
     .upload(path, blob, {
