@@ -118,13 +118,15 @@ export default function SettingsScreen() {
           </View>
           <Divider />
           <Text style={styles.inputLabel}>Username</Text>
-          <View style={styles.inputRow}><TextInput value={username} onChangeText={setUsername} autoCapitalize="none" style={styles.input} placeholder="Username" placeholderTextColor={colors.faint} /><Pressable onPress={() => currentUser && void runSave("username", () => updateProfileUsername(currentUser.id, username.trim()), "Username updated.")} disabled={!currentUser || !username.trim() || saving === "username"}><Text style={styles.saveText}>{saving === "username" ? "..." : "Save"}</Text></Pressable></View>
+          <View style={styles.inputRow}><TextInput value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={30} style={styles.input} placeholder="Username" placeholderTextColor={colors.faint} accessibilityLabel="Username" /><Pressable onPress={() => void runSave("username", () => updateProfileUsername(username), "Username updated.")} disabled={!currentUser || username.trim().length < 4 || username.trim() === currentUser.username || saving === "username"}><Text style={[styles.saveText, (!currentUser || username.trim().length < 4 || username.trim() === currentUser.username || saving === "username") && styles.disabledSaveText]}>{saving === "username" ? "Saving..." : "Save"}</Text></Pressable></View>
+          {username.trim().length > 0 && username.trim().length < 4 ? <Text style={styles.fieldError}>Username must be at least 4 characters.</Text> : null}
           <Text style={styles.joined}>Member since {currentUser?.date_joined ? new Date(currentUser.date_joined).toLocaleDateString() : "—"}</Text>
         </Section>
 
         <Section title="Password">
           <Text style={styles.helper}>Choose a new password for your BetterBite account.</Text>
-          <View style={styles.inputRow}><TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" style={styles.input} placeholder="New password" placeholderTextColor={colors.faint} /><Pressable onPress={() => void runSave("password", async () => { if (password.length < 6) throw new Error("Password must be at least 6 characters."); await updatePassword(password); setPassword(""); }, "Password updated.")} disabled={!password || saving === "password"}><Text style={styles.saveText}>{saving === "password" ? "..." : "Update"}</Text></Pressable></View>
+          <View style={styles.inputRow}><TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={styles.input} placeholder="New password" placeholderTextColor={colors.faint} accessibilityLabel="New password" /><Pressable onPress={() => void runSave("password", async () => { await updatePassword(password); setPassword(""); }, "Password updated.")} disabled={!currentUser || password.length < 6 || saving === "password"}><Text style={[styles.saveText, (!currentUser || password.length < 6 || saving === "password") && styles.disabledSaveText]}>{saving === "password" ? "Updating..." : "Update"}</Text></Pressable></View>
+          {password.length > 0 && password.length < 6 ? <Text style={styles.fieldError}>Password must be at least 6 characters.</Text> : null}
         </Section>
 
         <Section title="Dietary restrictions">
@@ -170,6 +172,8 @@ const styles = StyleSheet.create({
   inputRow: { minHeight: 50, flexDirection: "row", alignItems: "center", marginHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
   input: { flex: 1, color: colors.ink, fontSize: 14, paddingVertical: 10 },
   saveText: { color: colors.sage, fontSize: 12, fontWeight: "800" },
+  disabledSaveText: { color: colors.faint },
+  fieldError: { marginHorizontal: 16, marginTop: 6, color: colors.terracotta, fontSize: 11 },
   joined: { padding: 16, paddingTop: 10, color: colors.muted, fontSize: 11 },
   helper: { paddingHorizontal: 16, paddingBottom: 8, color: colors.muted, fontSize: 12, lineHeight: 18 },
   loader: { padding: 14 },

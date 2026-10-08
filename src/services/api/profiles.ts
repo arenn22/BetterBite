@@ -147,16 +147,38 @@ export async function set_my_experience_level(difficulty: number) {
   }
 }
 
-export async function updateProfileUsername(userId: string, username: string): Promise<void> {
-  const { error } = await supabase
-    .from("profiles")
-    .update({ username })
-    .eq("id", userId);
+export async function updateProfileUsername(username: string): Promise<void> {
+  const normalizedUsername = username.trim();
+  if (normalizedUsername.length < 4) {
+    throw new Error("Username must be at least 4 characters long.");
+  }
 
-  if (error) throw error;
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  if (!authData.user) throw new Error("Sign in again to update your username.");
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ username: normalizedUsername })
+    .eq("id", authData.user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) {
+    throw new Error("Your username could not be updated. Check your connection and try again.");
+  }
 }
 
 export async function updatePassword(password: string): Promise<void> {
+  if (password.length < 6) {
+    throw new Error("Password must be at least 6 characters.");
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  if (!authData.user) throw new Error("Sign in again to update your password.");
+
   const { error } = await supabase.auth.updateUser({ password });
   if (error) throw new Error(error.message);
 }
