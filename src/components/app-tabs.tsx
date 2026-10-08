@@ -16,25 +16,37 @@ export default function AppTabs() {
 			<NativeTabs.Trigger name="home">
 				<NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
 				<NativeTabs.Trigger.Icon
-					src={require("@/assets/images/tabIcons/home.png")}
-					renderingMode="template"
+					sf={{ default: "house", selected: "house.fill" }}
+					md={{ default: "home", selected: "home" }}
 				/>
 			</NativeTabs.Trigger>
 			<NativeTabs.Trigger name="explore">
 				<NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
 				<NativeTabs.Trigger.Icon
-					src={require("@/assets/images/tabIcons/explore.png")}
-					renderingMode="template"
+					sf="magnifyingglass"
+					md="search"
+				/>
+			</NativeTabs.Trigger>
+			<NativeTabs.Trigger name="create">
+				<NativeTabs.Trigger.Label>+</NativeTabs.Trigger.Label>
+				<NativeTabs.Trigger.Icon
+					sf="plus"
+					md="add"
 				/>
 			</NativeTabs.Trigger>
 			<NativeTabs.Trigger name="social">
 				<NativeTabs.Trigger.Label>Social</NativeTabs.Trigger.Label>
-			</NativeTabs.Trigger>
-			<NativeTabs.Trigger name="create">
-				<NativeTabs.Trigger.Label>+</NativeTabs.Trigger.Label>
+				<NativeTabs.Trigger.Icon
+					sf="person.2"
+					md="group"
+				/>
 			</NativeTabs.Trigger>
 			<NativeTabs.Trigger name="profile">
 				<NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
+				<NativeTabs.Trigger.Icon
+					sf="person"
+					md="person"
+				/>
 			</NativeTabs.Trigger>
 		</NativeTabs>
 	);

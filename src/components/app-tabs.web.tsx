@@ -26,10 +26,10 @@ export default function AppTabs() {
               <TabTrigger name="explore" href="/explore" asChild>
                 <Pressable />
               </TabTrigger>
-              <TabTrigger name="social" href="/social" asChild>
+              <TabTrigger name="create" href="/create" asChild>
                 <Pressable />
               </TabTrigger>
-              <TabTrigger name="create" href="/create" asChild>
+              <TabTrigger name="social" href="/social" asChild>
                 <Pressable />
               </TabTrigger>
               <TabTrigger name="profile" href="/profile" asChild>
@@ -48,8 +48,8 @@ export default function AppTabs() {
 const NAV_ITEMS = [
   { label: "Home", icon: "⌂", path: "/home" },
   { label: "Explore", icon: "⌕", path: "/explore" },
-  { label: "Social", icon: "♧", path: "/social" },
   { label: "Create", icon: "＋", path: "/create" },
+  { label: "Social", icon: "♧", path: "/social" },
   { label: "Profile", icon: "◎", path: "/profile" },
 ] as const;
 
