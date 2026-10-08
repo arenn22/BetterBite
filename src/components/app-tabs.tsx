@@ -28,7 +28,7 @@ export default function AppTabs() {
 				/>
 			</NativeTabs.Trigger>
 			<NativeTabs.Trigger name="create">
-				<NativeTabs.Trigger.Label>+</NativeTabs.Trigger.Label>
+				<NativeTabs.Trigger.Label>Create</NativeTabs.Trigger.Label>
 				<NativeTabs.Trigger.Icon
 					sf="plus"
 					md="add"
