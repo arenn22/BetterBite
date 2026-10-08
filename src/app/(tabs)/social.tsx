@@ -22,7 +22,9 @@ import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Image,
+    Platform,
     Pressable,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -158,6 +160,9 @@ export default function SocialScreen() {
 	const [leaderboardLoading, setLeaderboardLoading] = useState(true);
 	const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
 	const [leaderboardRefresh, setLeaderboardRefresh] = useState(0);
+	const [socialRefresh, setSocialRefresh] = useState(0);
+	const [socialRefreshing, setSocialRefreshing] = useState(false);
+	const [leaderboardRefreshing, setLeaderboardRefreshing] = useState(false);
 
 	useEffect(() => {
 		let active = true;
@@ -171,12 +176,15 @@ export default function SocialScreen() {
 			} catch (error) {
 				if (active) setActionError(error instanceof Error ? error.message : "Unable to load your social connections.");
 			} finally {
-				if (active) setLoading(false);
+				if (active) {
+					setLoading(false);
+					setSocialRefreshing(false);
+				}
 			}
 		}
 		void loadSocialData();
 		return () => { active = false; };
-	}, []);
+	}, [socialRefresh]);
 
 	useEffect(() => {
 		let active = true;
@@ -193,7 +201,10 @@ export default function SocialScreen() {
 				setLeaderboardError(error instanceof Error ? error.message : "Unable to load the leaderboard.");
 			})
 			.finally(() => {
-				if (active) setLeaderboardLoading(false);
+				if (active) {
+					setLeaderboardLoading(false);
+					setLeaderboardRefreshing(false);
+				}
 			});
 
 		return () => { active = false; };
@@ -247,7 +258,24 @@ export default function SocialScreen() {
 	const rankLabels = ["🥇", "🥈", "🥉"];
 
 	return (
-		<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<ScrollView
+			showsVerticalScrollIndicator={false}
+			contentContainerStyle={styles.content}
+			keyboardShouldPersistTaps="handled"
+			refreshControl={Platform.OS === "web" ? undefined : (
+				<RefreshControl
+					refreshing={socialRefreshing || leaderboardRefreshing}
+					onRefresh={() => {
+						setSocialRefreshing(true);
+						setLeaderboardRefreshing(true);
+						setSocialRefresh((refresh) => refresh + 1);
+						setLeaderboardRefresh((refresh) => refresh + 1);
+					}}
+					tintColor={colors.sage}
+					colors={[colors.sage]}
+				/>
+			)}
+		>
 			<ScreenHeader eyebrow="Your crew" title="Social" subtitle="Add friends, manage requests, and check in with your people." />
 			{actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
 

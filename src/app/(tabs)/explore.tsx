@@ -14,6 +14,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -105,6 +106,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   const [postsLoading, setPostsLoading] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const { dietaryOptions, cuisineOptions, loading: filtersLoading } = useRecipeOptions();
   const { currentUser } = useAuthContext();
 
@@ -118,7 +120,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
         if (active) console.error("Unable to load liked posts:", error);
       });
     return () => { active = false; };
-  }, []);
+  }, [retryCount]);
 
   const cuisineFilters = useMemo(() => cuisineOptions.map((option) => ({
     id: option.id,
@@ -229,7 +231,10 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
           setPostsError(error instanceof Error ? error.message : "Could not load recipes.");
         }
       } finally {
-        if (isCurrentRequest) setPostsLoading(false);
+        if (isCurrentRequest) {
+          setPostsLoading(false);
+          setRefreshing(false);
+        }
       }
     };
 
@@ -264,6 +269,17 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ paddingBottom: 32 }}
+      refreshControl={Platform.OS === "web" ? undefined : (
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            setRetryCount((count) => count + 1);
+          }}
+          tintColor={colors.sage}
+          colors={[colors.sage]}
+        />
+      )}
     >
       <ScreenHeader eyebrow="The community table" title="Explore" subtitle="Real recipes from your BetterBite community." />
 

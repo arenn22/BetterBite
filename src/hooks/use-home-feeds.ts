@@ -16,6 +16,8 @@ export function useHomeFeeds() {
   const [homeFeeds, setHomeFeeds] = useState<HomeFeeds>(EMPTY_HOME_FEEDS);
   const [feedsLoading, setFeedsLoading] = useState(true);
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -37,12 +39,24 @@ export function useHomeFeeds() {
         if (active) setHomeFeeds(EMPTY_HOME_FEEDS);
       } finally {
         if (active) setFeedsLoading(false);
+        if (active && refreshKey > 0) setRefreshing(false);
       }
     }
 
     void loadHomeFeeds();
     return () => { active = false; };
-  }, []);
+  }, [refreshKey]);
 
-  return { homeFeeds, setHomeFeeds, feedsLoading, likedPostIds, setLikedPostIds };
+  return {
+    homeFeeds,
+    setHomeFeeds,
+    feedsLoading,
+    likedPostIds,
+    setLikedPostIds,
+    refreshing,
+    refreshHomeFeeds: () => {
+      setRefreshing(true);
+      setRefreshKey((key) => key + 1);
+    },
+  };
 }

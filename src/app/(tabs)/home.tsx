@@ -9,7 +9,7 @@ import { incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Image, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, shadowSm } from "./theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -35,7 +35,7 @@ function getLoggedDays(streakCount: number, lastStreakPost?: Date | string | nul
 
 function HomeScreen() {
   const [openRecipe, setOpenRecipe] = useState<RecipeCardData | null>(null);
-  const { homeFeeds, setHomeFeeds, feedsLoading, likedPostIds, setLikedPostIds } = useHomeFeeds();
+  const { homeFeeds, setHomeFeeds, feedsLoading, likedPostIds, setLikedPostIds, refreshing, refreshHomeFeeds } = useHomeFeeds();
   const [likeLoadingIds, setLikeLoadingIds] = useState<Set<string>>(new Set());
   const { currentUser } = useAuthContext();
   const username = currentUser?.username?.trim() || currentUser?.email.split("@")[0] || "there";
@@ -95,7 +95,13 @@ function HomeScreen() {
 
   return (
     <>
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 24 }}
+      refreshControl={Platform.OS === "web" ? undefined : (
+        <RefreshControl refreshing={refreshing} onRefresh={refreshHomeFeeds} tintColor={colors.sage} colors={[colors.sage]} />
+      )}
+    >
       <ScreenHeader
         eyebrow="Good morning"
         title={`Hey, ${username}.`}

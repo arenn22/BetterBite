@@ -14,6 +14,7 @@ import { router, type Href } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator, Image, Platform, Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -96,9 +97,12 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   const [likeLoading, setLikeLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedProfile, setHasLoadedProfile] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [xpPercentageLeft, setXpPercentageLeft] = useState<number | null>(null);
   const [xpProgressLoading, setXpProgressLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -137,13 +141,17 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
       } catch (error) {
         if (active) setLoadError(error instanceof Error ? error.message : "Unable to load this profile.");
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+          setHasLoadedProfile(true);
+          setRefreshing(false);
+        }
       }
     }
 
     void loadProfileData();
     return () => { active = false; };
-  }, [currentUser, isOwner, profileId]);
+  }, [currentUser, isOwner, profileId, refreshKey]);
 
   useEffect(() => {
     let active = true;
@@ -167,7 +175,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
       });
 
     return () => { active = false; };
-  }, [currentUser, isOwner]);
+  }, [currentUser, isOwner, refreshKey]);
 
   const layoutWidth = Platform.OS === "web" ? width : width;
   const cardWidth = Platform.OS === "web"
@@ -242,7 +250,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
   ];
   const selectedAuthorId = selectedRecipe?.post?.profile_id;
 
-  if (loading) return <ActivityIndicator color={colors.sage} style={{ flex: 1, paddingTop: 80 }} />;
+  if (loading && !hasLoadedProfile) return <ActivityIndicator color={colors.sage} style={{ flex: 1, paddingTop: 80 }} />;
   if (!profile) return <Text style={{ padding: 24, color: colors.terracotta, textAlign: "center" }}>{loadError ?? "This profile could not be found."}</Text>;
 
   return (
@@ -251,6 +259,17 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ paddingBottom: 40 }}
+      refreshControl={Platform.OS === "web" ? undefined : (
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            setRefreshKey((key) => key + 1);
+          }}
+          tintColor={colors.sage}
+          colors={[colors.sage]}
+        />
+      )}
     >
       <ScreenHeader
         eyebrow={isOwner ? "Your account" : "Community profile"}
