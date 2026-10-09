@@ -45,28 +45,79 @@ export async function createPost(payload: CreatePostPayload): Promise<string> {
 async function hydratePosts(posts: Post[]): Promise<Post[]> {
   if (!posts.length) return [];
   const profileIds = [...new Set(posts.map((post) => post.profile_id))];
-  const { data: profileRows, error: profilesError } = profileIds.length
-    ? await supabase
-        .from("profiles")
-        .select("id, username, pfp_url")
-        .in("id", profileIds)
-    : { data: [], error: null };
-  if (profilesError) throw profilesError;
+  const [profileResult, restrictionIdsByPost, cuisineIdsByPost] = await Promise.all([
+    profileIds.length
+      ? supabase
+          .from("profiles")
+          .select("id, username, pfp_url")
+          .in("id", profileIds)
+      : Promise.resolve({ data: [], error: null }),
+    fetchPostOptionIds(posts.map((post) => post.id), "restriction"),
+    fetchPostOptionIds(posts.map((post) => post.id), "cuisine"),
+  ]);
+  if (profileResult.error) throw profileResult.error;
 
   const profiles = new Map(
-    (profileRows || []).map((profile) => [profile.id, profile]),
+    (profileResult.data || []).map((profile) => [profile.id, profile]),
   );
   return Promise.all(
     posts.map(async (post) => {
       const profile = profiles.get(post.profile_id);
+      const existingPost = post as Post & {
+        restriction_ids?: number[] | null;
+        cuisine_ids?: number[] | null;
+      };
       return {
         ...post,
+        restrictionIds: restrictionIdsByPost.get(post.id) ?? existingPost.restriction_ids ?? post.restrictionIds ?? [],
+        cuisineIds: cuisineIdsByPost.get(post.id) ?? existingPost.cuisine_ids ?? post.cuisineIds ?? [],
         image_url: await resolvePostImageUrl(post.image_url),
         author_username: profile?.username || post.author_username,
         author_pfp_url: profile?.pfp_url || null,
       };
     }),
   );
+}
+
+async function fetchPostOptionIds(
+  postIds: string[],
+  kind: "restriction" | "cuisine",
+): Promise<Map<string, number[]>> {
+  const tableCandidates = kind === "restriction"
+    ? ["post_restrictions", "post_dietary_restrictions", "recipe_post_restrictions"]
+    : ["post_cuisines", "post_cuisine", "recipe_post_cuisines"];
+  const columnCandidates = kind === "restriction"
+    ? ["restriction_id", "dietary_restriction_id", "restriction", "id"]
+    : ["cuisine_id", "cuisine", "id"];
+
+  for (const tableName of tableCandidates) {
+    for (const columnName of columnCandidates) {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select(`post_id, ${columnName}`)
+        .in("post_id", postIds);
+
+      if (error) {
+        if (!/does not exist|column .* does not exist|not found/i.test(error.message || "")) {
+          console.warn(`Could not load ${kind} tags from ${tableName}.${columnName}:`, error.message);
+        }
+        continue;
+      }
+
+      const result = new Map<string, number[]>();
+      for (const row of data || []) {
+        const postId = String(row.post_id ?? "");
+        const optionId = Number(row[columnName]);
+        if (!postId || !Number.isFinite(optionId)) continue;
+        const ids = result.get(postId) ?? [];
+        if (!ids.includes(optionId)) ids.push(optionId);
+        result.set(postId, ids);
+      }
+      return result;
+    }
+  }
+
+  return new Map();
 }
 
 export async function fetchPosts(options: { authorId?: string; limit?: number } = {}): Promise<Post[]> {
