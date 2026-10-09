@@ -104,9 +104,7 @@ export default function SettingsScreen() {
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
       <View style={styles.page}>
         <ScreenHeader
-          eyebrow="Your account"
           title="Settings"
-          subtitle="Keep your profile and BetterBite preferences up to date."
           action={<Pressable onPress={() => router.back()} accessibilityRole="button"><Text style={styles.back}>Back</Text></Pressable>}
         />
 
@@ -154,7 +152,7 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingBottom: 40 },
+  content: { paddingTop: 4, paddingBottom: 90 },
   page: { width: "100%", maxWidth: 1080, alignSelf: "center" },
   back: { marginTop: 8, color: colors.sage, fontSize: 12, fontWeight: "800" },
   section: { marginHorizontal: 16, marginBottom: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", overflow: "hidden" },

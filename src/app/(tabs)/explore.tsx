@@ -268,7 +268,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     <ScrollView
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ paddingBottom: 32 }}
+      contentContainerStyle={{ paddingTop: 4, paddingBottom: 90 }}
       refreshControl={Platform.OS === "web" ? undefined : (
         <RefreshControl
           refreshing={refreshing}
@@ -281,7 +281,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
         />
       )}
     >
-      <ScreenHeader eyebrow="The community table" title="Explore" subtitle="Real recipes from your BetterBite community." />
+      <ScreenHeader title="Explore" />
 
       <View style={styles.searchRow}>
         <View style={[styles.search, shadowSm, searchFocused && styles.searchFocused]}>

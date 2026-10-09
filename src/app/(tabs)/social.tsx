@@ -260,7 +260,7 @@ export default function SocialScreen() {
 	return (
 		<ScrollView
 			showsVerticalScrollIndicator={false}
-			contentContainerStyle={styles.content}
+			contentContainerStyle={{ ...styles.content, paddingTop: 4, paddingBottom: 90 }}
 			keyboardShouldPersistTaps="handled"
 			refreshControl={Platform.OS === "web" ? undefined : (
 				<RefreshControl
@@ -276,7 +276,7 @@ export default function SocialScreen() {
 				/>
 			)}
 		>
-			<ScreenHeader eyebrow="Your crew" title="Social" subtitle="Add friends, manage requests, and check in with your people." />
+			<ScreenHeader title="Social" />
 			{actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
 
 			<View style={[styles.panel, shadowSm]}>

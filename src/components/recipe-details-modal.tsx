@@ -16,6 +16,7 @@ import {
 
 import { colors, fonts, shadowSm } from "@/app/(tabs)/theme";
 import { useAuthContext } from "@/lib/auth/auth-context";
+import { useRecipeOptions } from "@/hooks/use-recipe-options";
 import {
     createCookedPost,
     createPostReview,
@@ -109,6 +110,7 @@ export function RecipeDetailsModal({
   onAuthorPress,
 }: RecipeDetailsModalProps) {
   const { currentUser } = useAuthContext();
+  const { dietaryOptions, cuisineOptions } = useRecipeOptions();
   const [communityTab, setCommunityTab] = useState<CommunityTab>("cooks");
   const [reviews, setReviews] = useState<PostReviewWithAuthor[]>([]);
   const [cookedPhotos, setCookedPhotos] = useState<CookedPhotoWithAuthor[]>([]);
@@ -159,6 +161,12 @@ export function RecipeDetailsModal({
   const recipeData = post.recipe && typeof post.recipe === "object" ? post.recipe : {};
   const ingredients = asTextList(recipeData.ingredients);
   const steps = asTextList(recipeData.steps);
+  const dietaryNames = (post.restrictionIds ?? []).map((id) => dietaryOptions.find((option) => option.id === id)?.name).filter((name): name is string => Boolean(name));
+  const cuisineNames = (post.cuisineIds ?? []).map((id) => cuisineOptions.find((option) => option.id === id)?.name).filter((name): name is string => Boolean(name));
+  const inferredTagNames = [recipeData.tags, recipeData.dietary, recipeData.dietaryRestrictions, recipeData.cuisine, recipeData.cuisines]
+    .flatMap((value) => asTextList(Array.isArray(value) ? value : [value]))
+    .filter((name) => name.trim().length > 0);
+  const displayTags = [...new Set([...dietaryNames, ...cuisineNames, ...inferredTagNames])];
   const authorName = post.author_username || "BetterBite member";
   const hasCooked = Boolean(currentUser && cookedPhotos.some((photo) => photo.profile_id === currentUser.id));
   const cookPhotoCount = cookedPhotos.length;
@@ -337,6 +345,19 @@ export function RecipeDetailsModal({
                   <Text style={styles.authorName}>{views.toLocaleString()} views</Text>
                 </Pressable>
                 {post.description?.trim() ? <Text style={styles.description}>{post.description.trim()}</Text> : null}
+
+                {displayTags.length > 0 ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Tags</Text>
+                    <View style={styles.tagRow}>
+                      {displayTags.map((tag) => (
+                        <View key={tag} style={styles.tagChip}>
+                          <Text style={styles.tagText}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
 
                 {ingredients.length > 0 ? (
                   <View style={styles.detailSection}>
@@ -522,6 +543,9 @@ const styles = StyleSheet.create({
   averageRating: { color: colors.terracotta, fontSize: 11, fontWeight: "700" },
   metaDivider: { color: colors.border, fontSize: 14 },
   description: { marginTop: 16, color: colors.ink, fontSize: 13, lineHeight: 20 },
+  tagRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
+  tagChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.sageLight },
+  tagText: { color: colors.sage, fontSize: 10, fontWeight: "800" },
   detailSection: { marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.divider },
   detailSectionTitle: { marginBottom: 12, color: colors.muted, fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
   listRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 9 },

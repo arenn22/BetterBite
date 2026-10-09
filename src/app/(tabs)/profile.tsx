@@ -258,7 +258,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
     <ScrollView
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{ paddingTop: 4, paddingBottom: 90 }}
       refreshControl={Platform.OS === "web" ? undefined : (
         <RefreshControl
           refreshing={refreshing}
@@ -272,9 +272,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
       )}
     >
       <ScreenHeader
-        eyebrow={isOwner ? "Your account" : "Community profile"}
         title="Profile"
-        subtitle="Your food, friends, and progress."
         action={isOwner ? (
           <Pressable
             onPress={() => router.push("/settings" as Href)}

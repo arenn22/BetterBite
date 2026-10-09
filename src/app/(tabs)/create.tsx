@@ -348,9 +348,9 @@ export default function CreateScreen() {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 128 + (Platform.OS === "web" ? 104 : BottomTabInset) }}
+        contentContainerStyle={{ paddingTop: 4, paddingBottom: 160 + (Platform.OS === "web" ? 104 : BottomTabInset) }}
       >
-        <ScreenHeader eyebrow="Share the table" title="Create a recipe" subtitle="Turn something you love to cook into the next community favorite." />
+        <ScreenHeader title="Create" />
 
         <View style={{ paddingHorizontal: 16 }}>
           {/* PHOTO UPLOAD */}
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
   successCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.sageLight, alignItems: "center", justifyContent: "center", marginBottom: 20 },
   primaryBtn: { backgroundColor: colors.sage, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16 },
 
-  publishWrap: { position: "absolute", left: 0, right: 0, bottom: Platform.OS === "web" ? 104 : BottomTabInset, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 12 },
+  publishWrap: { position: "absolute", left: 0, right: 0, bottom: Platform.OS === "web" ? 104 : BottomTabInset + 12, paddingHorizontal: 16, paddingBottom: Platform.OS === "web" ? 16 : 12 + BottomTabInset, paddingTop: 12 },
   publishBtn: { width: "100%", paddingVertical: 16, borderRadius: 16, alignItems: "center" },
   publishError: { marginBottom: 8, color: "#B42318", fontSize: 12, textAlign: "center" },
 });

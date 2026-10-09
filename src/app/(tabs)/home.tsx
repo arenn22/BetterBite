@@ -38,7 +38,6 @@ function HomeScreen() {
   const { homeFeeds, setHomeFeeds, feedsLoading, likedPostIds, setLikedPostIds, refreshing, refreshHomeFeeds } = useHomeFeeds();
   const [likeLoadingIds, setLikeLoadingIds] = useState<Set<string>>(new Set());
   const { currentUser } = useAuthContext();
-  const username = currentUser?.username?.trim() || currentUser?.email.split("@")[0] || "there";
   const experienceLevel = getExperienceLevelName(currentUser?.experience_level ?? currentUser?.experienceLevel) ?? "Home Cook";
   const streakCount = Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0);
   const loggedDays = getLoggedDays(streakCount, currentUser?.last_streak_post ?? currentUser?.last_post_at);
@@ -97,17 +96,15 @@ function HomeScreen() {
     <>
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 24 }}
+      contentContainerStyle={{ paddingTop: 4, paddingBottom: 80 }}
       refreshControl={Platform.OS === "web" ? undefined : (
         <RefreshControl refreshing={refreshing} onRefresh={refreshHomeFeeds} tintColor={colors.sage} colors={[colors.sage]} />
       )}
     >
       <ScreenHeader
-        eyebrow="Good morning"
-        title={`Hey, ${username}.`}
-        subtitle="A little progress tastes good."
+        title="Home"
         action={(
-          <View style={{ marginLeft: 12, alignItems: "center" }}>
+          <View style={styles.profileAction}>
             <View style={styles.avatar}>
               <Image source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} />
             </View>
@@ -184,9 +181,10 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 12, fontWeight: "600", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
   h1: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },
   subtitle: { fontSize: 14, fontWeight: "500", color: colors.muted, marginTop: 4 },
-  avatar: { width: 64, height: 64, borderRadius: 32, overflow: "hidden", borderWidth: 2, borderColor: colors.clay, backgroundColor: colors.sageLight },
-  avatarBadge: { maxWidth: 136, marginTop: 6, backgroundColor: colors.sage, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999 },
-  avatarBadgeText: { color: "#fff", fontSize: 8, fontWeight: "800", textAlign: "center" },
+  profileAction: { position: "relative", width: 54, height: 54, alignItems: "center", justifyContent: "center" },
+  avatar: { width: 48, height: 48, borderRadius: 16, overflow: "hidden", backgroundColor: colors.sageLight },
+  avatarBadge: { position: "absolute", right: -2, bottom: -2, maxWidth: 88, backgroundColor: "rgba(138, 158, 122, 0.16)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.9)" },
+  avatarBadgeText: { color: colors.ink, fontSize: 8, fontWeight: "800", textAlign: "center" },
   // Streak
   streakCard: { marginHorizontal: 16, marginBottom: 16, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16 },
   streakContent: { flexDirection: Platform.OS === "web" ? "row" : "column", alignItems: Platform.OS === "web" ? "center" : "stretch", gap: 12 },
