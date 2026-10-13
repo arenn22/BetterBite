@@ -186,13 +186,13 @@ const styles = StyleSheet.create({
   avatarBadge: { position: "absolute", right: -2, bottom: -2, maxWidth: 88, backgroundColor: "rgba(138, 158, 122, 0.16)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.9)" },
   avatarBadgeText: { color: colors.ink, fontSize: 8, fontWeight: "800", textAlign: "center" },
   // Streak
-  streakCard: { marginHorizontal: 16, marginBottom: 16, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16 },
-  streakContent: { flexDirection: Platform.OS === "web" ? "row" : "column", alignItems: Platform.OS === "web" ? "center" : "stretch", gap: 12 },
-  streakTitle: { fontFamily: fonts.heading, fontSize: Platform.OS === "web" ? 30 : 24, color: colors.ink },
-  streakDays: { fontFamily: fonts.heading, fontSize: Platform.OS === "web" ? 22 : 18, color: colors.muted },
-  streakSubtitle: { marginTop: 2, display: Platform.OS === "web" ? "none" : "flex" },
-  streakDaysRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flex: Platform.OS === "web" ? 1 : undefined, marginLeft: Platform.OS === "web" ? 24 : 0 },
-  dayDot: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  streakCard: { marginHorizontal: 16, marginBottom: 16, backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 18, paddingVertical: 20 },
+  streakContent: { alignItems: "stretch", gap: 18 },
+  streakTitle: { fontFamily: fonts.heading, fontSize: 26, color: colors.ink },
+  streakDays: { fontFamily: fonts.heading, fontSize: 19, color: colors.muted },
+  streakSubtitle: { marginTop: 3 },
+  streakDaysRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "center", gap: 8 },
+  dayDot: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   dayLabel: { fontSize: 9, fontWeight: "600", color: colors.faint, textTransform: "uppercase" },
 
   // Sections / cards

@@ -305,6 +305,7 @@ export default function CreateScreen() {
   const [published, setPublished] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [optionSearch, setOptionSearch] = useState("");
 
   const doneFlags = [
     photoSrc !== null,
@@ -318,6 +319,9 @@ export default function CreateScreen() {
   const difficulty = difficultyLevel.name;
   const cookingTime = Number(timeMinutes);
   const canPublish = doneFlags.every(Boolean) && Number.isInteger(cookingTime) && cookingTime > 0;
+  const normalizedOptionSearch = optionSearch.trim().toLowerCase();
+  const visibleDietaryOptions = dietaryOptions.filter((option) => option.name.toLowerCase().includes(normalizedOptionSearch));
+  const visibleCuisineOptions = cuisineOptions.filter((option) => option.name.toLowerCase().includes(normalizedOptionSearch));
 
   useEffect(() => {
     if (optionsError) {
@@ -565,10 +569,17 @@ export default function CreateScreen() {
           {/* DIETARY */}
           <View style={{ marginBottom: 20 }}>
             <Text style={[styles.label, { marginBottom: 8 }]}>Dietary</Text>
+            <TextInput
+              value={optionSearch}
+              onChangeText={setOptionSearch}
+              placeholder="Search dietary and cuisine options"
+              placeholderTextColor={colors.ghost}
+              style={[styles.input, { marginBottom: 8 }]}
+            />
             {optionsLoading ? (
               <Text style={styles.optionStatus}>Loading dietary options…</Text>
             ) : dietaryOptions.length ? (
-              <TagChips tags={dietaryOptions} selected={dietary} kind="dietary" onToggle={(id) => setDietary(toggleTag(dietary, id))} />
+              <TagChips tags={visibleDietaryOptions} selected={dietary} kind="dietary" onToggle={(id) => setDietary(toggleTag(dietary, id))} />
             ) : (
               <Text style={styles.optionStatus}>No dietary options available.</Text>
             )}
@@ -580,7 +591,7 @@ export default function CreateScreen() {
             {optionsLoading ? (
               <Text style={styles.optionStatus}>Loading cuisine options…</Text>
             ) : cuisineOptions.length ? (
-              <TagChips tags={cuisineOptions} selected={cuisines} kind="cuisine" onToggle={(id) => setCuisines(toggleTag(cuisines, id))} />
+              <TagChips tags={visibleCuisineOptions} selected={cuisines} kind="cuisine" onToggle={(id) => setCuisines(toggleTag(cuisines, id))} />
             ) : (
               <Text style={styles.optionStatus}>No cuisine options available.</Text>
             )}

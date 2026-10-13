@@ -1,4 +1,4 @@
-import { RecipeCard } from "@/components/recipes/recipe-card";
+import { RecipeCard, RECIPE_CARD_WIDTH } from "@/components/recipes/recipe-card";
 import { RecipeDetailsModal } from "@/components/recipe-details-modal";
 import { ScreenHeader } from "@/components/screen-header";
 import { EXPERIENCE_LEVEL_NAMES } from "@/constants/experience-levels";
@@ -97,6 +97,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
   const [selectedTimeFilter, setSelectedTimeFilter] = useState("all");
   const [friendsOnly, setFriendsOnly] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [filterSearchValue, setFilterSearchValue] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardData | null>(null);
@@ -132,6 +133,10 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     label: option.name,
     icon: FILTER_EMOJIS[normalizeFilterTag(option.name)] ?? "🥗",
   })), [dietaryOptions]);
+  const normalizedFilterSearch = filterSearchValue.trim().toLowerCase();
+  const visibleCuisineFilters = cuisineFilters.filter((filter) => !normalizedFilterSearch || filter.label.toLowerCase().includes(normalizedFilterSearch));
+  const visibleDietaryFilters = dietaryFilters.filter((filter) => !normalizedFilterSearch || filter.label.toLowerCase().includes(normalizedFilterSearch));
+  const visibleDifficultyFilters = DIFFICULTY_FILTERS.filter((filter) => !normalizedFilterSearch || filter.label.toLowerCase().includes(normalizedFilterSearch));
 
   const hasActiveFilters = selectedCuisineFilters.size > 0
     || selectedDietaryFilters.size > 0
@@ -156,9 +161,8 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
     setFriendsOnly(false);
   };
 
-  const layoutWidth = Platform.OS === "web" ? Math.min(width, 430) : width;
+  const layoutWidth = width;
   const fullWidth = layoutWidth - GRID_PADDING * 2;
-  const halfWidth = (fullWidth - GRID_GAP) / 2;
 
   const maximumTime = TIME_FILTERS.find((filter) => filter.id === selectedTimeFilter)?.maxMinutes;
 
@@ -356,14 +360,14 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
             </Text>
           </View>
         ) : (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", columnGap: GRID_GAP, rowGap: GRID_GAP, width: fullWidth }}>
             {filtered.map((recipe) => {
               const authorId = recipe.post?.profile_id;
               return (
                 <RecipeCard
                   key={recipe.id}
                   recipe={recipe}
-                  width={halfWidth}
+                  width={RECIPE_CARD_WIDTH}
                   onPress={() => handleOpenRecipe(recipe)}
                   onAuthorPress={authorId ? () => router.push(`/profile/${authorId}`) : undefined}
                 />
@@ -395,6 +399,20 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
                 <Text style={styles.closeText}>×</Text>
               </Pressable>
             </View>
+            <View style={styles.filterSearch}>
+              <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={colors.muted} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                <Circle cx={11} cy={11} r={8} />
+                <Path d="m21 21-4.35-4.35" />
+              </Svg>
+              <TextInput
+                value={filterSearchValue}
+                onChangeText={setFilterSearchValue}
+                placeholder="Search filter options"
+                placeholderTextColor={colors.faint}
+                style={styles.filterSearchInput}
+              />
+              {!!filterSearchValue && <Pressable onPress={() => setFilterSearchValue("")} hitSlop={8}><Text style={styles.filterSearchClear}>✕</Text></Pressable>}
+            </View>
             {filtersLoading ? (
               <ActivityIndicator color={colors.sage} style={styles.filterLoading} />
             ) : (
@@ -416,7 +434,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
                 <View style={styles.filterGroup}>
                   <Text style={styles.filterGroupTitle}>Cuisine</Text>
                   <View style={styles.filterChipRow}>
-                    {cuisineFilters.map((filter) => (
+                    {visibleCuisineFilters.map((filter) => (
                       <FilterChip
                         key={filter.id}
                         icon={filter.icon}
@@ -430,7 +448,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
                 <View style={styles.filterGroup}>
                   <Text style={styles.filterGroupTitle}>Dietary</Text>
                   <View style={styles.filterChipRow}>
-                    {dietaryFilters.map((filter) => (
+                    {visibleDietaryFilters.map((filter) => (
                       <FilterChip
                         key={filter.id}
                         icon={filter.icon}
@@ -444,7 +462,7 @@ export default function ExploreScreen({ onOpenRecipe }: { onOpenRecipe?: (id: st
                 <View style={styles.filterGroup}>
                   <Text style={styles.filterGroupTitle}>Difficulty</Text>
                   <View style={styles.filterChipRow}>
-                    {DIFFICULTY_FILTERS.map((filter) => (
+                    {visibleDifficultyFilters.map((filter) => (
                       <FilterChip
                         key={filter.id}
                         icon={filter.icon}
@@ -491,6 +509,9 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, fontWeight: "500", color: colors.ink, padding: 0 },
   filterButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   filterButtonActive: { backgroundColor: colors.sage, borderColor: colors.sage },
+  filterSearch: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginTop: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
+  filterSearchInput: { flex: 1, padding: 0, color: colors.ink, fontSize: 13 },
+  filterSearchClear: { color: colors.faint, fontSize: 12 },
   filterModalRoot: { flex: 1, justifyContent: "flex-start", paddingTop: 150, paddingHorizontal: 16, backgroundColor: "rgba(48,49,46,0.3)" },
   filterMenu: { width: "100%", maxHeight: "70%", borderRadius: 16, backgroundColor: "#fff", overflow: "hidden" },
   filterMenuHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.divider },

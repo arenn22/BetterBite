@@ -3,6 +3,8 @@ import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native
 import { colors, shadowSm } from "@/app/(tabs)/theme";
 import { DIFFICULTY_COLORS, formatCount, type RecipeCardData } from "@/lib/recipes";
 
+export const RECIPE_CARD_WIDTH = Platform.OS === "web" ? 196 : 176;
+
 export function RecipeCard({
   recipe,
   onPress,
@@ -73,12 +75,12 @@ const styles = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
   card: { position: "relative", borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
   cardPressable: { width: "100%" },
-  horizontalCard: { width: Platform.OS === "web" ? 196 : 176 },
-  imageWrap: { height: Platform.OS === "web" ? 124 : 112, backgroundColor: colors.sageLight, overflow: "hidden" },
-  compactImage: { height: Platform.OS === "web" ? 124 : 112 },
+  horizontalCard: { width: RECIPE_CARD_WIDTH },
+  imageWrap: { aspectRatio: 1, backgroundColor: colors.sageLight, overflow: "hidden" },
+  compactImage: { aspectRatio: 1 },
   imageFallback: { alignItems: "center", justifyContent: "center" },
   fallbackText: { fontSize: 10, fontWeight: "500", color: colors.muted },
-  authorTag: { position: "absolute", top: 82, left: 8, backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  authorTag: { position: "absolute", top: Platform.OS === "web" ? 154 : 134, left: 8, backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   authorTagText: { fontSize: 10, fontWeight: "600", color: colors.ink },
   body: { padding: 10 },
   title: { fontSize: 12, fontWeight: "700", color: colors.ink, lineHeight: 16, marginBottom: 6 },
