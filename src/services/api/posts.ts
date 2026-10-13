@@ -73,7 +73,7 @@ async function hydratePosts(posts: Post[]): Promise<Post[]> {
         cuisineIds: cuisineIdsByPost.get(post.id) ?? existingPost.cuisine_ids ?? post.cuisineIds ?? [],
         image_url: await resolvePostImageUrl(post.image_url),
         author_username: profile?.username || post.author_username,
-        author_pfp_url: profile?.pfp_url || null,
+        author_pfp_url: await resolveProfileImageUrl(profile?.pfp_url),
       };
     }),
   );
@@ -202,6 +202,27 @@ export async function resolvePostImageUrl(
   }
 
   return trimmed;
+}
+
+const SIGNED_URL_TTL_MS = 50 * 60 * 1000;
+const profileImageCache = new Map<string, { url: string; expiresAt: number }>();
+
+/**
+ * Profile photos live in the private `post-images` bucket but were saved as
+ * public URLs, which the bucket rejects. Re-sign them (cached for 50 minutes so
+ * long lists don't re-sign the same photo). External URLs pass through.
+ */
+export async function resolveProfileImageUrl(value: string | null | undefined): Promise<string | null> {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const cached = profileImageCache.get(trimmed);
+  if (cached && cached.expiresAt > Date.now()) return cached.url;
+
+  const url = await resolvePostImageUrl(trimmed, "post-images");
+  if (!url) return null;
+  profileImageCache.set(trimmed, { url, expiresAt: Date.now() + SIGNED_URL_TTL_MS });
+  return url;
 }
 
 export function getPostImagePath(imageValue: string, bucketName = "post-images") {

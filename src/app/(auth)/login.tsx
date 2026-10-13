@@ -43,6 +43,7 @@ export default function Login() {
 
 					<View style={styles.form}>
 						<AuthInput
+							icon="profile"
 							placeholder="Email or Username"
 							value={identifierInput}
 							onChangeText={setIdentifierInput}
@@ -51,6 +52,7 @@ export default function Login() {
 						/>
 
 						<AuthInput
+							icon="lock"
 							placeholder="Password"
 							secureTextEntry
 							value={passwordInput}
@@ -70,6 +72,7 @@ export default function Login() {
 								title={loading ? "Logging In..." : "Log In"}
 								onPress={onLogin}
 								disabled={loading}
+								loading={loading}
 							/>
 						</View>
 

@@ -1,6 +1,7 @@
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 import type { AuthResult, Profile } from "../../types/auth";
+import { resolveProfileImageUrl } from "./posts";
 import { DEFAULT_PROFILE_IMAGE } from "./profiles";
 
 export async function signOut(): Promise<void> {
@@ -89,7 +90,7 @@ export async function handleSignInEmail(
       username: profileData?.username || data.user.user_metadata?.username || "",
       email: data.user.email || email,
       date_joined: date,
-      pfp_url: profileData?.pfp_url || DEFAULT_PROFILE_IMAGE,
+      pfp_url: (await resolveProfileImageUrl(profileData?.pfp_url)) || DEFAULT_PROFILE_IMAGE,
       experience_level: (profileData as any)?.experience_level ?? (profileData as any)?.experienceLevel ?? null,
       experienceLevel: (profileData as any)?.experience_level ?? (profileData as any)?.experienceLevel ?? null,
       streakCount: streakValue,

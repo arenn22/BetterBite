@@ -1,6 +1,7 @@
 import { supabase } from "../../lib/supabase";
 import type { SearchUserResult } from "../../types/auth";
 import type { LeaderboardEntry, PendingFriendRequest } from "../../types/models";
+import { resolveProfileImageUrl } from "./posts";
 
 export async function searchUsers(searchQuery: string): Promise<SearchUserResult[]> {
   const { data, error } = await supabase
@@ -13,7 +14,10 @@ export async function searchUsers(searchQuery: string): Promise<SearchUserResult
     return [];
   }
 
-  return (data || []) as SearchUserResult[];
+  return Promise.all(((data || []) as SearchUserResult[]).map(async (user) => ({
+    ...user,
+    pfp_url: await resolveProfileImageUrl(user.pfp_url),
+  })));
 }
 
 export async function sendFriendRequest(receiverId: string): Promise<void> {
@@ -55,7 +59,11 @@ export async function fetchFriends() {
     return [];
   }
   else {
-    return data || [];
+    return Promise.all(((data || []) as Record<string, unknown>[]).map(async (friend) => ({
+      ...friend,
+      pfp_url: await resolveProfileImageUrl(typeof friend.pfp_url === "string" ? friend.pfp_url : null),
+      friend_pfp_url: await resolveProfileImageUrl(typeof friend.friend_pfp_url === "string" ? friend.friend_pfp_url : null),
+    })));
   }
 }
 
@@ -123,12 +131,12 @@ async function fetchLeaderboard(
     throw new Error(`${rpcName} returned an invalid leaderboard response.`);
   }
 
-  return data.map((entry: unknown, index) => {
+  return Promise.all(data.map(async (entry: unknown, index) => {
     if (!isLeaderboardEntry(entry)) {
       throw new Error(`${rpcName} returned an invalid leaderboard row at index ${index}.`);
     }
-    return entry;
-  });
+    return { ...entry, pfp_url: await resolveProfileImageUrl(entry.pfp_url) };
+  }));
 }
 
 export async function getStreakLeaderboardFromEveryone(

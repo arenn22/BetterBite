@@ -7,40 +7,38 @@ import { useAuthContext } from "@/lib/auth/auth-context";
 import { updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
 import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
-import { router } from "expo-router";
-import { useState } from "react";
+import { getActiveStreak, getStreakWeekDays, getTodayWeekIndex } from "@/lib/streak";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { colors, fonts, shadowSm } from "./theme";
+import Animated, { ZoomIn } from "react-native-reanimated";
+import { FadeIn } from "@/components/ui/fade-in";
+import { AppIcon } from "@/components/ui/icon";
+import { IconBadge } from "@/components/ui/icon-badge";
+import { colors, fonts, layout, radii, shadowSm } from "./theme";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
-
-function getLoggedDays(streakCount: number, lastStreakPost?: Date | string | null) {
-  const dateOnlyMatch = typeof lastStreakPost === "string"
-    ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(lastStreakPost)
-    : null;
-  const lastPost = dateOnlyMatch
-    ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
-    : lastStreakPost ? new Date(lastStreakPost) : null;
-
-  if (!lastPost || Number.isNaN(lastPost.getTime()) || !Number.isFinite(streakCount) || streakCount <= 0) {
-    return DAYS.map(() => false);
-  }
-
-  const lastPostWeekday = (lastPost.getDay() + 6) % 7;
-  return DAYS.map((_, index) => {
-    const daysBeforeLastPost = (lastPostWeekday - index + DAYS.length) % DAYS.length;
-    return daysBeforeLastPost >= 0 && daysBeforeLastPost < streakCount;
-  });
-}
 
 function HomeScreen() {
   const [openRecipe, setOpenRecipe] = useState<RecipeCardData | null>(null);
   const { homeFeeds, setHomeFeeds, feedsLoading, likedPostIds, setLikedPostIds, refreshing, refreshHomeFeeds } = useHomeFeeds();
   const [likeLoadingIds, setLikeLoadingIds] = useState<Set<string>>(new Set());
-  const { currentUser } = useAuthContext();
+  const { currentUser, refreshCurrentUser } = useAuthContext();
   const experienceLevel = getExperienceLevelName(currentUser?.experience_level ?? currentUser?.experienceLevel) ?? "Home Cook";
-  const streakCount = Number(currentUser?.streakCount ?? currentUser?.streakcount ?? 0);
-  const loggedDays = getLoggedDays(streakCount, currentUser?.last_streak_post ?? currentUser?.last_post_at);
+  const lastStreakPost = currentUser?.last_streak_post ?? currentUser?.last_post_at;
+  const streakCount = getActiveStreak(currentUser?.streakCount ?? currentUser?.streakcount, lastStreakPost);
+  const loggedDays = getStreakWeekDays(currentUser?.streakCount ?? currentUser?.streakcount, lastStreakPost);
+  const todayIndex = getTodayWeekIndex();
+  const postedToday = loggedDays[todayIndex];
+
+  // Pull the latest streak from the server whenever Home comes back into view
+  // (e.g. after publishing a recipe or sharing a cook).
+  useFocusEffect(
+    useCallback(() => {
+      void refreshCurrentUser().catch((error) => console.error("Unable to refresh streak:", error));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser?.id]),
+  );
 
   const handleOpenRecipe = (recipe: RecipeCardData) => {
     setOpenRecipe(recipe);
@@ -92,13 +90,18 @@ function HomeScreen() {
     }
   };
 
+  const openAuthor = (recipe: RecipeCardData) => {
+    if (recipe.post?.profile_id) router.push(`/profile/${recipe.post.profile_id}`);
+  };
+  const openRecipeAuthorId = openRecipe?.post?.profile_id;
+
   return (
     <>
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingTop: 4, paddingBottom: 80 }}
       refreshControl={Platform.OS === "web" ? undefined : (
-        <RefreshControl refreshing={refreshing} onRefresh={refreshHomeFeeds} tintColor={colors.sage} colors={[colors.sage]} />
+        <RefreshControl refreshing={refreshing} onRefresh={() => { refreshHomeFeeds(); void refreshCurrentUser().catch(() => {}); }} tintColor={colors.sage} colors={[colors.sage]} />
       )}
     >
       <ScreenHeader
@@ -116,40 +119,47 @@ function HomeScreen() {
       />
 
       {/* STREAK CARD */}
-      <View style={[styles.streakCard, shadowSm]}>
+      <FadeIn delay={80} style={[styles.streakCard, shadowSm]}>
         <View style={styles.streakContent}>
-          <View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Text style={{ fontSize: 20 }}>🔥</Text>
+          <View style={styles.streakHeader}>
+            <IconBadge name="flame" size={44} color={colors.flame} backgroundColor={colors.terraBg} />
+            <View style={styles.streakCopy}>
               <Text style={styles.streakTitle}>{streakCount} <Text style={styles.streakDays}>day streak</Text></Text>
+              <Text style={styles.streakSubtitle}>
+                {postedToday
+                  ? "You've cooked today. Nice work!"
+                  : streakCount > 0
+                    ? "Share a recipe today to keep it going."
+                    : "Share a recipe to start a new streak."}
+              </Text>
             </View>
-            <Text style={[styles.sectionSub, styles.streakSubtitle]}>Keep your cooking rhythm going.</Text>
           </View>
           <View style={styles.streakDaysRow}>
           {DAYS.map((day, i) => {
             const active = loggedDays[i];
+            const isToday = i === todayIndex;
             return (
-              <View key={i} style={{ alignItems: "center", gap: 4 }}>
-                <View style={[styles.dayDot, { backgroundColor: active ? colors.terracotta : colors.divider }]}>
-                  {active ? (
-                    <Text style={{ fontSize: 14 }}>🔥</Text>
-                  ) : (
-                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.ghost }}>{day}</Text>
-                  )}
-                </View>
-                <Text style={styles.dayLabel}>{day}</Text>
+              <View key={i} style={styles.dayColumn}>
+                {active ? (
+                  <Animated.View entering={ZoomIn.delay(120 + i * 40).duration(220)} style={[styles.dayDot, styles.dayDotActive]}>
+                    <AppIcon name="flame" size={16} color="#FFFFFF" weight="semibold" />
+                  </Animated.View>
+                ) : (
+                  <View style={[styles.dayDot, isToday && styles.dayDotToday, i > todayIndex && styles.dayDotFuture]} />
+                )}
+                <Text style={[styles.dayLabel, active && styles.dayLabelActive, isToday && styles.dayLabelToday]}>{day}</Text>
               </View>
             );
           })}
           </View>
         </View>
-      </View>
+      </FadeIn>
 
       {/* RECIPE SECTIONS */}
-      <RecipeSection icon="🔥" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={homeFeeds.recommended} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={(recipe) => recipe.post?.profile_id && router.push(`/profile/${recipe.post.profile_id}`)} />
-      <RecipeSection icon="⚡" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={homeFeeds.easyWins} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={(recipe) => recipe.post?.profile_id && router.push(`/profile/${recipe.post.profile_id}`)} />
-      <RecipeSection icon="🏆" title="Challenge yourself" subtitle="Push your skills further" recipes={homeFeeds.challenge} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={(recipe) => recipe.post?.profile_id && router.push(`/profile/${recipe.post.profile_id}`)} />
-      <RecipeSection icon="👥" title="From your friends" subtitle="What the community cooked this week" recipes={homeFeeds.friends} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={(recipe) => recipe.post?.profile_id && router.push(`/profile/${recipe.post.profile_id}`)} />
+      <RecipeSection icon="sparkles" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={homeFeeds.recommended} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
+      <RecipeSection icon="bolt" iconColor={colors.gold} iconBackground="#F8EED6" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={homeFeeds.easyWins} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
+      <RecipeSection icon="trophy" iconColor={colors.terracotta} iconBackground={colors.terraBg} title="Challenge yourself" subtitle="Push your skills further" recipes={homeFeeds.challenge} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
+      <RecipeSection icon="social" iconColor="#4A7A99" iconBackground="#E3EEF4" title="From your friends" subtitle="What the community cooked this week" recipes={homeFeeds.friends} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
     </ScrollView>
     <RecipeDetailsModal
       post={openRecipe?.post ?? null}
@@ -162,7 +172,7 @@ function HomeScreen() {
       likeLoading={openRecipe ? likeLoadingIds.has(openRecipe.id) : false}
       onClose={() => setOpenRecipe(null)}
       onLike={(currentlyLiked) => openRecipe ? handleLikePost(openRecipe.id, currentlyLiked) : Promise.resolve()}
-      onAuthorPress={openRecipe?.post?.profile_id ? () => router.push(`/profile/${openRecipe.post.profile_id}`) : undefined}
+      onAuthorPress={openRecipeAuthorId ? () => router.push(`/profile/${openRecipeAuthorId}`) : undefined}
     />
     </>
   );
@@ -174,43 +184,26 @@ export default function HomeScreenRoute() {
 
 const styles = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
-  rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-
-  // Home header
-  homeHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingTop: 16, paddingBottom: 16, paddingHorizontal: 16 },
-  eyebrow: { fontSize: 12, fontWeight: "600", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
-  h1: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },
-  subtitle: { fontSize: 14, fontWeight: "500", color: colors.muted, marginTop: 4 },
   profileAction: { position: "relative", width: 54, height: 54, alignItems: "center", justifyContent: "center" },
-  avatar: { width: 48, height: 48, borderRadius: 16, overflow: "hidden", backgroundColor: colors.sageLight },
-  avatarBadge: { position: "absolute", right: -2, bottom: -2, maxWidth: 88, backgroundColor: "rgba(138, 158, 122, 0.16)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.9)" },
-  avatarBadgeText: { color: colors.ink, fontSize: 8, fontWeight: "800", textAlign: "center" },
+  avatar: { width: 48, height: 48, borderRadius: 16, overflow: "hidden", backgroundColor: colors.sageLight, borderWidth: 2, borderColor: colors.card },
+  avatarBadge: { position: "absolute", right: -2, bottom: -2, maxWidth: 88, backgroundColor: colors.sageLight, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.card },
+  avatarBadgeText: { color: colors.sage, fontSize: 8, fontWeight: "800", textAlign: "center" },
+
   // Streak
-  streakCard: { marginHorizontal: 16, marginBottom: 16, backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 18, paddingVertical: 20 },
+  streakCard: { marginHorizontal: layout.gutter, marginBottom: layout.sectionGap, backgroundColor: colors.card, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, padding: 18 },
   streakContent: { alignItems: "stretch", gap: 18 },
+  streakHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  streakCopy: { flex: 1 },
   streakTitle: { fontFamily: fonts.heading, fontSize: 26, color: colors.ink },
   streakDays: { fontFamily: fonts.heading, fontSize: 19, color: colors.muted },
-  streakSubtitle: { marginTop: 3 },
-  streakDaysRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "center", gap: 8 },
-  dayDot: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  dayLabel: { fontSize: 9, fontWeight: "600", color: colors.faint, textTransform: "uppercase" },
-
-  // Sections / cards
-  sectionHead: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 16, marginBottom: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: colors.ink },
-  sectionSub: { fontSize: 12, fontWeight: "500", color: colors.muted, marginTop: 2 },
-  recipeCard: { width: 176, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
-  recipeImgWrap: { height: 112, backgroundColor: colors.sageLight, overflow: "hidden" },
-  imageFallback: { alignItems: "center", justifyContent: "center", backgroundColor: colors.sageLight },
-  imageFallbackText: { fontSize: 10, fontWeight: "500", color: colors.muted },
-  friendTag: { position: "absolute", bottom: 8, left: 8, backgroundColor: "rgba(255,255,255,0.9)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  friendTagText: { fontSize: 10, fontWeight: "600", color: colors.ink },
-  recipeTitle: { fontSize: 12, fontWeight: "700", color: colors.ink, lineHeight: 15, marginBottom: 6 },
-  pill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  pillText: { fontSize: 10, fontWeight: "600" },
-  recipeTime: { fontSize: 10, fontWeight: "500", color: colors.muted },
-  recipeStats: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
-  recipeStat: { fontSize: 9, fontWeight: "600", color: colors.muted },
-  emptySection: { paddingHorizontal: 16, paddingVertical: 20, fontSize: 12, fontWeight: "500", color: colors.muted },
-
+  streakSubtitle: { marginTop: 2, fontSize: 12, fontWeight: "500", color: colors.muted },
+  streakDaysRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "center", gap: 4 },
+  dayColumn: { flex: 1, maxWidth: 42, alignItems: "center", gap: 6 },
+  dayDot: { width: "100%", aspectRatio: 1, borderRadius: radii.pill, alignItems: "center", justifyContent: "center", backgroundColor: colors.divider },
+  dayDotActive: { backgroundColor: colors.flame, shadowColor: colors.flame, shadowOpacity: 0.35, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  dayLabel: { fontSize: 10, fontWeight: "700", color: colors.faint, textTransform: "uppercase" },
+  dayLabelActive: { color: colors.flame },
+  dayDotToday: { borderWidth: 2, borderStyle: "dashed", borderColor: colors.clay, backgroundColor: colors.terraBg },
+  dayDotFuture: { opacity: 0.55 },
+  dayLabelToday: { color: colors.ink, fontWeight: "800" },
 });

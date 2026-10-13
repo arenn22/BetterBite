@@ -2,8 +2,16 @@ import { RecipeDetailsModal } from "@/components/recipe-details-modal";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { BotanicalBanner } from "@/components/profile/botanical-banner";
 import { ScreenHeader } from "@/components/screen-header";
+import { SectionLabel } from "@/components/section-label";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FadeIn } from "@/components/ui/fade-in";
+import { AppIcon, type IconName } from "@/components/ui/icon";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { EXPERIENCE_LEVEL_NAMES, getExperienceLevelName } from "@/constants/experience-levels";
 import { useAuthContext } from "@/lib/auth/auth-context";
+import { getActiveStreak } from "@/lib/streak";
 import { toRecipeCardData, updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { getCookedPostsByUser } from "@/services/api/cooked-posts";
 import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
@@ -13,7 +21,7 @@ import type { Profile } from "@/types/auth";
 import { router, type Href } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator, Image, Platform, Pressable,
+  ActivityIndicator, Image, Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -21,11 +29,8 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import Svg, {
-  Circle,
-  Path,
-} from "react-native-svg";
-import { colors, fonts, shadowMd, shadowSm } from "./theme";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { colors, fonts, layout, radii, shadowMd, shadowSm } from "./theme";
 
 type ProfileFriend = { id: string; name: string; initials: string; color: string; streak: number; img?: string };
 
@@ -39,7 +44,7 @@ function normalizeFriend(value: Record<string, unknown>, index: number): Profile
     name,
     initials,
     color: FRIEND_COLORS[index % FRIEND_COLORS.length],
-    streak: Number(value.streakCount ?? value.streakcount ?? value.streak ?? 0) || 0,
+    streak: getActiveStreak(value.streakCount ?? value.streakcount ?? value.streak_count ?? value.streak, (value.last_streak_post ?? value.last_post_at) as string | null | undefined),
     img: typeof value.pfp_url === "string" ? value.pfp_url : typeof value.friend_pfp_url === "string" ? value.friend_pfp_url : undefined,
   };
 }
@@ -49,35 +54,17 @@ function uniqueRecipeCards(recipes: RecipeCardData[]): RecipeCardData[] {
 }
 
 type TabId = "created" | "cooked" | "liked";
-const TABS: { id: TabId; label: string }[] = [
-  { id: "created", label: "Created" },
-  { id: "cooked", label: "Cooked" },
-  { id: "liked", label: "Liked" },
+const TABS: { id: TabId; label: string; icon: IconName }[] = [
+  { id: "created", label: "Created", icon: "edit" },
+  { id: "cooked", label: "Cooked", icon: "pan" },
+  { id: "liked", label: "Liked", icon: "heartFill" },
 ];
 
-// ─── Empty tab state ──────────────────────────────────────────────────────────
-
-function EmptyTabState({ tab }: { tab: TabId }) {
-  const copy: Record<TabId, { emoji: string; heading: string; sub: string }> = {
-    liked: { emoji: "🤍", heading: "No liked recipes yet", sub: "Tap the heart on any recipe to save it here." },
-    cooked: { emoji: "🍳", heading: "Nothing logged yet", sub: "Cook something and log it — it'll appear here." },
-    created: { emoji: "✏️", heading: "No recipes created yet", sub: "When you write your first recipe, it'll live here." },
-  };
-  const { emoji, heading, sub } = copy[tab];
-  return (
-    <View style={{ width: "100%", alignItems: "center", paddingVertical: 48, paddingHorizontal: 24 }}>
-      <View style={{ width: 80, height: 80, marginBottom: 16, alignItems: "center", justifyContent: "center" }}>
-        <Svg width={80} height={80} viewBox="0 0 80 80" style={StyleSheet.absoluteFill}>
-          <Circle cx={40} cy={40} r={32} fill="#F0E8DF" />
-          <Circle cx={40} cy={40} r={22} fill="none" stroke="#D9A28B" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.7} />
-        </Svg>
-        <Text style={{ fontSize: 22 }}>{emoji}</Text>
-      </View>
-      <Text style={{ fontFamily: fonts.headingSemi, fontSize: 16, color: colors.ink, marginBottom: 4 }}>{heading}</Text>
-      <Text style={{ fontSize: 12, fontWeight: "500", color: colors.muted, lineHeight: 19, textAlign: "center" }}>{sub}</Text>
-    </View>
-  );
-}
+const EMPTY_TAB_COPY: Record<TabId, { icon: IconName; heading: string; sub: string }> = {
+  liked: { icon: "heart", heading: "No liked recipes yet", sub: "Tap the heart on any recipe to save it here." },
+  cooked: { icon: "pan", heading: "Nothing logged yet", sub: "Cook something and log it — it'll appear here." },
+  created: { icon: "edit", heading: "No recipes created yet", sub: "When you write your first recipe, it'll live here." },
+};
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
@@ -88,6 +75,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
   const profileId = userId ?? currentUser?.id;
   const openUserProfile = (userId: string) => router.push(`/profile/${userId}` as Href);
   const [activeTab, setActiveTab] = useState<TabId>("created");
+  const [tabRowWidth, setTabRowWidth] = useState(0);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeCardData | null>(null);
   const [viewedProfile, setViewedProfile] = useState<Profile | null>(null);
   const [createdRecipes, setCreatedRecipes] = useState<RecipeCardData[]>([]);
@@ -243,15 +231,26 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
   const nextTier = EXPERIENCE_LEVEL_NAMES[experienceLevel] ?? "Max level";
   const progressToNextLevel = xpPercentageLeft === null ? null : 100 - xpPercentageLeft;
   const tierProgress = (progressToNextLevel ?? 0) / 100;
-  const stats = [
-    { label: "Recipes", value: String(createdRecipes.length) },
-    { label: "Friends", value: isOwner ? String(friends.length) : "--" },
-    { label: "Streak", value: `${Number(profile?.streakCount ?? profile?.streakcount ?? 0)}🔥` },
+  const stats: { label: string; value: string; icon: IconName; color: string }[] = [
+    { label: "Recipes", value: String(createdRecipes.length), icon: "book", color: colors.sage },
+    { label: "Friends", value: isOwner ? String(friends.length) : "--", icon: "social", color: "#4A7A99" },
+    { label: "Streak", value: String(getActiveStreak(profile?.streakCount ?? profile?.streakcount, profile?.last_streak_post ?? profile?.last_post_at)), icon: "flame", color: colors.flame },
   ];
   const selectedAuthorId = selectedRecipe?.post?.profile_id;
+  const activeTabIndex = TABS.findIndex((tab) => tab.id === activeTab);
 
   if (loading && !hasLoadedProfile) return <ActivityIndicator color={colors.sage} style={{ flex: 1, paddingTop: 80 }} />;
-  if (!profile) return <Text style={{ padding: 24, color: colors.terracotta, textAlign: "center" }}>{loadError ?? "This profile could not be found."}</Text>;
+  if (!profile) {
+    return (
+      <EmptyState
+        tone="error"
+        icon="profile"
+        title="Profile not found"
+        message={loadError ?? "This profile could not be found."}
+        action={!isOwner ? <Button title="Go back" icon="back" variant="outline" size="sm" onPress={() => router.back()} /> : undefined}
+      />
+    );
+  }
 
   return (
     <>
@@ -274,34 +273,23 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
       <ScreenHeader
         title="Profile"
         action={isOwner ? (
-          <Pressable
+          <PressableScale
             onPress={() => router.push("/settings" as Href)}
-            style={({ pressed }) => [
-              styles.settingsBtn,
-              pressed && { transform: [{ scale: 0.95 }] },
-            ]}
+            pressScale={0.9}
+            style={[styles.headerButton, shadowSm]}
+            hoverStyle={styles.headerButtonHover}
             accessibilityRole="button"
             accessibilityLabel="Settings"
           >
-            <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={colors.muted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <Circle cx={12} cy={12} r={3} />
-              <Path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2m0 18v-2M2 12h2m18 0h-2" />
-            </Svg>
-          </Pressable>
+            <AppIcon name="settings" size={18} color={colors.muted} />
+          </PressableScale>
         ) : (
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Text style={styles.backBtnText}>‹ Back</Text>
-          </Pressable>
+          <Button title="Back" icon="back" variant="outline" size="sm" onPress={() => router.back()} accessibilityLabel="Go back" />
         )}
       />
 
       {/* PROFILE CARD */}
-      <View style={[styles.profileCard, shadowSm]}>
+      <FadeIn delay={60} style={[styles.profileCard, shadowSm]}>
         {/* Banner */}
         <View style={{ height: 112, overflow: "hidden" }}>
           <BotanicalBanner />
@@ -310,15 +298,12 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
         {/* Avatar overlaps banner */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 16, marginTop: -36 }}>
           <View style={{ marginBottom: 12 }}>
-            <View>
-              {/* ring with gap, replaces CSS outline + outline-offset */}
-              <View style={[styles.avatarRing, shadowMd]}>
-                <View style={styles.avatarInner}>
-                  <Image source={{ uri: profile.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} resizeMode="cover" />
-                </View>
+            {/* ring with gap, replaces CSS outline + outline-offset */}
+            <View style={[styles.avatarRing, shadowMd]}>
+              <View style={styles.avatarInner}>
+                <Image source={{ uri: profile.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} resizeMode="cover" />
               </View>
             </View>
-
           </View>
 
           {/* Name & handle */}
@@ -328,62 +313,56 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
           </View>
 
           {/* Tier badge */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <View style={{ backgroundColor: colors.sageLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
-              <Text style={{ fontSize: 12, fontWeight: "800", color: colors.sage }}>{tier}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <View style={styles.tierBadge}>
+              <AppIcon name="medal" size={13} color={colors.sage} weight="semibold" />
+              <Text style={styles.tierText}>{tier}</Text>
             </View>
-            <Text style={{ fontSize: 10, fontWeight: "500", color: colors.faint }}>→ {nextTier}</Text>
+            <AppIcon name="forward" size={11} color={colors.faint} />
+            <Text style={{ fontSize: 11, fontWeight: "600", color: colors.faint }}>{nextTier}</Text>
           </View>
 
           {/* Progress */}
           <View style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-              <Text style={{ fontSize: 9, fontWeight: "600", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={styles.progressLabel}>
                 Progress to {nextTier}
               </Text>
-              <Text style={{ fontSize: 9, fontWeight: "700", color: colors.sage }}>
+              <Text style={styles.progressValue}>
                 {xpProgressLoading ? "…" : progressToNextLevel === null ? "--" : `${progressToNextLevel.toFixed(2)}%`}
               </Text>
             </View>
-            <View style={{ height: 6, backgroundColor: colors.divider, borderRadius: 999, overflow: "hidden" }}>
-              <View style={{ height: "100%", width: `${tierProgress * 100}%`, backgroundColor: colors.sage, borderRadius: 999 }} />
-            </View>
+            <ProgressBar progress={tierProgress} height={7} />
           </View>
 
           {/* Stats */}
-          <View style={{ borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: 12, flexDirection: "row" }}>
+          <View style={styles.statsRow}>
             {stats.map((stat, i) => (
-              <View
-                key={stat.label}
-                style={{
-                  flex: 1,
-                  alignItems: "center",
-                  borderLeftWidth: i > 0 ? 1 : 0,
-                  borderLeftColor: colors.divider,
-                }}
-              >
-                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.sage }}>{stat.value}</Text>
-                <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>
-                  {stat.label}
-                </Text>
+              <View key={stat.label} style={[styles.statCell, i > 0 && styles.statDivider]}>
+                <View style={styles.statValueRow}>
+                  <AppIcon name={stat.icon} size={15} color={stat.color} weight="semibold" />
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                </View>
+                <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
             ))}
           </View>
         </View>
-      </View>
+      </FadeIn>
 
       {/* YOUR FRIENDS */}
-      {isOwner && friends.length > 0 ? <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <Text style={styles.sectionLabel}>Your friends</Text>
-          <Pressable>
-            <Text style={{ fontSize: 10, fontWeight: "700", color: colors.muted }}>See all →</Text>
-          </Pressable>
+      {isOwner && friends.length > 0 ? <FadeIn delay={120} style={{ paddingHorizontal: layout.gutter, marginBottom: layout.sectionGap }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <SectionLabel icon="social">Your friends</SectionLabel>
+          <PressableScale onPress={() => router.push("/social" as Href)} style={styles.seeAll} hoverStyle={styles.seeAllHover} accessibilityRole="button">
+            <Text style={styles.seeAllText}>See all</Text>
+            <AppIcon name="chevronRight" size={11} color={colors.sage} weight="bold" />
+          </PressableScale>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 4 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingTop: 4, paddingBottom: 4 }}>
           {friends.map((f) => (
-            <View key={f.id} style={{ alignItems: "center", gap: 6 }}>
+            <PressableScale key={f.id} onPress={() => openUserProfile(f.id)} pressScale={0.92} hoverLift={2} style={{ alignItems: "center", gap: 6 }} accessibilityRole="button" accessibilityLabel={`Open ${f.name}'s profile`}>
               <View>
                 <View style={[styles.friendAvatar, { backgroundColor: f.color }]}>
                   {f.img ? (
@@ -394,42 +373,51 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
                 </View>
                 {f.streak > 0 && (
                   <View style={styles.flameBadge}>
-                    <Text style={{ fontSize: 9 }}>🔥</Text>
+                    <AppIcon name="flame" size={11} color={colors.flame} />
                   </View>
                 )}
               </View>
-              <Text numberOfLines={1} style={{ fontSize: 9, fontWeight: "600", color: colors.muted, maxWidth: 44, textAlign: "center" }}>
+              <Text numberOfLines={1} style={{ fontSize: 10, fontWeight: "600", color: colors.muted, maxWidth: 52, textAlign: "center" }}>
                 {f.name}
               </Text>
-            </View>
+            </PressableScale>
           ))}
           {loadError ? <Text style={{ fontSize: 11, color: colors.terracotta }}>{loadError}</Text> : null}
         </ScrollView>
-      </View> : null}
+      </FadeIn> : null}
 
       {/* RECIPE LIBRARY */}
-      <View style={{ paddingHorizontal: 16 }}>
-        <Text style={[styles.sectionLabel, { marginBottom: 12 }]}>{isOwner ? "Your recipe library" : "Recipe library"}</Text>
+      <View style={{ paddingHorizontal: layout.gutter }}>
+        <SectionLabel icon="book">{isOwner ? "Your recipe library" : "Recipe library"}</SectionLabel>
 
         {/* Tabs */}
-        <View style={{ flexDirection: "row", marginBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <View style={styles.tabRow} onLayout={(event) => setTabRowWidth(event.nativeEvent.layout.width)}>
           {TABS.map((tab) => {
             const active = activeTab === tab.id;
             const count = tabRecipes[tab.id].length;
             return (
-              <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={styles.tabBtn}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <PressableScale
+                key={tab.id}
+                onPress={() => setActiveTab(tab.id)}
+                pressScale={0.95}
+                style={styles.tabBtn}
+                hoverStyle={styles.tabBtnHover}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <AppIcon name={tab.icon} size={14} color={active ? colors.sage : colors.faint} />
                   <Text style={{ fontSize: 12, fontWeight: "700", color: active ? colors.ink : colors.faint }}>{tab.label}</Text>
                   {count > 0 && (
-                    <View style={{ backgroundColor: active ? colors.sageLight : colors.divider, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 999 }}>
+                    <View style={{ backgroundColor: active ? colors.sageLight : colors.divider, paddingHorizontal: 5, paddingVertical: 1, borderRadius: radii.pill }}>
                       <Text style={{ fontSize: 9, fontWeight: "800", color: active ? colors.sage : colors.faint }}>{count}</Text>
                     </View>
                   )}
                 </View>
-                {active && <View style={styles.tabUnderline} />}
-              </Pressable>
+              </PressableScale>
             );
           })}
+          {tabRowWidth > 0 ? <TabUnderline index={activeTabIndex} tabWidth={tabRowWidth / TABS.length} /> : null}
         </View>
 
         {/* Grid */}
@@ -437,21 +425,22 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
           {loading ? (
             <ActivityIndicator color={colors.sage} style={{ width: "100%", height: 150 }} />
           ) : recipes.length === 0 ? (
-            <EmptyTabState tab={activeTab} />
+            <EmptyState icon={EMPTY_TAB_COPY[activeTab].icon} title={EMPTY_TAB_COPY[activeTab].heading} message={EMPTY_TAB_COPY[activeTab].sub} />
           ) : (
-            recipes.map((r) => (
-              (() => {
-                const authorId = r.post?.profile_id;
-                return <RecipeCard
-                  key={r.id}
-                  recipe={r}
-                  width={cardWidth}
-                  compact
-                  onPress={() => handleOpenAndTrackRecipe(r)}
-                  onAuthorPress={authorId ? () => openUserProfile(authorId) : undefined}
-                />;
-              })()
-            ))
+            recipes.map((r, index) => {
+              const authorId = r.post?.profile_id;
+              return (
+                <FadeIn key={`${activeTab}-${r.id}`} delay={Math.min(index, 8) * 50}>
+                  <RecipeCard
+                    recipe={r}
+                    width={cardWidth}
+                    compact
+                    onPress={() => handleOpenAndTrackRecipe(r)}
+                    onAuthorPress={authorId ? () => openUserProfile(authorId) : undefined}
+                  />
+                </FadeIn>
+              );
+            })
           )}
         </View>
       </View>
@@ -473,29 +462,59 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
   );
 }
 
+/** Sage underline that slides between the library tabs. */
+function TabUnderline({ index, tabWidth }: { index: number; tabWidth: number }) {
+  const offset = useSharedValue(index * tabWidth);
+
+  useEffect(() => {
+    offset.value = withSpring(index * tabWidth, { damping: 20, stiffness: 240 });
+  }, [index, offset, tabWidth]);
+
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.tabUnderlineTrack, { width: tabWidth }, animatedStyle]}>
+      <View style={styles.tabUnderline} />
+    </Animated.View>
+  );
+}
+
 export default function ProfileScreenRoute() {
   return <ProfileScreenContent />;
 }
 
 const styles = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
-  settingsBtn: { marginTop: 4, width: 32, height: 32, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  backBtn: { marginTop: 4, minHeight: 32, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  backBtnText: { fontSize: 12, fontWeight: "700", color: colors.muted },
+  headerButton: { width: 40, height: 40, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, alignItems: "center", justifyContent: "center" },
+  headerButtonHover: { backgroundColor: colors.bg, borderColor: colors.sageMid },
 
-  profileCard: { marginHorizontal: 16, marginBottom: 20, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
+  profileCard: { marginHorizontal: layout.gutter, marginBottom: layout.sectionGap, backgroundColor: colors.card, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
 
-  avatarRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: colors.clay, backgroundColor: "#fff", padding: 2 },
-  avatarInner: { flex: 1, borderRadius: 999, overflow: "hidden" },
-  name: { fontFamily: fonts.heading, fontSize: 20, color: colors.ink, lineHeight: 24 },
+  avatarRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 3, borderColor: colors.clay, backgroundColor: colors.card, padding: 2 },
+  avatarInner: { flex: 1, borderRadius: radii.pill, overflow: "hidden" },
+  name: { fontFamily: fonts.heading, fontSize: 22, color: colors.ink, lineHeight: 26 },
+  tierBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.sageLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.pill },
+  tierText: { fontSize: 12, fontWeight: "800", color: colors.sage },
+  progressLabel: { fontSize: 10, fontWeight: "700", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5 },
+  progressValue: { fontSize: 10, fontWeight: "800", color: colors.sage },
 
-  sectionLabel: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5 },
+  statsRow: { borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: 14, flexDirection: "row" },
+  statCell: { flex: 1, alignItems: "center" },
+  statDivider: { borderLeftWidth: 1, borderLeftColor: colors.divider },
+  statValueRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  statValue: { fontSize: 20, fontWeight: "800", color: colors.ink },
+  statLabel: { fontSize: 10, fontWeight: "700", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
 
-  friendAvatar: { width: 48, height: 48, borderRadius: 24, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  flameBadge: { position: "absolute", bottom: -4, right: -4, width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.divider, alignItems: "center", justifyContent: "center" },
-  addFriend: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderStyle: "dashed", borderColor: "#D5D5CE", alignItems: "center", justifyContent: "center" },
+  seeAll: { flexDirection: "row", alignItems: "center", gap: 2, marginBottom: 10, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill },
+  seeAllHover: { backgroundColor: colors.sageLight },
+  seeAllText: { fontSize: 11, fontWeight: "700", color: colors.sage },
 
-  tabBtn: { flex: 1, alignItems: "center", paddingBottom: 10, paddingTop: 4 },
-  tabUnderline: { position: "absolute", bottom: 0, left: 16, right: 16, height: 2, backgroundColor: colors.sage, borderRadius: 999 },
+  friendAvatar: { width: 52, height: 52, borderRadius: 26, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.card },
+  flameBadge: { position: "absolute", bottom: -3, right: -3, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.divider, alignItems: "center", justifyContent: "center" },
 
+  tabRow: { flexDirection: "row", marginBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabBtn: { flex: 1, alignItems: "center", paddingBottom: 10, paddingTop: 6, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
+  tabBtnHover: { backgroundColor: colors.sageLight },
+  tabUnderlineTrack: { position: "absolute", left: 0, bottom: -1, height: 2, alignItems: "center" },
+  tabUnderline: { width: "60%", height: 2, backgroundColor: colors.sage, borderRadius: radii.pill },
 });

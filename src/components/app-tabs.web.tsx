@@ -1,16 +1,25 @@
 import { TabList, Tabs, TabSlot, TabTrigger } from "expo-router/ui";
 import { router, usePathname } from "expo-router";
+import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
-import { colors, fonts } from "@/app/(tabs)/theme";
+import { colors, fonts, radii } from "@/app/(tabs)/theme";
+import { AppIcon, type IconName } from "@/components/ui/icon";
+import { PressableScale } from "@/components/ui/pressable-scale";
 
 export default function AppTabs() {
   return (
     <View style={styles.webShell}>
       <View style={styles.sidebar}>
         <View style={styles.brand}>
-          <View style={styles.brandMark}><Text style={styles.brandMarkText}>B</Text></View>
-          <Text style={styles.brandName}>BetterBite</Text>
+          <View style={styles.brandMark}>
+            <AppIcon name="forkKnife" size={18} color="#FFFFFF" weight="semibold" />
+          </View>
+          <View>
+            <Text style={styles.brandName}>BetterBite</Text>
+            <Text style={styles.brandTagline}>Cook smarter</Text>
+          </View>
         </View>
 
         <SidebarNavigation />
@@ -45,54 +54,98 @@ export default function AppTabs() {
   );
 }
 
-const NAV_ITEMS = [
-  { label: "Home", icon: "⌂", path: "/home" },
-  { label: "Explore", icon: "⌕", path: "/explore" },
-  { label: "Create", icon: "＋", path: "/create" },
-  { label: "Social", icon: "♧", path: "/social" },
-  { label: "Profile", icon: "◎", path: "/profile" },
-] as const;
+const NAV_ITEMS: { label: string; icon: IconName; path: "/home" | "/explore" | "/create" | "/social" | "/profile" }[] = [
+  { label: "Home", icon: "home", path: "/home" },
+  { label: "Explore", icon: "explore", path: "/explore" },
+  { label: "Create", icon: "create", path: "/create" },
+  { label: "Social", icon: "social", path: "/social" },
+  { label: "Profile", icon: "profile", path: "/profile" },
+];
+
+const NAV_ITEM_HEIGHT = 46;
+const NAV_ITEM_GAP = 6;
+/** Quick, bounce-free slide for the active-tab highlight. */
+const INDICATOR_TIMING = { duration: 160, easing: Easing.out(Easing.cubic) };
 
 function SidebarNavigation() {
   const pathname = usePathname();
+  const activeIndex = NAV_ITEMS.findIndex((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));
+  const indicatorY = useSharedValue(Math.max(activeIndex, 0) * (NAV_ITEM_HEIGHT + NAV_ITEM_GAP));
+  const indicatorOpacity = useSharedValue(activeIndex >= 0 ? 1 : 0);
+
+  useEffect(() => {
+    if (activeIndex >= 0) {
+      indicatorY.value = withTiming(activeIndex * (NAV_ITEM_HEIGHT + NAV_ITEM_GAP), INDICATOR_TIMING);
+    }
+    indicatorOpacity.value = withTiming(activeIndex >= 0 ? 1 : 0, INDICATOR_TIMING);
+  }, [activeIndex, indicatorOpacity, indicatorY]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    opacity: indicatorOpacity.value,
+    transform: [{ translateY: indicatorY.value }],
+  }));
 
   return (
     <View style={styles.navigation}>
-      <View style={styles.navItems}>
-        {NAV_ITEMS.map((item) => {
-          const isFocused = pathname === item.path;
-          return (
-            <Pressable
+      <View>
+        <Text style={styles.navHeading}>Menu</Text>
+        <View style={styles.navItems}>
+          <Animated.View pointerEvents="none" style={[styles.activeIndicator, indicatorStyle]}>
+            <View style={styles.activeBar} />
+          </Animated.View>
+          {NAV_ITEMS.map((item, index) => (
+            <NavButton
               key={item.path}
+              label={item.label}
+              icon={item.icon}
+              focused={index === activeIndex}
               onPress={() => router.push(item.path)}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              style={({ pressed }) => [
-                styles.tabButton,
-                isFocused && styles.focusedButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={[styles.icon, isFocused && styles.focusedText]}>{item.icon}</Text>
-              <Text style={[styles.label, isFocused && styles.focusedText]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
+            />
+          ))}
+        </View>
       </View>
-      <Pressable
-        onPress={() => router.push("/settings")}
-        accessibilityRole="button"
-        accessibilityLabel="Settings"
-        style={({ pressed }) => [
-          styles.settingsButton,
-          pathname === "/settings" && styles.focusedButton,
-          pressed && styles.pressed,
-        ]}
-      >
-        <Text style={[styles.icon, pathname === "/settings" && styles.focusedText]}>⚙</Text>
-        <Text style={[styles.label, pathname === "/settings" && styles.focusedText]}>Settings</Text>
-      </Pressable>
+      <View style={styles.footer}>
+        <NavButton
+          label="Settings"
+          icon="settings"
+          focused={pathname === "/settings"}
+          highlightFocused
+          onPress={() => router.push("/settings")}
+        />
+      </View>
     </View>
+  );
+}
+
+function NavButton({
+  label,
+  icon,
+  focused,
+  highlightFocused = false,
+  onPress,
+}: {
+  label: string;
+  icon: IconName;
+  focused: boolean;
+  /** Draw the active background directly (for items outside the animated indicator). */
+  highlightFocused?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: focused }}
+      pressScale={0.97}
+      style={[styles.tabButton, highlightFocused && focused && styles.focusedButton]}
+      hoverStyle={focused ? null : styles.hoveredButton}
+    >
+      <View style={styles.iconBox}>
+        <AppIcon name={icon} size={20} color={focused ? colors.sage : colors.muted} weight={focused ? "semibold" : "medium"} />
+      </View>
+      <Text style={[styles.label, focused && styles.focusedText]}>{label}</Text>
+    </PressableScale>
   );
 }
 
@@ -119,35 +172,67 @@ const styles = StyleSheet.create({
   brand: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 10,
-    paddingBottom: 34,
+    gap: 12,
+    paddingHorizontal: 8,
+    paddingBottom: 32,
   },
   brandMark: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.sage,
-  },
-  brandMarkText: {
-    color: "#FFFFFF",
-    fontFamily: fonts.heading,
-    fontSize: 21,
+    shadowColor: colors.sage,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   brandName: {
     color: colors.ink,
     fontFamily: fonts.heading,
     fontSize: 21,
+    lineHeight: 24,
+  },
+  brandTagline: {
+    color: colors.faint,
+    fontSize: 11,
+    fontWeight: "600",
   },
   navigation: {
     flex: 1,
     justifyContent: "space-between",
   },
+  navHeading: {
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.faint,
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+  },
   navItems: {
-    gap: 8,
-    paddingTop: 4,
+    position: "relative",
+    gap: NAV_ITEM_GAP,
+  },
+  activeIndicator: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: NAV_ITEM_HEIGHT,
+    borderRadius: radii.md,
+    backgroundColor: colors.sageLight,
+    justifyContent: "center",
+  },
+  activeBar: {
+    position: "absolute",
+    left: 0,
+    width: 3,
+    height: 20,
+    borderRadius: 2,
+    backgroundColor: colors.sage,
   },
   hiddenTabList: {
     position: "absolute",
@@ -156,17 +241,17 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     pointerEvents: "none",
   },
-  pressed: {
-    opacity: 0.7,
-  },
   tabButton: {
-    minHeight: 46,
+    height: NAV_ITEM_HEIGHT,
     width: "100%",
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: radii.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
+  },
+  hoveredButton: {
+    backgroundColor: colors.bg,
   },
   appFrame: {
     flex: 1,
@@ -179,24 +264,19 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
   },
-  settingsButton: {
-    minHeight: 46,
-    width: "100%",
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    marginTop: 24,
+  footer: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
   },
   focusedButton: {
     backgroundColor: colors.sageLight,
   },
-  icon: {
+  iconBox: {
     width: 22,
-    color: colors.muted,
-    fontSize: 21,
-    textAlign: "center",
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   label: {
     color: colors.muted,

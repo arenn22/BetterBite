@@ -8,14 +8,18 @@ import {
   updateProfilePhoto,
   updateProfileUsername,
 } from "@/services/api/profiles";
-import { colors, fonts, shadowSm } from "@/app/(tabs)/theme";
+import { colors, fonts, layout, radii, shadowSm } from "@/app/(tabs)/theme";
+import { Button } from "@/components/ui/button";
+import { FadeIn } from "@/components/ui/fade-in";
+import { AppIcon, type IconName } from "@/components/ui/icon";
+import { IconBadge } from "@/components/ui/icon-badge";
+import { TagChip } from "@/components/ui/tag-chip";
 import { Href, router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -23,11 +27,24 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, icon, delay = 0, children }: { title: string; icon: IconName; delay?: number; children: ReactNode }) {
   return (
-    <View style={[styles.section, shadowSm]}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+    <FadeIn delay={delay} style={[styles.section, shadowSm]}>
+      <View style={styles.sectionHeader}>
+        <AppIcon name={icon} size={13} color={colors.sage} weight="bold" />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {children}
+    </FadeIn>
+  );
+}
+
+function FieldRow({ icon, children }: { icon: IconName; children: ReactNode }) {
+  return (
+    <View style={styles.fieldRow}>
+      <AppIcon name={icon} size={15} color={colors.muted} />
       {children}
     </View>
   );
@@ -100,52 +117,93 @@ export default function SettingsScreen() {
     setSelectedRestrictions((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   };
 
+  const usernameSaveDisabled = !currentUser || username.trim().length < 4 || username.trim() === currentUser.username || saving === "username";
+  const passwordSaveDisabled = !currentUser || password.length < 6 || saving === "password";
+
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
       <View style={styles.page}>
         <ScreenHeader
           title="Settings"
-          action={<Pressable onPress={() => router.back()} accessibilityRole="button"><Text style={styles.back}>Back</Text></Pressable>}
+          action={<Button title="Back" icon="back" variant="outline" size="sm" onPress={() => router.back()} accessibilityLabel="Go back" />}
         />
 
-        <Section title="Profile">
+        <Section title="Profile" icon="profile" delay={40}>
           <View style={styles.profileRow}>
             {currentUser?.pfp_url ? <Image source={{ uri: currentUser.pfp_url }} style={styles.avatar} /> : <View style={styles.avatarFallback}><Text style={styles.avatarText}>{(username[0] ?? "B").toUpperCase()}</Text></View>}
             <View style={styles.profileCopy}><Text style={styles.profileName}>{username || "BetterBite member"}</Text><Text style={styles.rowValue}>{currentUser?.email || "Email unavailable"}</Text></View>
-            <Pressable onPress={() => void choosePhoto()} disabled={saving === "photo"} style={styles.smallButton}><Text style={styles.smallButtonText}>{saving === "photo" ? "..." : "Change"}</Text></Pressable>
+            <Button title="Change" icon="camera" variant="outline" size="sm" loading={saving === "photo"} onPress={() => void choosePhoto()} />
           </View>
           <Divider />
           <Text style={styles.inputLabel}>Username</Text>
-          <View style={styles.inputRow}><TextInput value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={30} style={styles.input} placeholder="Username" placeholderTextColor={colors.faint} accessibilityLabel="Username" /><Pressable onPress={() => void runSave("username", () => updateProfileUsername(username), "Username updated.")} disabled={!currentUser || username.trim().length < 4 || username.trim() === currentUser.username || saving === "username"}><Text style={[styles.saveText, (!currentUser || username.trim().length < 4 || username.trim() === currentUser.username || saving === "username") && styles.disabledSaveText]}>{saving === "username" ? "Saving..." : "Save"}</Text></Pressable></View>
+          <FieldRow icon="profile">
+            <TextInput value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={30} style={styles.input} placeholder="Username" placeholderTextColor={colors.faint} accessibilityLabel="Username" />
+            <Button title={saving === "username" ? "Saving..." : "Save"} variant="ghost" size="sm" disabled={usernameSaveDisabled} onPress={() => void runSave("username", () => updateProfileUsername(username), "Username updated.")} />
+          </FieldRow>
           {username.trim().length > 0 && username.trim().length < 4 ? <Text style={styles.fieldError}>Username must be at least 4 characters.</Text> : null}
-          <Text style={styles.joined}>Member since {currentUser?.date_joined ? new Date(currentUser.date_joined).toLocaleDateString() : "—"}</Text>
+          <View style={styles.joinedRow}>
+            <AppIcon name="clock" size={12} color={colors.faint} />
+            <Text style={styles.joined}>Member since {currentUser?.date_joined ? new Date(currentUser.date_joined).toLocaleDateString() : "—"}</Text>
+          </View>
         </Section>
 
-        <Section title="Password">
+        <Section title="Password" icon="lock" delay={80}>
           <Text style={styles.helper}>Choose a new password for your BetterBite account.</Text>
-          <View style={styles.inputRow}><TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={styles.input} placeholder="New password" placeholderTextColor={colors.faint} accessibilityLabel="New password" /><Pressable onPress={() => void runSave("password", async () => { await updatePassword(password); setPassword(""); }, "Password updated.")} disabled={!currentUser || password.length < 6 || saving === "password"}><Text style={[styles.saveText, (!currentUser || password.length < 6 || saving === "password") && styles.disabledSaveText]}>{saving === "password" ? "Updating..." : "Update"}</Text></Pressable></View>
+          <FieldRow icon="lock">
+            <TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={styles.input} placeholder="New password" placeholderTextColor={colors.faint} accessibilityLabel="New password" />
+            <Button title={saving === "password" ? "Updating..." : "Update"} variant="ghost" size="sm" disabled={passwordSaveDisabled} onPress={() => void runSave("password", async () => { await updatePassword(password); setPassword(""); }, "Password updated.")} />
+          </FieldRow>
           {password.length > 0 && password.length < 6 ? <Text style={styles.fieldError}>Password must be at least 6 characters.</Text> : null}
+          <View style={{ height: 12 }} />
         </Section>
 
-        <Section title="Dietary restrictions">
+        <Section title="Dietary restrictions" icon="leaf" delay={120}>
           <Text style={styles.helper}>Personalize recipe suggestions with the restrictions that apply to you.</Text>
-          {optionsLoading ? <ActivityIndicator color={colors.sage} style={styles.loader} /> : <View style={styles.chips}>{dietaryOptions.map((option) => { const selected = selectedRestrictions.includes(option.id); return <Pressable key={option.id} onPress={() => toggleRestriction(option.id)} style={[styles.chip, selected && styles.chipSelected]}><Text style={[styles.chipText, selected && styles.chipTextSelected]}>{option.name}</Text></Pressable>; })}</View>}
+          {optionsLoading ? <ActivityIndicator color={colors.sage} style={styles.loader} /> : (
+            <View style={styles.chips}>
+              {dietaryOptions.map((option) => (
+                <TagChip key={option.id} kind="dietary" label={option.name} selected={selectedRestrictions.includes(option.id)} onPress={() => toggleRestriction(option.id)} />
+              ))}
+            </View>
+          )}
           {selectedNames.length > 0 ? <Text style={styles.selectedSummary}>Selected: {selectedNames.join(", ")}</Text> : null}
-          <Pressable onPress={() => void runSave("diet", () => set_my_dietary_restrictions(selectedRestrictions), "Dietary restrictions updated.")} disabled={saving === "diet"} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{saving === "diet" ? "Saving..." : "Save restrictions"}</Text></Pressable>
+          <View style={styles.sectionAction}>
+            <Button title="Save restrictions" icon="check" loading={saving === "diet"} onPress={() => void runSave("diet", () => set_my_dietary_restrictions(selectedRestrictions), "Dietary restrictions updated.")} fullWidth />
+          </View>
         </Section>
 
-        <Section title="Notifications">
-          <View style={styles.settingRow}><View style={styles.rowCopy}><Text style={styles.rowLabel}>Streak reminders</Text><Text style={styles.rowValue}>Get updates about your daily streak.</Text></View><Switch value={notifyStreaks} onValueChange={(value) => { setNotifyStreaks(value); void runSave("notifications", () => updateNotificationPreferences(value, notifyFriends), "Notification preferences updated."); }} trackColor={{ false: colors.border, true: colors.sageLight }} thumbColor={notifyStreaks ? colors.sage : colors.faint} /></View>
+        <Section title="Notifications" icon="bell" delay={160}>
+          <View style={styles.settingRow}>
+            <IconBadge name="flame" size={34} color={colors.flame} backgroundColor={colors.terraBg} />
+            <View style={styles.rowCopy}><Text style={styles.rowLabel}>Streak reminders</Text><Text style={styles.rowValue}>Get updates about your daily streak.</Text></View>
+            <Switch value={notifyStreaks} onValueChange={(value) => { setNotifyStreaks(value); void runSave("notifications", () => updateNotificationPreferences(value, notifyFriends), "Notification preferences updated."); }} trackColor={{ false: colors.border, true: colors.sageMid }} thumbColor={notifyStreaks ? colors.sage : "#fff"} />
+          </View>
           <Divider />
-          <View style={styles.settingRow}><View style={styles.rowCopy}><Text style={styles.rowLabel}>Friend activity</Text><Text style={styles.rowValue}>Know when friends share and cook.</Text></View><Switch value={notifyFriends} onValueChange={(value) => { setNotifyFriends(value); void runSave("notifications", () => updateNotificationPreferences(notifyStreaks, value), "Notification preferences updated."); }} trackColor={{ false: colors.border, true: colors.sageLight }} thumbColor={notifyFriends ? colors.sage : colors.faint} /></View>
+          <View style={styles.settingRow}>
+            <IconBadge name="social" size={34} color="#4A7A99" backgroundColor="#E3EEF4" />
+            <View style={styles.rowCopy}><Text style={styles.rowLabel}>Friend activity</Text><Text style={styles.rowValue}>Know when friends share and cook.</Text></View>
+            <Switch value={notifyFriends} onValueChange={(value) => { setNotifyFriends(value); void runSave("notifications", () => updateNotificationPreferences(notifyStreaks, value), "Notification preferences updated."); }} trackColor={{ false: colors.border, true: colors.sageMid }} thumbColor={notifyFriends ? colors.sage : "#fff"} />
+          </View>
         </Section>
 
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Section title="Session">
-          <Pressable onPress={() => void runSave("signout", async () => { await signOut(); router.replace("/login" as Href); }, "Signed out.")} disabled={saving === "signout"} style={styles.outlineButton}><Text style={styles.signOutText}>{saving === "signout" ? "Signing out..." : "Sign out"}</Text></Pressable>
+        {message ? (
+          <Animated.View entering={FadeInDown.duration(220)} style={[styles.banner, styles.successBanner]}>
+            <AppIcon name="checkCircle" size={15} color={colors.sage} />
+            <Text style={styles.message}>{message}</Text>
+          </Animated.View>
+        ) : null}
+        {error ? (
+          <Animated.View entering={FadeInDown.duration(220)} style={[styles.banner, styles.errorBanner]}>
+            <AppIcon name="close" size={13} color={colors.danger} weight="bold" />
+            <Text style={styles.error}>{error}</Text>
+          </Animated.View>
+        ) : null}
+        <Section title="Session" icon="logout" delay={200}>
+          <View style={styles.sectionAction}>
+            <Button title={saving === "signout" ? "Signing out..." : "Sign out"} icon="logout" variant="danger" size="lg" loading={saving === "signout"} onPress={() => void runSave("signout", async () => { await signOut(); router.replace("/login" as Href); }, "Signed out.")} fullWidth />
+          </View>
         </Section>
-        <Pressable style={styles.deleteButton} accessibilityRole="button" accessibilityLabel="Delete account"><Text style={styles.deleteText}>Delete account</Text></Pressable>
+        <Button title="Delete account" icon="trash" variant="danger" style={styles.deleteButton} accessibilityLabel="Delete account" />
       </View>
     </ScrollView>
   );
@@ -154,43 +212,35 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   content: { paddingTop: 4, paddingBottom: 90 },
   page: { width: "100%", maxWidth: 1080, alignSelf: "center" },
-  back: { marginTop: 8, color: colors.sage, fontSize: 12, fontWeight: "800" },
-  section: { marginHorizontal: 16, marginBottom: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", overflow: "hidden" },
-  sectionTitle: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5 },
+  section: { marginHorizontal: layout.gutter, marginBottom: 16, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, overflow: "hidden" },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  sectionTitle: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5 },
+  sectionAction: { padding: 16, paddingTop: 4 },
   profileRow: { flexDirection: "row", alignItems: "center", padding: 16, paddingTop: 8 },
   profileCopy: { flex: 1, marginHorizontal: 12 },
   profileName: { fontFamily: fonts.heading, fontSize: 20, color: colors.ink },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.sageLight },
+  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.sageLight, borderWidth: 2, borderColor: colors.clay },
   avatarFallback: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: colors.sageLight },
   avatarText: { fontSize: 20, fontWeight: "800", color: colors.sage },
-  smallButton: { borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8 },
-  smallButtonText: { color: colors.sage, fontSize: 12, fontWeight: "800" },
   divider: { height: 1, marginHorizontal: 16, backgroundColor: colors.divider },
-  inputLabel: { marginHorizontal: 16, marginTop: 14, fontSize: 11, fontWeight: "800", color: colors.muted },
-  inputRow: { minHeight: 50, flexDirection: "row", alignItems: "center", marginHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+  inputLabel: { marginHorizontal: 16, marginTop: 14, marginBottom: 6, fontSize: 11, fontWeight: "800", color: colors.muted },
+  fieldRow: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, paddingLeft: 12, paddingRight: 4, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg },
   input: { flex: 1, color: colors.ink, fontSize: 14, paddingVertical: 10 },
-  saveText: { color: colors.sage, fontSize: 12, fontWeight: "800" },
-  disabledSaveText: { color: colors.faint },
   fieldError: { marginHorizontal: 16, marginTop: 6, color: colors.terracotta, fontSize: 11 },
-  joined: { padding: 16, paddingTop: 10, color: colors.muted, fontSize: 11 },
-  helper: { paddingHorizontal: 16, paddingBottom: 8, color: colors.muted, fontSize: 12, lineHeight: 18 },
+  joinedRow: { flexDirection: "row", alignItems: "center", gap: 6, padding: 16, paddingTop: 12 },
+  joined: { color: colors.muted, fontSize: 11 },
+  helper: { paddingHorizontal: 16, paddingBottom: 10, color: colors.muted, fontSize: 12, lineHeight: 18 },
   loader: { padding: 14 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 16, paddingTop: 8 },
-  chip: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: "#fff" },
-  chipSelected: { borderColor: colors.sage, backgroundColor: colors.sageLight },
-  chipText: { color: colors.muted, fontSize: 12, fontWeight: "700" },
-  chipTextSelected: { color: colors.sage },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 16, paddingTop: 4 },
   selectedSummary: { paddingHorizontal: 16, paddingBottom: 10, color: colors.muted, fontSize: 11 },
-  primaryButton: { alignItems: "center", margin: 16, marginTop: 4, borderRadius: 12, paddingVertical: 13, backgroundColor: colors.sage },
-  primaryButtonText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-  settingRow: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
-  rowCopy: { flex: 1, paddingRight: 12 },
+  settingRow: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16 },
+  rowCopy: { flex: 1, paddingRight: 8 },
   rowLabel: { fontSize: 14, fontWeight: "700", color: colors.ink },
   rowValue: { marginTop: 3, fontSize: 12, color: colors.muted },
-  outlineButton: { minHeight: 52, alignItems: "center", justifyContent: "center", margin: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.clay },
-  signOutText: { fontSize: 14, fontWeight: "800", color: colors.terracotta },
-  deleteButton: { alignItems: "center", paddingVertical: 12, marginBottom: 8 },
-  deleteText: { color: colors.terracotta, fontSize: 13, fontWeight: "800" },
-  message: { marginHorizontal: 20, marginBottom: 12, color: colors.sage, fontSize: 12, fontWeight: "700" },
-  error: { marginHorizontal: 20, marginBottom: 12, color: colors.terracotta, fontSize: 12, fontWeight: "700" },
+  deleteButton: { alignSelf: "center", marginBottom: 8, borderColor: "transparent", backgroundColor: "transparent" },
+  banner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: layout.gutter, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radii.md },
+  successBanner: { backgroundColor: colors.sageLight },
+  errorBanner: { backgroundColor: colors.dangerBg },
+  message: { flex: 1, color: colors.sage, fontSize: 12, fontWeight: "700" },
+  error: { flex: 1, color: colors.danger, fontSize: 12, fontWeight: "700" },
 });

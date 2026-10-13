@@ -1,5 +1,13 @@
 import { ScreenHeader } from "@/components/screen-header";
 import { SectionLabel } from "@/components/section-label";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FadeIn } from "@/components/ui/fade-in";
+import { AppIcon, type IconName } from "@/components/ui/icon";
+import { IconBadge } from "@/components/ui/icon-badge";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { TagChip } from "@/components/ui/tag-chip";
+import { getActiveStreak } from "@/lib/streak";
 import {
 	fetchFriendRequests,
 	fetchFriends,
@@ -23,7 +31,6 @@ import {
     ActivityIndicator,
     Image,
     Platform,
-    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -31,7 +38,8 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { colors, fonts, shadowSm } from "./theme";
+import Animated, { FadeIn as FadeInAnimation, FadeInDown } from "react-native-reanimated";
+import { colors, layout, radii, shadowSm } from "./theme";
 
 type Friend = {
 	id: string;
@@ -80,12 +88,15 @@ const LEADERBOARD_FETCHERS: Record<LeaderboardMetric, Record<LeaderboardAudience
 	},
 };
 
-const LEADERBOARD_METRICS: { value: LeaderboardMetric; label: string }[] = [
-	{ value: "streak", label: "Streak" },
-	{ value: "xp", label: "Lifetime XP" },
-	{ value: "cookedPosts", label: "Cooked posts" },
-	{ value: "createdPosts", label: "Created posts" },
+const LEADERBOARD_METRICS: { value: LeaderboardMetric; label: string; icon: IconName }[] = [
+	{ value: "streak", label: "Streak", icon: "flame" },
+	{ value: "xp", label: "Lifetime XP", icon: "sparkles" },
+	{ value: "cookedPosts", label: "Cooked posts", icon: "pan" },
+	{ value: "createdPosts", label: "Created posts", icon: "edit" },
 ];
+
+/** Gold, silver and bronze for the top three ranks. */
+const MEDALS = [colors.gold, colors.silver, colors.bronze];
 
 function leaderboardScoreLabel(metric: LeaderboardMetric): string {
 	switch (metric) {
@@ -112,7 +123,7 @@ function normalizeFriend(value: Record<string, unknown>, index: number): Friend 
 		initials: initialsFor(name),
 		color: FRIEND_COLORS[index % FRIEND_COLORS.length],
 		tier: String(value.tier ?? value.experience_level_name ?? "Member"),
-		streak: Number(value.streakCount ?? value.streakcount ?? value.streak ?? 0) || 0,
+		streak: getActiveStreak(value.streakCount ?? value.streakcount ?? value.streak_count ?? value.streak, (value.last_streak_post ?? value.last_post_at) as string | null | undefined),
 		recipes: Number(value.recipe_count ?? value.recipes ?? 0) || 0,
 		level: Number(value.experience_level ?? value.level ?? 0) || 0,
 		recentImgs: Array.isArray(value.recent_images) ? value.recent_images.filter((image): image is string => typeof image === "string") : [],
@@ -163,6 +174,7 @@ export default function SocialScreen() {
 	const [socialRefresh, setSocialRefresh] = useState(0);
 	const [socialRefreshing, setSocialRefreshing] = useState(false);
 	const [leaderboardRefreshing, setLeaderboardRefreshing] = useState(false);
+	const [searchFocused, setSearchFocused] = useState(false);
 
 	useEffect(() => {
 		let active = true;
@@ -252,10 +264,9 @@ export default function SocialScreen() {
 		}
 	};
 
-	const selectedMetricLabel = LEADERBOARD_METRICS.find((item) => item.value === leaderboardMetric)?.label ?? "Streak";
+	const selectedMetric = LEADERBOARD_METRICS.find((item) => item.value === leaderboardMetric) ?? LEADERBOARD_METRICS[0];
 	const podiumEntries = [leaderboardEntries[1], leaderboardEntries[0], leaderboardEntries[2]]
 		.filter((entry): entry is LeaderboardEntry => entry !== undefined);
-	const rankLabels = ["🥇", "🥈", "🥉"];
 
 	return (
 		<ScrollView
@@ -277,34 +288,197 @@ export default function SocialScreen() {
 			)}
 		>
 			<ScreenHeader title="Social" />
-			{actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
+			{actionError ? (
+				<Animated.View entering={FadeInAnimation} style={styles.errorBanner}>
+					<AppIcon name="close" size={12} color={colors.danger} weight="bold" />
+					<Text style={styles.errorText}>{actionError}</Text>
+				</Animated.View>
+			) : null}
 
-			<View style={[styles.panel, shadowSm]}>
-				<View style={styles.panelHeader}><View style={styles.headingRow}><Text style={styles.headingIcon}>🏆</Text><Text style={styles.heading}>Top {selectedMetricLabel} · {leaderboardAudience}</Text></View><Pressable onPress={() => setShowLeaderboard((value) => !value)}><Text style={styles.link}>{showLeaderboard ? "Hide" : "See full leaderboard"} →</Text></Pressable></View>
-				{showLeaderboard && <View style={styles.leaderboardControls}>
-					<Text style={styles.controlLabel}>Rank by</Text>
-					<View style={styles.controlOptions}>{LEADERBOARD_METRICS.map((metric) => <Pressable key={metric.value} accessibilityRole="button" accessibilityState={{ selected: leaderboardMetric === metric.value }} onPress={() => setLeaderboardMetric(metric.value)} style={[styles.controlButton, leaderboardMetric === metric.value && styles.controlButtonSelected]}><Text style={[styles.controlText, leaderboardMetric === metric.value && styles.controlTextSelected]}>{metric.label}</Text></Pressable>)}</View>
-					<Text style={styles.controlLabel}>Show</Text>
-					<View style={styles.controlOptions}>{(["friends", "everyone"] as const).map((audience) => <Pressable key={audience} accessibilityRole="button" accessibilityState={{ selected: leaderboardAudience === audience }} onPress={() => setLeaderboardAudience(audience)} style={[styles.controlButton, leaderboardAudience === audience && styles.controlButtonSelected]}><Text style={[styles.controlText, leaderboardAudience === audience && styles.controlTextSelected]}>{audience === "friends" ? "Friends" : "Everyone"}</Text></Pressable>)}</View>
-				</View>}
-				{leaderboardLoading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : leaderboardError ? <View style={styles.leaderboardMessage}><Text style={styles.leaderboardError}>{leaderboardError}</Text><Pressable onPress={() => setLeaderboardRefresh((value) => value + 1)}><Text style={styles.link}>Try again</Text></Pressable></View> : leaderboardEntries.length === 0 ? <Text style={styles.emptyText}>No leaderboard entries yet.</Text> : <>
+			{/* LEADERBOARD */}
+			<FadeIn delay={60} style={[styles.panel, shadowSm]}>
+				<View style={styles.panelHeader}>
+					<View style={styles.headingRow}>
+						<IconBadge name="trophy" size={34} color={colors.gold} backgroundColor="#F8EED6" />
+						<View style={{ flexShrink: 1 }}>
+							<Text style={styles.heading}>Top {selectedMetric.label}</Text>
+							<Text style={styles.headingSub}>{leaderboardAudience === "friends" ? "Among your friends" : "Across BetterBite"}</Text>
+						</View>
+					</View>
+					<PressableScale onPress={() => setShowLeaderboard((value) => !value)} style={styles.linkButton} hoverStyle={styles.linkButtonHover} accessibilityRole="button">
+						<Text style={styles.link}>{showLeaderboard ? "Hide" : "Full board"}</Text>
+						<AppIcon name="chevronDown" size={12} color={colors.sage} weight="bold" style={{ transform: [{ rotate: showLeaderboard ? "180deg" : "0deg" }] }} />
+					</PressableScale>
+				</View>
+				{showLeaderboard && (
+					<Animated.View entering={FadeInDown.duration(240)} style={styles.leaderboardControls}>
+						<Text style={styles.controlLabel}>Rank by</Text>
+						<View style={styles.controlOptions}>
+							{LEADERBOARD_METRICS.map((metric) => (
+								<TagChip key={metric.value} size="sm" icon={metric.icon} label={metric.label} selected={leaderboardMetric === metric.value} onPress={() => setLeaderboardMetric(metric.value)} />
+							))}
+						</View>
+						<Text style={styles.controlLabel}>Show</Text>
+						<View style={styles.controlOptions}>
+							{(["friends", "everyone"] as const).map((audience) => (
+								<TagChip key={audience} size="sm" icon={audience === "friends" ? "social" : "globe"} label={audience === "friends" ? "Friends" : "Everyone"} selected={leaderboardAudience === audience} onPress={() => setLeaderboardAudience(audience)} />
+							))}
+						</View>
+					</Animated.View>
+				)}
+				{leaderboardLoading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : leaderboardError ? (
+					<EmptyState tone="error" icon="trophy" title="Leaderboard unavailable" message={leaderboardError} action={<Button title="Try again" icon="refresh" size="sm" variant="outline" onPress={() => setLeaderboardRefresh((value) => value + 1)} />} />
+				) : leaderboardEntries.length === 0 ? (
+					<EmptyState icon="trophy" title="No rankings yet" message="Cook and share recipes to climb the board." />
+				) : <>
 					<View style={styles.podiumRow}>{podiumEntries.map((entry, index) => {
 						const avatar = { initials: initialsFor(entry.username), color: FRIEND_COLORS[index % FRIEND_COLORS.length], img: entry.pfp_url ?? undefined };
+						const medal = MEDALS[entry.rank - 1];
 						const blockStyle = entry.rank === 1 ? styles.firstBlock : entry.rank === 2 ? styles.secondBlock : styles.thirdBlock;
-						return <View key={entry.profile_id} style={[styles.podiumEntry, index !== 1 && styles.podiumLower]}><Text style={styles.rank}>{rankLabels[entry.rank - 1] ?? `#${entry.rank}`}</Text><Avatar friend={avatar} size={entry.rank === 1 ? 56 : 40} /><Text numberOfLines={1} style={styles.podiumName}>{entry.username}</Text><Text style={styles.points}>{entry.score.toLocaleString()} {leaderboardScoreLabel(leaderboardMetric)}</Text><View style={[styles.podiumBlock, blockStyle]} /></View>;
+						return (
+							<FadeIn key={entry.profile_id} delay={entry.rank === 1 ? 120 : entry.rank === 2 ? 220 : 300}>
+								<PressableScale onPress={() => router.push(`/profile/${entry.profile_id}`)} pressScale={0.95} hoverLift={3} style={[styles.podiumEntry, index !== 1 && styles.podiumLower]} accessibilityRole="button" accessibilityLabel={`Rank ${entry.rank}, ${entry.username}`}>
+									{medal ? <AppIcon name={entry.rank === 1 ? "trophy" : "medal"} size={entry.rank === 1 ? 22 : 18} color={medal} /> : <Text style={styles.rank}>#{entry.rank}</Text>}
+									<View style={[styles.podiumAvatar, medal ? { borderColor: medal } : null]}>
+										<Avatar friend={avatar} size={entry.rank === 1 ? 56 : 42} />
+									</View>
+									<Text numberOfLines={1} style={styles.podiumName}>{entry.username}</Text>
+									<Text style={styles.points}>{entry.score.toLocaleString()} {leaderboardScoreLabel(leaderboardMetric)}</Text>
+									<View style={[styles.podiumBlock, blockStyle]}>
+										<Text style={styles.podiumBlockText}>{entry.rank}</Text>
+									</View>
+								</PressableScale>
+							</FadeIn>
+						);
 					})}</View>
 					{showLeaderboard && <View style={styles.leaderboard}>{leaderboardEntries.map((entry, index) => {
 						const avatar = { initials: initialsFor(entry.username), color: FRIEND_COLORS[index % FRIEND_COLORS.length], img: entry.pfp_url ?? undefined };
-						return <View key={entry.profile_id} style={styles.leaderRow}><Text style={styles.leaderRank}>{entry.rank}</Text><Avatar friend={avatar} size={32} /><Text style={styles.leaderName}>{entry.username}</Text><Text style={styles.points}>{entry.score.toLocaleString()} {leaderboardScoreLabel(leaderboardMetric)}</Text></View>;
+						const medal = MEDALS[entry.rank - 1];
+						return (
+							<Animated.View key={entry.profile_id} entering={FadeInDown.delay(Math.min(index, 10) * 30).duration(240)}>
+								<PressableScale onPress={() => router.push(`/profile/${entry.profile_id}`)} pressScale={0.98} style={styles.leaderRow} hoverStyle={styles.rowHover} accessibilityRole="button">
+									<View style={styles.leaderRankBox}>
+										{medal ? <AppIcon name="medal" size={15} color={medal} /> : <Text style={styles.leaderRank}>{entry.rank}</Text>}
+									</View>
+									<Avatar friend={avatar} size={32} />
+									<Text numberOfLines={1} style={styles.leaderName}>{entry.username}</Text>
+									<View style={styles.scorePill}>
+										<AppIcon name={selectedMetric.icon} size={10} color={colors.sage} />
+										<Text style={styles.scoreText}>{entry.score.toLocaleString()} {leaderboardScoreLabel(leaderboardMetric)}</Text>
+									</View>
+								</PressableScale>
+							</Animated.View>
+						);
 					})}</View>}
 				</>}
-			</View>
+			</FadeIn>
 
-			<View style={styles.section}><SectionLabel>Add friends</SectionLabel><View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search users" placeholderTextColor={colors.faint} style={styles.searchInput} />{searchQuery.length > 0 && <Pressable onPress={() => setSearchQuery("")}><Text style={styles.clear}>✕</Text></Pressable>}</View><View style={[styles.listPanel, shadowSm]}>{searchLoading ? <Text style={styles.emptyText}>Searching users…</Text> : searchQuery.trim() && searchResults.length === 0 ? <Text style={styles.emptyText}>No users found for "{searchQuery}"</Text> : searchQuery.trim() ? searchResults.map((user, index) => { const added = addedIds.has(user.id); return <View key={user.id} style={[styles.userRow, index < searchResults.length - 1 && styles.rowBorder]}><Pressable onPress={() => router.push(`/profile/${user.id}`)} style={styles.profileLink}><View style={[styles.avatar, { backgroundColor: user.color }]}>{user.pfp_url ? <Image source={{ uri: user.pfp_url }} style={styles.fill} /> : <Text style={styles.avatarText}>{user.initials}</Text>}</View><View style={styles.userInfo}><Text style={styles.userName}>{user.username}</Text>{user.tier ? <TierBadge tier={user.tier} /> : null}</View></Pressable><Pressable onPress={() => void handleSendRequest(user)} disabled={added} style={[styles.actionButton, added ? styles.sentButton : styles.addButton]}><Text style={[styles.actionText, added && styles.sentText]}>{added ? "Sent ✓" : "+ Add"}</Text></Pressable></View>}) : <Text style={styles.suggestedFooter}>Search by username to find friends.</Text>}</View></View>
+			{/* ADD FRIENDS */}
+			<FadeIn delay={120} style={styles.section}>
+				<SectionLabel icon="personAdd">Add friends</SectionLabel>
+				<View style={[styles.searchBox, shadowSm, searchFocused && styles.searchBoxFocused]}>
+					<AppIcon name="search" size={17} color={searchFocused ? colors.sage : colors.muted} />
+					<TextInput value={searchQuery} onChangeText={setSearchQuery} onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} placeholder="Search users" placeholderTextColor={colors.faint} style={styles.searchInput} autoCapitalize="none" />
+					{searchQuery.length > 0 && (
+						<PressableScale onPress={() => setSearchQuery("")} hitSlop={8} style={styles.clearCircle} hoverStyle={styles.clearCircleHover} accessibilityRole="button" accessibilityLabel="Clear search">
+							<AppIcon name="close" size={11} color={colors.muted} weight="bold" />
+						</PressableScale>
+					)}
+				</View>
+				<View style={[styles.listPanel, shadowSm]}>
+					{searchLoading ? (
+						<ActivityIndicator color={colors.sage} style={styles.inlineLoading} />
+					) : searchQuery.trim() && searchResults.length === 0 ? (
+						<EmptyState icon="search" title="No users found" message={`Nobody matches "${searchQuery}" yet.`} />
+					) : searchQuery.trim() ? searchResults.map((user, index) => {
+						const added = addedIds.has(user.id);
+						return (
+							<Animated.View key={user.id} entering={FadeInDown.delay(index * 40).duration(220)} style={[styles.userRow, index < searchResults.length - 1 && styles.rowBorder]}>
+								<PressableScale onPress={() => router.push(`/profile/${user.id}`)} pressScale={0.98} style={styles.profileLink} accessibilityRole="button">
+									<Avatar friend={{ initials: user.initials, color: user.color, img: user.pfp_url ?? undefined }} />
+									<View style={styles.userInfo}>
+										<Text style={styles.userName}>{user.username}</Text>
+										{user.tier ? <TierBadge tier={user.tier} /> : null}
+									</View>
+								</PressableScale>
+								<Button
+									title={added ? "Sent" : "Add"}
+									icon={added ? "check" : "personAdd"}
+									variant={added ? "secondary" : "primary"}
+									size="sm"
+									disabled={added}
+									onPress={() => void handleSendRequest(user)}
+								/>
+							</Animated.View>
+						);
+					}) : (
+						<View style={styles.searchHint}>
+							<AppIcon name="wave" size={16} color={colors.clay} />
+							<Text style={styles.searchHintText}>Search by username to find friends.</Text>
+						</View>
+					)}
+				</View>
+			</FadeIn>
 
-			<View style={styles.section}><View style={styles.sectionTitleRow}><SectionLabel>Friend requests</SectionLabel>{requests.length > 0 && <View style={styles.requestCount}><Text style={styles.requestCountText}>{requests.length}</Text></View>}</View>{loading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : requests.length === 0 ? <View style={[styles.emptyPanel, shadowSm]}><Text style={styles.emptyEmoji}>👐</Text><Text style={styles.emptyText}>No pending requests</Text></View> : <View style={[styles.listPanel, shadowSm]}>{requests.map((request, index) => <View key={request.id} style={[styles.userRow, index < requests.length - 1 && styles.rowBorder]}><View style={[styles.avatar, { backgroundColor: request.color }]}><Text style={styles.avatarText}>{request.initials}</Text></View><View style={styles.userInfo}><Text style={styles.userName}>{request.name}</Text><Text style={styles.mutuals}>{request.mutuals ? `${request.mutuals} mutual friends` : "Wants to connect with you"}</Text></View><Pressable onPress={() => void handleRequestResponse(request, false)} style={[styles.smallAction, styles.rejectButton]}><Text style={styles.rejectText}>Reject</Text></Pressable><Pressable onPress={() => void handleRequestResponse(request, true)} style={[styles.smallAction, styles.acceptButton]}><Text style={styles.acceptText}>Accept</Text></Pressable></View>)}</View>}</View>
+			{/* FRIEND REQUESTS */}
+			<FadeIn delay={180} style={styles.section}>
+				<View style={styles.sectionTitleRow}>
+					<SectionLabel icon="mail">Friend requests</SectionLabel>
+					{requests.length > 0 && <View style={styles.requestCount}><Text style={styles.requestCountText}>{requests.length}</Text></View>}
+				</View>
+				{loading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : requests.length === 0 ? (
+					<View style={[styles.listPanel, shadowSm]}>
+						<EmptyState icon="mail" title="No pending requests" message="New friend requests will show up here." />
+					</View>
+				) : (
+					<View style={[styles.listPanel, shadowSm]}>
+						{requests.map((request, index) => (
+							<View key={request.id} style={[styles.userRow, index < requests.length - 1 && styles.rowBorder]}>
+								<Avatar friend={request} />
+								<View style={styles.userInfo}>
+									<Text style={styles.userName}>{request.name}</Text>
+									<Text style={styles.mutuals}>{request.mutuals ? `${request.mutuals} mutual friends` : "Wants to connect with you"}</Text>
+								</View>
+								<PressableScale onPress={() => void handleRequestResponse(request, false)} pressScale={0.9} style={[styles.iconAction, styles.rejectButton]} hoverStyle={styles.rejectButtonHover} accessibilityRole="button" accessibilityLabel={`Reject ${request.name}`}>
+									<AppIcon name="close" size={14} color={colors.terracotta} weight="bold" />
+								</PressableScale>
+								<PressableScale onPress={() => void handleRequestResponse(request, true)} pressScale={0.9} style={[styles.iconAction, styles.acceptButton]} hoverStyle={styles.acceptButtonHover} accessibilityRole="button" accessibilityLabel={`Accept ${request.name}`}>
+									<AppIcon name="check" size={14} color="#fff" weight="bold" />
+								</PressableScale>
+							</View>
+						))}
+					</View>
+				)}
+			</FadeIn>
 
-			<View style={styles.section}><View style={styles.sectionTitleRow}><SectionLabel>Your friends</SectionLabel><Text style={styles.friendCount}>{friends.length} friends</Text></View>{loading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : friends.length === 0 ? <View style={[styles.emptyPanel, shadowSm]}><Text style={styles.emptyText}>No friends yet</Text></View> : <View style={[styles.listPanel, shadowSm]}>{friends.map((friend, index) => <Pressable key={friend.id} onPress={() => router.push(`/profile/${friend.id}`)} style={[styles.userRow, index < friends.length - 1 && styles.rowBorder]}><Avatar friend={friend} /><View style={styles.userInfo}><View style={styles.nameTierRow}><Text style={styles.userName}>{friend.name}</Text><TierBadge tier={friend.tier} /></View><Text style={styles.mutuals}>🔥 {friend.streak} day streak</Text></View></Pressable>)}</View>}</View>
+			{/* FRIENDS */}
+			<FadeIn delay={240} style={styles.section}>
+				<View style={styles.sectionTitleRow}>
+					<SectionLabel icon="social">Your friends</SectionLabel>
+					<Text style={styles.friendCount}>{friends.length} {friends.length === 1 ? "friend" : "friends"}</Text>
+				</View>
+				{loading ? <ActivityIndicator color={colors.sage} style={styles.inlineLoading} /> : friends.length === 0 ? (
+					<View style={[styles.listPanel, shadowSm]}>
+						<EmptyState icon="social" title="No friends yet" message="Find friends above to cook together." />
+					</View>
+				) : (
+					<View style={[styles.listPanel, shadowSm]}>
+						{friends.map((friend, index) => (
+							<PressableScale key={friend.id} onPress={() => router.push(`/profile/${friend.id}`)} pressScale={0.98} style={[styles.userRow, index < friends.length - 1 && styles.rowBorder]} hoverStyle={styles.rowHover} accessibilityRole="button" accessibilityLabel={`Open ${friend.name}'s profile`}>
+								<Avatar friend={friend} />
+								<View style={styles.userInfo}>
+									<View style={styles.nameTierRow}><Text style={styles.userName}>{friend.name}</Text><TierBadge tier={friend.tier} /></View>
+									<View style={styles.streakRow}>
+										<AppIcon name="flame" size={11} color={friend.streak > 0 ? colors.flame : colors.ghost} />
+										<Text style={styles.mutuals}>{friend.streak} day streak</Text>
+									</View>
+								</View>
+								<AppIcon name="chevronRight" size={14} color={colors.ghost} weight="semibold" />
+							</PressableScale>
+						))}
+					</View>
+				)}
+			</FadeIn>
 		</ScrollView>
 	);
 }
@@ -312,83 +486,68 @@ export default function SocialScreen() {
 const styles = StyleSheet.create({
 	fill: { width: "100%", height: "100%" },
 	content: { paddingBottom: 32 },
-	errorText: { marginHorizontal: 16, marginBottom: 12, fontSize: 12, color: colors.terracotta },
+	errorBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: layout.gutter, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radii.md, backgroundColor: colors.dangerBg },
+	errorText: { flex: 1, fontSize: 12, fontWeight: "600", color: colors.danger },
 	inlineLoading: { height: 80 },
-	header: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 20 },
-	eyebrow: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
-	title: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },
-	subtitle: { fontSize: 14, lineHeight: 21, fontWeight: "500", color: colors.muted, marginTop: 4 },
-	section: { paddingHorizontal: 16, marginBottom: 20 },
-	sectionLabel: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10 },
-	panel: { marginHorizontal: 16, marginBottom: 20, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
-	panelHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
-	headingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-	headingIcon: { fontSize: 16 },
-	heading: { fontSize: 14, fontWeight: "800", color: colors.ink },
-	link: { fontSize: 11, fontWeight: "700", color: colors.sage },
+	section: { paddingHorizontal: layout.gutter, marginBottom: layout.sectionGap },
+	panel: { marginHorizontal: layout.gutter, marginBottom: layout.sectionGap, padding: 16, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
+	panelHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 16 },
+	headingRow: { flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 1 },
+	heading: { fontSize: 15, fontWeight: "800", color: colors.ink },
+	headingSub: { fontSize: 11, fontWeight: "500", color: colors.muted, marginTop: 1 },
+	linkButton: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radii.pill, backgroundColor: colors.sageLight },
+	linkButtonHover: { backgroundColor: "#DCE6D6" },
+	link: { fontSize: 11, fontWeight: "800", color: colors.sage },
 	podiumRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: 16 },
 	podiumEntry: { alignItems: "center", gap: 4 },
 	podiumLower: { marginBottom: -4 },
-	rank: { fontSize: 16 },
-	podiumName: { fontSize: 11, fontWeight: "700", color: colors.ink },
-	points: { fontSize: 9, fontWeight: "600", color: colors.muted },
-	podiumBlock: { width: 56, borderTopLeftRadius: 6, borderTopRightRadius: 6, marginTop: 2 },
-	firstBlock: { height: 24, backgroundColor: colors.clay },
-	secondBlock: { height: 16, backgroundColor: colors.sageLight },
-	thirdBlock: { height: 12, backgroundColor: "#F0F0EC" },
-	leaderboard: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.cream, gap: 8 },
-	leaderboardControls: { gap: 8, marginBottom: 16 },
-	controlLabel: { fontSize: 10, fontWeight: "700", color: colors.muted, textTransform: "uppercase" },
+	podiumAvatar: { borderRadius: radii.pill, borderWidth: 2, borderColor: colors.divider, padding: 2 },
+	rank: { fontSize: 13, fontWeight: "800", color: colors.faint },
+	podiumName: { maxWidth: 80, fontSize: 12, fontWeight: "700", color: colors.ink },
+	points: { fontSize: 10, fontWeight: "600", color: colors.muted },
+	podiumBlock: { width: 64, alignItems: "center", justifyContent: "center", borderTopLeftRadius: 8, borderTopRightRadius: 8, marginTop: 4 },
+	podiumBlockText: { fontSize: 12, fontWeight: "800", color: "rgba(255,255,255,0.95)" },
+	firstBlock: { height: 34, backgroundColor: colors.gold },
+	secondBlock: { height: 24, backgroundColor: colors.silver },
+	thirdBlock: { height: 18, backgroundColor: colors.bronze },
+	leaderboard: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.divider, gap: 2 },
+	leaderboardControls: { gap: 8, marginBottom: 18 },
+	controlLabel: { fontSize: 10, fontWeight: "800", color: colors.muted, textTransform: "uppercase", letterSpacing: 1 },
 	controlOptions: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 4 },
-	controlButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
-	controlButtonSelected: { backgroundColor: colors.sageLight, borderColor: colors.sage },
-	controlText: { fontSize: 10, fontWeight: "700", color: colors.muted },
-	controlTextSelected: { color: colors.sage },
-	leaderboardMessage: { alignItems: "center", gap: 4 },
-	leaderboardError: { padding: 12, textAlign: "center", fontSize: 12, color: colors.terracotta },
-	leaderRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-	leaderRank: { width: 16, textAlign: "center", fontSize: 12, fontWeight: "800", color: colors.faint },
-	leaderName: { flex: 1, fontSize: 12, fontWeight: "700", color: colors.ink },
-	searchBox: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
-	searchIcon: { fontSize: 21, color: colors.muted },
-	searchInput: { flex: 1, padding: 0, fontSize: 14, color: colors.ink },
-	clear: { color: colors.faint, fontSize: 12 },
-	listPanel: { overflow: "hidden", borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
+	leaderRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8, paddingVertical: 7, borderRadius: radii.md },
+	rowHover: { backgroundColor: colors.bg },
+	leaderRankBox: { width: 20, alignItems: "center" },
+	leaderRank: { fontSize: 12, fontWeight: "800", color: colors.faint },
+	leaderName: { flex: 1, fontSize: 13, fontWeight: "700", color: colors.ink },
+	scorePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radii.pill, backgroundColor: colors.sageLight },
+	scoreText: { fontSize: 10, fontWeight: "800", color: colors.sage },
+	searchBox: { minHeight: 46, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
+	searchBoxFocused: { borderColor: colors.sage, shadowColor: colors.sage, shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } },
+	searchInput: { flex: 1, padding: 0, fontSize: 14, fontWeight: "500", color: colors.ink },
+	clearCircle: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: colors.divider },
+	clearCircleHover: { backgroundColor: colors.border },
+	listPanel: { overflow: "hidden", borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
 	userRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
-	rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.cream },
-	openRow: { backgroundColor: colors.bg },
+	rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
 	avatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", overflow: "hidden" },
 	avatarText: { color: "#fff", fontSize: 11, fontWeight: "800" },
 	userInfo: { flex: 1, minWidth: 0 },
 	profileLink: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
 	userName: { fontSize: 14, fontWeight: "700", color: colors.ink, lineHeight: 18 },
 	nameTierRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-	tierBadge: { alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
+	streakRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
+	tierBadge: { alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 2, borderRadius: radii.pill },
 	tierText: { fontSize: 9, fontWeight: "800" },
-	mutuals: { marginTop: 2, fontSize: 10, fontWeight: "500", color: colors.muted },
-	actionButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-	addButton: { backgroundColor: colors.sage },
-	sentButton: { backgroundColor: colors.sageLight },
-	actionText: { fontSize: 12, fontWeight: "700", color: "#fff" },
-	sentText: { color: colors.sage },
-	suggestedFooter: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.cream, fontSize: 10, fontWeight: "600", color: colors.faint },
-	emptyPanel: { alignItems: "center", paddingVertical: 20, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
-	emptyEmoji: { fontSize: 24, marginBottom: 4 },
-	emptyText: { padding: 20, textAlign: "center", fontSize: 14, fontWeight: "500", color: colors.muted },
-	requestCount: { marginTop: -10, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.clay },
+	mutuals: { marginTop: 2, fontSize: 11, fontWeight: "500", color: colors.muted },
+	searchHint: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: colors.bg },
+	searchHintText: { fontSize: 12, fontWeight: "600", color: colors.muted },
+	requestCount: { marginBottom: 10, minWidth: 18, alignItems: "center", paddingHorizontal: 6, paddingVertical: 2, borderRadius: radii.pill, backgroundColor: colors.flame },
 	requestCountText: { color: "#fff", fontSize: 9, fontWeight: "800" },
 	sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-	smallAction: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999 },
-	rejectButton: { borderWidth: 1, borderColor: colors.border },
-	rejectText: { color: colors.terracotta, fontSize: 11, fontWeight: "700" },
+	iconAction: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+	rejectButton: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
+	rejectButtonHover: { borderColor: colors.clay, backgroundColor: colors.terraBg },
 	acceptButton: { backgroundColor: colors.sage },
-	acceptText: { color: "#fff", fontSize: 11, fontWeight: "700" },
-	friendCount: { marginTop: -10, fontSize: 10, fontWeight: "600", color: colors.muted },
-	statsRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-	statBox: { flex: 1, alignItems: "center", padding: 10, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border },
-	statValue: { fontSize: 14, fontWeight: "800", color: colors.ink },
-	statLabel: { marginTop: 2, fontSize: 9, fontWeight: "600", color: colors.muted, textTransform: "uppercase" },
-	recentLabel: { marginBottom: 8, fontSize: 10, fontWeight: "700", color: colors.muted, textTransform: "uppercase" },
-	recentRow: { flexDirection: "row", gap: 8 },
-	recentImage: { flex: 1, aspectRatio: 1, borderRadius: 12, backgroundColor: colors.sageLight },
+	acceptButtonHover: { backgroundColor: colors.sageDark },
+	friendCount: { marginLeft: "auto", marginBottom: 10, fontSize: 11, fontWeight: "600", color: colors.muted },
 });

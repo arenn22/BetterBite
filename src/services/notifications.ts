@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 import { fetchFriends } from "@/services/api/social";
+import { getActiveStreak } from "@/lib/streak";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/types/auth";
 
@@ -26,7 +27,7 @@ function isNative() {
 }
 
 function getStreakCount(profile: Profile) {
-  return Number(profile.streakCount ?? profile.streakcount ?? 0);
+  return getActiveStreak(profile.streakCount ?? profile.streakcount, profile.last_streak_post ?? profile.last_post_at);
 }
 
 async function requestPermission() {

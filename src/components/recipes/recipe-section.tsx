@@ -1,11 +1,16 @@
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { colors } from "@/app/(tabs)/theme";
+import { colors, layout } from "@/app/(tabs)/theme";
+import { FadeIn } from "@/components/ui/fade-in";
+import { IconBadge } from "@/components/ui/icon-badge";
+import type { IconName } from "@/components/ui/icon";
 import { type RecipeCardData } from "@/lib/recipes";
 import { RecipeCard } from "./recipe-card";
 
 export function RecipeSection({
   icon,
+  iconColor = colors.sage,
+  iconBackground = colors.sageLight,
   title,
   subtitle,
   recipes,
@@ -13,7 +18,9 @@ export function RecipeSection({
   onOpen,
   onAuthorPress,
 }: {
-  icon: string;
+  icon: IconName;
+  iconColor?: string;
+  iconBackground?: string;
   title: string;
   subtitle: string;
   recipes: RecipeCardData[];
@@ -24,8 +31,8 @@ export function RecipeSection({
   return (
     <View style={styles.section}>
       <View style={styles.heading}>
-        <Text style={styles.icon}>{icon}</Text>
-        <View>
+        <IconBadge name={icon} size={34} color={iconColor} backgroundColor={iconBackground} />
+        <View style={styles.headingCopy}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
@@ -34,22 +41,30 @@ export function RecipeSection({
         <ActivityIndicator color={colors.sage} style={styles.loading} />
       ) : recipes.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards}>
-          {recipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} onPress={() => onOpen(recipe)} onAuthorPress={onAuthorPress ? () => onAuthorPress(recipe) : undefined} />)}
+          {recipes.map((recipe, index) => (
+            <FadeIn key={recipe.id} delay={Math.min(index, 6) * 60}>
+              <RecipeCard recipe={recipe} onPress={() => onOpen(recipe)} onAuthorPress={onAuthorPress ? () => onAuthorPress(recipe) : undefined} />
+            </FadeIn>
+          ))}
         </ScrollView>
       ) : (
-        <Text style={styles.empty}>No recipes to show yet.</Text>
+        <View style={styles.emptyRow}>
+          <Text style={styles.empty}>No recipes to show yet.</Text>
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { marginBottom: 24 },
-  heading: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 16, marginBottom: 12 },
-  icon: { fontSize: 20, marginTop: 2 },
-  title: { fontSize: 14, fontWeight: "800", color: colors.ink },
+  section: { marginBottom: layout.sectionGap },
+  heading: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: layout.gutter, marginBottom: 12 },
+  headingCopy: { flex: 1 },
+  title: { fontSize: 15, fontWeight: "800", color: colors.ink },
   subtitle: { fontSize: 12, fontWeight: "500", color: colors.muted, marginTop: 2 },
   loading: { height: 150 },
-  cards: { paddingHorizontal: 16, paddingBottom: 4, gap: 12 },
-  empty: { paddingHorizontal: 16, paddingVertical: 20, fontSize: 12, fontWeight: "500", color: colors.muted },
+  // Vertical padding leaves room for the card hover lift and shadow.
+  cards: { paddingHorizontal: layout.gutter, paddingTop: 6, paddingBottom: 10, gap: 12 },
+  emptyRow: { marginHorizontal: layout.gutter, paddingVertical: 20, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border },
+  empty: { fontSize: 12, fontWeight: "600", color: colors.muted, textAlign: "center" },
 });

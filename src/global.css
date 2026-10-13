@@ -52,3 +52,30 @@ body {
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+::selection {
+  background: rgba(104, 123, 93, 0.22);
+}
+
+/* Visible keyboard focus ring for every interactive element on web. */
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+a:focus-visible {
+  outline: 2px solid #8A9E7A;
+  outline-offset: 2px;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

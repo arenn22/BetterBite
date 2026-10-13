@@ -1,5 +1,6 @@
 import { supabase } from "../../lib/supabase";
 import { getImageContentType } from "./image-mime";
+import { resolveProfileImageUrl } from "./posts";
 import type { Profile } from "../../types/auth";
 
 export const DEFAULT_PROFILE_IMAGE =
@@ -59,6 +60,7 @@ export async function fetchUserProfile(userId: string): Promise<Profile | null> 
 
   return {
     ...data,
+    pfp_url: await resolveProfileImageUrl((data as any).pfp_url),
     streakCount: streakValue,
     streakcount: streakValue,
     last_streak_post: lastStreakPost,

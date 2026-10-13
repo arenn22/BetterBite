@@ -1,6 +1,8 @@
 import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, fonts, shadowSm } from "@/app/(tabs)/theme";
+import { AppIcon } from "@/components/ui/icon";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import type { RecipeCardData } from "@/lib/recipes";
 
 export function RecipePreviewModal({
@@ -22,9 +24,9 @@ export function RecipePreviewModal({
             <View style={styles.content}>
               <View style={styles.titleRow}>
                 <Text style={styles.title}>{recipe.title}</Text>
-                <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close recipe preview">
-                  <Text style={styles.close}>×</Text>
-                </Pressable>
+                <PressableScale onPress={onClose} hitSlop={8} pressScale={0.88} style={styles.close} hoverStyle={styles.closeHover} accessibilityRole="button" accessibilityLabel="Close recipe preview">
+                  <AppIcon name="close" size={14} color={colors.muted} weight="bold" />
+                </PressableScale>
               </View>
               {recipe.author ? <Text style={styles.author}>by {recipe.author}</Text> : null}
               {recipe.time ? <Text style={styles.meta}>{recipe.difficulty} · {recipe.time}</Text> : null}
@@ -43,7 +45,8 @@ const styles = StyleSheet.create({
   content: { padding: 16 },
   titleRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
   title: { flex: 1, marginRight: 12, fontFamily: fonts.heading, fontSize: 22, color: colors.ink },
-  close: { fontSize: 28, lineHeight: 30, color: colors.muted },
+  close: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
+  closeHover: { backgroundColor: colors.divider },
   author: { marginTop: 8, fontSize: 12, fontWeight: "600", color: colors.muted },
   meta: { marginTop: 6, fontSize: 11, fontWeight: "600", color: colors.sage },
 });

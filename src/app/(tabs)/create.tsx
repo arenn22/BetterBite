@@ -1,84 +1,38 @@
 import { ScreenHeader } from "@/components/screen-header";
 import { SectionLabel } from "@/components/section-label";
+import { Button } from "@/components/ui/button";
+import { AppIcon, type IconName } from "@/components/ui/icon";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { TagChip } from "@/components/ui/tag-chip";
 import { EXPERIENCE_LEVEL_NAMES } from "@/constants/experience-levels";
 import { BottomTabInset } from "@/constants/theme";
 import { useListEditor } from "@/hooks/use-list-editor";
 import { useRecipeOptions } from "@/hooks/use-recipe-options";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { createPost, uploadPostImage } from "@/services/api/posts";
+import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
 import Slider from "@expo/ui/community/slider";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Alert,
-    Animated,
     Image,
     KeyboardAvoidingView, Platform,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     View,
 } from "react-native";
-import type { PressableProps } from "react-native";
+import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import Svg, { Circle, Ellipse, G, Line, Rect } from "react-native-svg";
-import { colors, fonts, shadowSm } from "./theme";
+import { colors, fonts, layout, radii, shadowSm } from "./theme";
 
 // ─── Types & constants ───────────────────────────────────────────────────────
 
 type Difficulty = (typeof EXPERIENCE_LEVEL_NAMES)[number];
-
-function InteractivePressable({
-  children,
-  disabled = false,
-  onPressIn,
-  onPressOut,
-  onHoverIn,
-  onHoverOut,
-  style,
-  ...props
-}: PressableProps) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const animateScale = (toValue: number) => {
-    Animated.spring(scale, {
-      toValue,
-      useNativeDriver: true,
-      speed: 24,
-      bounciness: 5,
-    }).start();
-  };
-
-  return (
-    <Animated.View style={{ transform: [{ scale }], opacity: disabled ? 0.65 : 1 }}>
-      <Pressable
-        {...props}
-        disabled={disabled}
-        onPressIn={(event) => {
-          animateScale(0.97);
-          onPressIn?.(event);
-        }}
-        onPressOut={(event) => {
-          animateScale(1);
-          onPressOut?.(event);
-        }}
-        onHoverIn={(event) => {
-          animateScale(1.015);
-          onHoverIn?.(event);
-        }}
-        onHoverOut={(event) => {
-          animateScale(1);
-          onHoverOut?.(event);
-        }}
-        style={style}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
-  );
-}
 
 const DIFFICULTY_LEVELS: Record<number, { name: Difficulty; meaning: string; examples: string }> = {
   1: { name: EXPERIENCE_LEVEL_NAMES[0], meaning: "No heat or single-step prep.", examples: "Sandwiches, cereal, basic salads" },
@@ -106,25 +60,18 @@ const DIFF_COLOR: Record<Difficulty, { bg: string; text: string }> = {
   "Expert Chef": { bg: "#F8DDD0", text: "#9B3A1A" },
 };
 
-const OPTION_EMOJIS: Record<string, string> = {
-  vegan: "🌱", vegetarian: "🥦", "gluten-free": "🌾", "dairy-free": "🥛",
-  kosher: "✡️", halal: "☪️", keto: "🥩", paleo: "🍖",
-  italian: "🍝", mexican: "🌮", thai: "🍜", indian: "🍛", japanese: "🍱",
-  french: "🥐", american: "🍔", mediterranean: "🫒", chinese: "🥟", "middle eastern": "🧆",
-};
-
 // ─── Small reusable pieces ───────────────────────────────────────────────────
 
 function StyledInput({
-  label, value, onChange, placeholder, multiline = false, rows = 3,
+  label, icon, value, onChange, placeholder, multiline = false, rows = 3,
 }: {
-  label: string; value: string; onChange: (v: string) => void;
+  label: string; icon?: IconName; value: string; onChange: (v: string) => void;
   placeholder?: string; multiline?: boolean; rows?: number;
 }) {
   const [focused, setFocused] = useState(false);
   return (
-    <View style={{ marginBottom: 16 }}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={styles.field}>
+      <SectionLabel icon={icon}>{label}</SectionLabel>
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -153,9 +100,9 @@ function ListRow({
 }) {
   const [focused, setFocused] = useState(false);
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-      <View style={styles.indexBubble}>
-        <Text style={styles.indexText}>{index + 1}</Text>
+    <Animated.View entering={FadeInDown.duration(220)} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <View style={[styles.indexBubble, value.trim() ? styles.indexBubbleDone : null]}>
+        <Text style={[styles.indexText, value.trim() ? styles.indexTextDone : null]}>{index + 1}</Text>
       </View>
       <TextInput
         value={value}
@@ -166,10 +113,10 @@ function ListRow({
         onBlur={() => setFocused(false)}
         style={[styles.input, { flex: 1, paddingVertical: 8, paddingHorizontal: 12 }, focused && styles.inputFocused]}
       />
-      <InteractivePressable onPress={onRemove} hitSlop={6} style={styles.removeBtn}>
-        <Text style={{ color: colors.ghost, fontSize: 12, fontWeight: "700" }}>✕</Text>
-      </InteractivePressable>
-    </View>
+      <PressableScale onPress={onRemove} hitSlop={6} pressScale={0.88} style={styles.removeBtn} hoverStyle={styles.removeBtnHover} accessibilityRole="button" accessibilityLabel={`Remove item ${index + 1}`}>
+        <AppIcon name="close" size={12} color={colors.faint} weight="bold" />
+      </PressableScale>
+    </Animated.View>
   );
 }
 
@@ -215,8 +162,8 @@ function UploadPlaceholder() {
 // ─── Live preview card ────────────────────────────────────────────────────────
 
 function PreviewCard({
-  name, difficulty, photoSrc,
-}: { name: string; difficulty: Difficulty; photoSrc: string | null }) {
+  name, difficulty, photoSrc, authorName, authorImage,
+}: { name: string; difficulty: Difficulty; photoSrc: string | null; authorName: string; authorImage: string }) {
   const diff = DIFF_COLOR[difficulty];
   return (
     <View style={[styles.previewCard, shadowSm]}>
@@ -225,7 +172,7 @@ function PreviewCard({
           <Image source={{ uri: photoSrc }} style={styles.fill} resizeMode="cover" />
         ) : (
           <View style={[styles.fill, { alignItems: "center", justifyContent: "center" }]}>
-            <Text style={{ fontSize: 30, opacity: 0.4 }}>📷</Text>
+            <AppIcon name="camera" size={28} color={colors.clay} />
           </View>
         )}
         <View style={{ position: "absolute", top: 8, left: 8 }}>
@@ -240,12 +187,9 @@ function PreviewCard({
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
           <View style={{ width: 16, height: 16, borderRadius: 8, overflow: "hidden", backgroundColor: colors.clay }}>
-            <Image
-              source={{ uri: "https://images.unsplash.com/photo-1556910636-c508da52e01c?w=32&h=32&fit=crop&auto=format" }}
-              style={styles.fill}
-            />
+            <Image source={{ uri: authorImage }} style={styles.fill} />
           </View>
-          <Text style={{ fontSize: 9, fontWeight: "500", color: colors.muted }}>by Sofía</Text>
+          <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 9, fontWeight: "500", color: colors.muted }}>by {authorName}</Text>
         </View>
       </View>
     </View>
@@ -264,24 +208,9 @@ function TagChips({
 }) {
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-      {tags.map((t) => {
-        const active = selected.has(t.id);
-        const emoji = OPTION_EMOJIS[t.name.trim().toLowerCase().replace(/\s+/g, "-")] ?? (kind === "dietary" ? "🥗" : "🍽️");
-        return (
-          <InteractivePressable
-            key={t.id}
-            onPress={() => onToggle(t.id)}
-            style={({ pressed }) => [
-              styles.tagChip,
-              active && { backgroundColor: colors.sage, borderColor: colors.sage },
-              pressed && { transform: [{ scale: 0.95 }] },
-            ]}
-          >
-            <Text style={{ fontSize: 14 }}>{emoji}</Text>
-            <Text style={{ fontSize: 12, fontWeight: "700", color: active ? "#fff" : colors.ink }}>{t.name}</Text>
-          </InteractivePressable>
-        );
-      })}
+      {tags.map((t) => (
+        <TagChip key={t.id} kind={kind} label={t.name} selected={selected.has(t.id)} onPress={() => onToggle(t.id)} />
+      ))}
     </View>
   );
 }
@@ -409,26 +338,28 @@ export default function CreateScreen() {
 
   if (published) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
-        <View style={styles.successCircle}>
-          <Text style={{ fontSize: 36 }}>🎉</Text>
-        </View>
-        <Text style={{ fontFamily: fonts.heading, fontSize: 24, color: colors.ink, marginBottom: 8 }}>Recipe shared!</Text>
-        <Text style={{ fontSize: 14, fontWeight: "500", color: colors.muted, lineHeight: 22, textAlign: "center", marginBottom: 24 }}>
-          <Text style={{ fontWeight: "700", color: colors.ink }}>{recipeName || "Your recipe"}</Text> is now live on the community table.
-        </Text>
-        <InteractivePressable
-          onPress={() => {
-            setPublished(false);
-            setRecipeName(""); setDescription(""); setPhotoSrc(null);
-            ingredientsEditor.reset(); stepsEditor.reset();
-            setDietary(new Set()); setCuisines(new Set());
-            setDifficultyVal(3); setTimeMinutes("30"); setPublishError(null);
-          }}
-          style={({ pressed }) => [styles.primaryBtn, pressed && { transform: [{ scale: 0.95 }] }]}
-        >
-          <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Create another recipe</Text>
-        </InteractivePressable>
+      <View style={styles.successRoot}>
+        <Animated.View entering={ZoomIn.springify().damping(12)} style={styles.successCircle}>
+          <AppIcon name="celebrate" size={38} color={colors.sage} weight="semibold" />
+        </Animated.View>
+        <Animated.View entering={FadeInDown.delay(150).duration(380)} style={{ alignItems: "center" }}>
+          <Text style={styles.successTitle}>Recipe shared!</Text>
+          <Text style={styles.successBody}>
+            <Text style={{ fontWeight: "700", color: colors.ink }}>{recipeName || "Your recipe"}</Text> is now live on the community table.
+          </Text>
+          <Button
+            title="Create another recipe"
+            icon="add"
+            size="lg"
+            onPress={() => {
+              setPublished(false);
+              setRecipeName(""); setDescription(""); setPhotoSrc(null);
+              ingredientsEditor.reset(); stepsEditor.reset();
+              setDietary(new Set()); setCuisines(new Set());
+              setDifficultyVal(3); setTimeMinutes("30"); setPublishError(null);
+            }}
+          />
+        </Animated.View>
       </View>
     );
   }
@@ -442,20 +373,35 @@ export default function CreateScreen() {
       >
         <ScreenHeader title="Create" />
 
-        <View style={{ paddingHorizontal: 16 }}>
+        <View style={{ paddingHorizontal: layout.gutter }}>
+          {/* PROGRESS */}
+          <View style={styles.progressCard}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressTitle}>{pct === 100 ? "Ready to publish" : "Recipe progress"}</Text>
+              <Text style={styles.progressPct}>{pct}%</Text>
+            </View>
+            <ProgressBar progress={pct / 100} />
+          </View>
+
           {/* PHOTO UPLOAD */}
-          <View style={{ marginBottom: 20 }}>
-            <SectionLabel>Recipe photo</SectionLabel>
-            <InteractivePressable
+          <View style={styles.field}>
+            <SectionLabel icon="camera">Recipe photo</SectionLabel>
+            <PressableScale
               onPress={handlePhoto}
-              style={({ pressed }) => [
-                styles.photoBtn,
-                { height: photoSrc ? 200 : 160 },
-                pressed && { opacity: 0.95 },
-              ]}
+              pressScale={0.98}
+              style={[styles.photoBtn, { height: photoSrc ? 200 : 160 }, photoSrc ? styles.photoBtnFilled : null]}
+              hoverStyle={styles.photoBtnHover}
+              accessibilityRole="button"
+              accessibilityLabel={photoSrc ? "Change recipe photo" : "Add a recipe photo"}
             >
               {photoSrc ? (
-                <Image source={{ uri: photoSrc }} style={styles.fill} resizeMode="cover" />
+                <>
+                  <Image source={{ uri: photoSrc }} style={styles.fill} resizeMode="cover" />
+                  <View style={styles.changePhotoPill}>
+                    <AppIcon name="camera" size={12} color={colors.ink} />
+                    <Text style={styles.changePhotoText}>Change</Text>
+                  </View>
+                </>
               ) : (
                 <>
                   <View style={StyleSheet.absoluteFill}>
@@ -463,7 +409,7 @@ export default function CreateScreen() {
                   </View>
                   <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", gap: 8 }]}>
                     <View style={styles.plusCircle}>
-                      <Text style={{ color: "#fff", fontSize: 20 }}>+</Text>
+                      <AppIcon name="addPhoto" size={20} color="#fff" weight="semibold" />
                     </View>
                     <View style={styles.photoLabel}>
                       <Text style={{ fontSize: 12, fontWeight: "700", color: colors.terracotta }}>Add a recipe photo</Text>
@@ -471,13 +417,14 @@ export default function CreateScreen() {
                   </View>
                 </>
               )}
-            </InteractivePressable>
+            </PressableScale>
           </View>
 
           {/* NAME & DESC */}
-          <StyledInput label="Recipe name" value={recipeName} onChange={setRecipeName} placeholder="e.g. Golden Garlic Pasta" />
+          <StyledInput label="Recipe name" icon="edit" value={recipeName} onChange={setRecipeName} placeholder="e.g. Golden Garlic Pasta" />
           <StyledInput
             label="Description"
+            icon="book"
             value={description}
             onChange={setDescription}
             placeholder="What makes this dish special? Any tips?"
@@ -485,8 +432,8 @@ export default function CreateScreen() {
             rows={3}
           />
 
-          <View style={{ marginBottom: 20 }}>
-            <Text style={styles.label}>Cooking time</Text>
+          <View style={styles.field}>
+            <SectionLabel icon="clock">Cooking time</SectionLabel>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
               <TextInput
                 accessibilityLabel="Cooking time in minutes"
@@ -502,35 +449,37 @@ export default function CreateScreen() {
           </View>
 
           {/* DIFFICULTY SLIDER */}
-          <View style={{ marginBottom: 20 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Text style={styles.label}>Difficulty:</Text>
-              <View style={{ backgroundColor: DIFF_COLOR[difficulty].bg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+          <View style={styles.field}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <SectionLabel icon="chart">Difficulty</SectionLabel>
+              <View style={{ marginBottom: 10, backgroundColor: DIFF_COLOR[difficulty].bg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: radii.pill }}>
                 <Text style={{ fontSize: 12, fontWeight: "800", color: DIFF_COLOR[difficulty].text }}>{difficulty}</Text>
               </View>
-              <Text style={{ marginLeft: "auto", fontSize: 12, fontWeight: "500", color: colors.faint }}>{difficultyVal} / 10</Text>
+              <Text style={{ marginLeft: "auto", marginBottom: 10, fontSize: 12, fontWeight: "600", color: colors.faint }}>{difficultyVal} / 10</Text>
             </View>
-            <Slider
-              minimumValue={1}
-              maximumValue={10}
-              step={1}
-              value={difficultyVal}
-              onValueChange={setDifficultyVal}
-              minimumTrackTintColor="#8A9E7A"
-              maximumTrackTintColor="#F0F0EC"
-              thumbTintColor={colors.sage}
-            />
-            <Text style={{ fontSize: 11, fontWeight: "600", color: colors.ink, marginTop: 4 }}>{difficultyLevel.meaning}</Text>
-            <Text style={{ fontSize: 10, fontWeight: "500", color: colors.muted, marginTop: 2 }}>Examples: {difficultyLevel.examples}</Text>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: -2 }}>
-              <Text style={{ fontSize: 9, fontWeight: "500", color: colors.faint }}>Simple</Text>
-              <Text style={{ fontSize: 9, fontWeight: "500", color: colors.faint }}>Expert</Text>
+            <View style={styles.sliderCard}>
+              <Slider
+                minimumValue={1}
+                maximumValue={10}
+                step={1}
+                value={difficultyVal}
+                onValueChange={setDifficultyVal}
+                minimumTrackTintColor={colors.sageMid}
+                maximumTrackTintColor="#F0F0EC"
+                thumbTintColor={colors.sage}
+              />
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: -2 }}>
+                <Text style={styles.sliderEnd}>Simple</Text>
+                <Text style={styles.sliderEnd}>Expert</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.ink, marginTop: 8 }}>{difficultyLevel.meaning}</Text>
+              <Text style={{ fontSize: 11, fontWeight: "500", color: colors.muted, marginTop: 2 }}>Examples: {difficultyLevel.examples}</Text>
             </View>
           </View>
 
           {/* INGREDIENTS */}
-          <View style={{ marginBottom: 20 }}>
-            <Text style={[styles.label, { marginBottom: 8 }]}>Ingredients</Text>
+          <View style={styles.field}>
+            <SectionLabel icon="list">Ingredients</SectionLabel>
             {ingredients.map((val, i) => (
               <ListRow
                 key={i}
@@ -541,15 +490,12 @@ export default function CreateScreen() {
                 placeholder={`e.g. ${["2 cloves garlic", "1 cup flour", "3 tbsp olive oil", "Salt to taste"][i % 4]}`}
               />
             ))}
-            <InteractivePressable onPress={() => ingredientsEditor.add()} style={styles.addRow}>
-              <View style={styles.addCircle}><Text style={{ color: colors.sage, fontSize: 12 }}>+</Text></View>
-              <Text style={styles.addText}>Add ingredient</Text>
-            </InteractivePressable>
+            <Button title="Add ingredient" icon="add" variant="ghost" size="sm" onPress={() => ingredientsEditor.add()} style={styles.addRow} />
           </View>
 
           {/* STEPS */}
-          <View style={{ marginBottom: 20 }}>
-            <Text style={[styles.label, { marginBottom: 8 }]}>Steps</Text>
+          <View style={styles.field}>
+            <SectionLabel icon="numberedList">Steps</SectionLabel>
             {steps.map((val, i) => (
               <ListRow
                 key={i}
@@ -560,22 +506,22 @@ export default function CreateScreen() {
                 placeholder={`Step ${i + 1}…`}
               />
             ))}
-            <InteractivePressable onPress={() => stepsEditor.add()} style={styles.addRow}>
-              <View style={styles.addCircle}><Text style={{ color: colors.sage, fontSize: 12 }}>+</Text></View>
-              <Text style={styles.addText}>Add step</Text>
-            </InteractivePressable>
+            <Button title="Add step" icon="add" variant="ghost" size="sm" onPress={() => stepsEditor.add()} style={styles.addRow} />
           </View>
 
           {/* DIETARY */}
-          <View style={{ marginBottom: 20 }}>
-            <Text style={[styles.label, { marginBottom: 8 }]}>Dietary</Text>
-            <TextInput
-              value={optionSearch}
-              onChangeText={setOptionSearch}
-              placeholder="Search dietary and cuisine options"
-              placeholderTextColor={colors.ghost}
-              style={[styles.input, { marginBottom: 8 }]}
-            />
+          <View style={styles.field}>
+            <SectionLabel icon="leaf">Dietary</SectionLabel>
+            <View style={[styles.input, styles.searchInput]}>
+              <AppIcon name="search" size={15} color={colors.muted} />
+              <TextInput
+                value={optionSearch}
+                onChangeText={setOptionSearch}
+                placeholder="Search dietary and cuisine options"
+                placeholderTextColor={colors.ghost}
+                style={styles.searchTextInput}
+              />
+            </View>
             {optionsLoading ? (
               <Text style={styles.optionStatus}>Loading dietary options…</Text>
             ) : dietaryOptions.length ? (
@@ -586,8 +532,8 @@ export default function CreateScreen() {
           </View>
 
           {/* CUISINE */}
-          <View style={{ marginBottom: 24 }}>
-            <Text style={[styles.label, { marginBottom: 8 }]}>Cuisine</Text>
+          <View style={styles.field}>
+            <SectionLabel icon="globe">Cuisine</SectionLabel>
             {optionsLoading ? (
               <Text style={styles.optionStatus}>Loading cuisine options…</Text>
             ) : cuisineOptions.length ? (
@@ -599,29 +545,26 @@ export default function CreateScreen() {
 
           {/* LIVE PREVIEW */}
           <View style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <SectionLabel>Feed preview</SectionLabel>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.clay, marginBottom: 8 }} />
-            </View>
+            <SectionLabel icon="eye">Feed preview</SectionLabel>
             <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
               <View style={{ width: 160 }}>
-                <PreviewCard name={recipeName} difficulty={difficulty} photoSrc={photoSrc} />
+                <PreviewCard name={recipeName} difficulty={difficulty} photoSrc={photoSrc} authorName={currentUser?.username || "you"} authorImage={currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE} />
               </View>
               <View style={{ flex: 1, paddingTop: 4 }}>
-                <Text style={{ fontSize: 10, fontWeight: "500", color: colors.muted, lineHeight: 16 }}>
+                <Text style={{ fontSize: 11, fontWeight: "500", color: colors.muted, lineHeight: 17 }}>
                   This is how your recipe will appear in the Explore feed and your profile.
                 </Text>
                 {pct === 100 ? (
-                  <View style={{ marginTop: 8, flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Text style={{ fontSize: 12 }}>✅</Text>
-                    <Text style={{ fontSize: 10, fontWeight: "700", color: colors.sage }}>Ready to publish!</Text>
-                  </View>
+                  <Animated.View entering={ZoomIn.springify()} style={{ marginTop: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <AppIcon name="checkCircle" size={16} color={colors.sage} />
+                    <Text style={{ fontSize: 12, fontWeight: "800", color: colors.sage }}>Ready to publish!</Text>
+                  </Animated.View>
                 ) : (
-                  <View style={{ marginTop: 8, gap: 4 }}>
-                    {!doneFlags[0] && <Todo text="Add a photo" />}
-                    {!doneFlags[1] && <Todo text="Name your recipe" />}
-                    {!doneFlags[2] && <Todo text="Add ingredients" />}
-                    {!doneFlags[3] && <Todo text="Add steps" />}
+                  <View style={{ marginTop: 10, gap: 6 }}>
+                    <Todo text="Add a photo" done={doneFlags[0]} />
+                    <Todo text="Name your recipe" done={doneFlags[1]} />
+                    <Todo text="Add ingredients" done={doneFlags[2]} />
+                    <Todo text="Add steps" done={doneFlags[3]} />
                   </View>
                 )}
               </View>
@@ -637,72 +580,77 @@ export default function CreateScreen() {
         pointerEvents="box-none"
         style={styles.publishWrap}
       >
-        {publishError ? <Text style={styles.publishError}>{publishError}</Text> : null}
-        <InteractivePressable
-          disabled={isPublishing}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: isPublishing }}
+        {publishError ? (
+          <Animated.View entering={FadeIn} style={styles.publishErrorRow}>
+            <Text style={styles.publishError}>{publishError}</Text>
+          </Animated.View>
+        ) : null}
+        <Button
+          title={isPublishing ? "Publishing…" : "Publish recipe"}
+          icon={pct === 100 ? "celebrate" : undefined}
+          iconRight={pct === 100 ? undefined : "forward"}
+          size="lg"
+          loading={isPublishing}
           onPress={() => void handlePublish()}
-          style={({ pressed }) => [
-            styles.publishBtn,
-            !isPublishing
-              ? { backgroundColor: colors.sage, shadowColor: colors.sage, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }
-              : { backgroundColor: "#C8D4C0" },
-            pressed && { transform: [{ scale: 0.98 }] },
-          ]}
-        >
-          <Text style={{ color: isPublishing ? colors.sage : "#fff", fontSize: 14, fontWeight: "800" }}>
-            {isPublishing ? "Publishing…" : pct === 100 ? "🎉 Publish recipe" : "Publish recipe →"}
-          </Text>
-        </InteractivePressable>
+          style={{ width: "100%" }}
+        />
       </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
 
-function Todo({ text }: { text: string }) {
+function Todo({ text, done }: { text: string; done: boolean }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.cream, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ fontSize: 8, color: colors.faint }}>○</Text>
-      </View>
-      <Text style={{ fontSize: 10, fontWeight: "500", color: colors.faint }}>{text}</Text>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <AppIcon name={done ? "checkCircle" : "circle"} size={14} color={done ? colors.sage : colors.ghost} />
+      <Text style={{ fontSize: 11, fontWeight: done ? "700" : "500", color: done ? colors.sage : colors.faint, textDecorationLine: done ? "line-through" : "none" }}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
-  eyebrow: { fontSize: 10, fontWeight: "800", color: colors.sage, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 4 },
-  h1: { fontFamily: fonts.heading, fontSize: 30, color: colors.ink, lineHeight: 36 },
-  subtitle: { fontSize: 14, fontWeight: "500", color: colors.muted, marginTop: 4, lineHeight: 21 },
-  sectionLabel: { fontSize: 10, fontWeight: "800", color: colors.muted, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8 },
-  label: { fontSize: 12, fontWeight: "700", color: colors.ink, marginBottom: 6 },
+  field: { marginBottom: 22 },
 
-  input: { backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: "500", color: colors.ink },
-  inputFocused: { borderColor: colors.sage, shadowColor: colors.sage, shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 0 } },
+  input: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: "500", color: colors.ink },
+  inputFocused: { borderColor: colors.sage, shadowColor: colors.sage, shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 0 } },
+  searchInput: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  searchTextInput: { flex: 1, padding: 0, fontSize: 14, fontWeight: "500", color: colors.ink },
 
-  indexBubble: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.sageLight, alignItems: "center", justifyContent: "center" },
-  indexText: { fontSize: 9, fontWeight: "800", color: colors.sage },
+  progressCard: { marginBottom: 22, padding: 14, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, ...shadowSm },
+  progressHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  progressTitle: { fontSize: 13, fontWeight: "800", color: colors.ink },
+  progressPct: { fontSize: 12, fontWeight: "800", color: colors.sage },
+
+  indexBubble: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.sageLight, alignItems: "center", justifyContent: "center" },
+  indexBubbleDone: { backgroundColor: colors.sage },
+  indexText: { fontSize: 10, fontWeight: "800", color: colors.sage },
+  indexTextDone: { color: "#fff" },
   removeBtn: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  removeBtnHover: { backgroundColor: colors.terraBg },
 
-  photoBtn: { width: "100%", borderRadius: 16, borderWidth: 2, borderStyle: "dashed", borderColor: colors.clay, overflow: "hidden" },
-  plusCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(217,162,139,0.8)", alignItems: "center", justifyContent: "center" },
-  photoLabel: { backgroundColor: "rgba(255,255,255,0.8)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  photoBtn: { width: "100%", borderRadius: radii.lg, borderWidth: 2, borderStyle: "dashed", borderColor: colors.clay, overflow: "hidden" },
+  photoBtnFilled: { borderStyle: "solid", borderWidth: 1, borderColor: colors.border },
+  photoBtnHover: { borderColor: colors.terracotta },
+  plusCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(217,162,139,0.9)", alignItems: "center", justifyContent: "center" },
+  photoLabel: { backgroundColor: "rgba(255,255,255,0.85)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.pill },
+  changePhotoPill: { position: "absolute", right: 10, bottom: 10, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radii.pill, backgroundColor: "rgba(255,255,255,0.92)" },
+  changePhotoText: { fontSize: 11, fontWeight: "800", color: colors.ink },
 
-  addRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  addCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colors.sage, alignItems: "center", justifyContent: "center" },
-  addText: { fontSize: 12, fontWeight: "700", color: colors.sage },
+  sliderCard: { padding: 12, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
+  sliderEnd: { fontSize: 10, fontWeight: "600", color: colors.faint },
+
+  addRow: { alignSelf: "flex-start", marginTop: 2, paddingHorizontal: 8 },
   optionStatus: { fontSize: 12, fontWeight: "500", color: colors.muted },
 
-  tagChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff" },
+  previewCard: { borderRadius: radii.lg, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, width: "100%" },
 
-  previewCard: { borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: "#fff", width: "100%" },
+  successRoot: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  successCircle: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.sageLight, alignItems: "center", justifyContent: "center", marginBottom: 20 },
+  successTitle: { fontFamily: fonts.heading, fontSize: 26, color: colors.ink, marginBottom: 8 },
+  successBody: { fontSize: 14, fontWeight: "500", color: colors.muted, lineHeight: 22, textAlign: "center", marginBottom: 24 },
 
-  successCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.sageLight, alignItems: "center", justifyContent: "center", marginBottom: 20 },
-  primaryBtn: { backgroundColor: colors.sage, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16 },
-
-  publishWrap: { position: "absolute", left: 0, right: 0, bottom: Platform.OS === "web" ? 104 : BottomTabInset + 12, paddingHorizontal: 16, paddingBottom: Platform.OS === "web" ? 16 : 12 + BottomTabInset, paddingTop: 12 },
-  publishBtn: { width: "100%", paddingVertical: 16, borderRadius: 16, alignItems: "center" },
-  publishError: { marginBottom: 8, color: "#B42318", fontSize: 12, textAlign: "center" },
+  publishWrap: { position: "absolute", left: 0, right: 0, bottom: Platform.OS === "web" ? 104 : BottomTabInset + 12, paddingHorizontal: layout.gutter, paddingBottom: Platform.OS === "web" ? 16 : 12 + BottomTabInset, paddingTop: 12 },
+  publishErrorRow: { marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.md, backgroundColor: colors.dangerBg },
+  publishError: { color: colors.danger, fontSize: 12, textAlign: "center" },
 });

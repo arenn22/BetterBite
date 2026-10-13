@@ -44,12 +44,14 @@ export default function Signup() {
 
 					<View style={styles.form}>
 						<AuthInput
+							icon="profile"
 							placeholder="Username"
 							value={usernameInput}
 							onChangeText={setUsernameInput}
 						/>
 
 						<AuthInput
+							icon="mail"
 							placeholder="Email Address"
 							value={emailInput}
 							onChangeText={setEmailInput}
@@ -59,6 +61,7 @@ export default function Signup() {
 						/>
 
 						<AuthInput
+							icon="lock"
 							placeholder="Password"
 							secureTextEntry
 							value={passwordInput}
@@ -72,6 +75,7 @@ export default function Signup() {
 								title={loading ? "Signing Up..." : "Sign Up"}
 								onPress={onSignUp}
 								disabled={loading}
+								loading={loading}
 							/>
 						</View>
 

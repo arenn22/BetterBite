@@ -1,5 +1,8 @@
+import { loadAsync } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import materialSymbols from "expo-symbols/androidWeights/regular";
+import { Platform } from "react-native";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { AuthProvider, useAuthContext } from "@/lib/auth/auth-context";
@@ -12,6 +15,14 @@ import { useEffect } from "react";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+	// Android and web draw icons with the Material Symbols font; start loading it
+	// as soon as the app mounts so icons are ready by the first screen.
+	useEffect(() => {
+		if (Platform.OS !== "ios") {
+			void loadAsync({ [materialSymbols.name]: materialSymbols.font }).catch(() => {});
+		}
+	}, []);
+
 	return (
 		<AuthProvider>
 			<>

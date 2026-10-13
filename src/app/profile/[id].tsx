@@ -1,4 +1,5 @@
 import { ProfileScreenContent } from "@/app/(tabs)/profile";
+import { colors } from "@/app/(tabs)/theme";
 import { useLocalSearchParams } from "expo-router";
 import { Platform, StyleSheet, View } from "react-native";
 
@@ -17,6 +18,6 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: Platform.OS === "web" ? 1080 : 430,
     alignSelf: "center",
-    backgroundColor: "#F7F7F4",
+    backgroundColor: colors.bg,
   },
 });

@@ -14,7 +14,15 @@ import {
     View,
 } from "react-native";
 
-import { colors, fonts, shadowSm } from "@/app/(tabs)/theme";
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSequence, withSpring } from "react-native-reanimated";
+
+import { colors, fonts, radii, shadowLg } from "@/app/(tabs)/theme";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AppIcon, type IconName } from "@/components/ui/icon";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { TagChip } from "@/components/ui/tag-chip";
+import type { TagKind } from "@/constants/tag-icons";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { useRecipeOptions } from "@/hooks/use-recipe-options";
 import {
@@ -68,30 +76,62 @@ function formatDate(value: Date | string) {
   return days === 1 ? "1 day ago" : `${days} days ago`;
 }
 
-function StarRating({ value, onChange }: { value: number; onChange?: (rating: number) => void }) {
+function StarRating({ value, onChange, size = 20 }: { value: number; onChange?: (rating: number) => void; size?: number }) {
   return (
     <View style={styles.stars}>
-      {[1, 2, 3, 4, 5].map((rating) => (
-        <Pressable
-          key={rating}
-          disabled={!onChange}
-          onPress={() => onChange?.(rating)}
-          accessibilityRole={onChange ? "button" : undefined}
-          accessibilityLabel={onChange ? `${rating} star${rating === 1 ? "" : "s"}` : undefined}
-          style={({ pressed }) => [pressed && onChange ? styles.starPressed : null]}
-        >
-          <Text style={[styles.star, rating <= value ? styles.starSelected : styles.starMuted]}>★</Text>
-        </Pressable>
-      ))}
+      {[1, 2, 3, 4, 5].map((rating) => {
+        const star = <AppIcon name="star" size={size} color={rating <= value ? colors.gold : colors.border} />;
+        return onChange ? (
+          <PressableScale
+            key={rating}
+            onPress={() => onChange(rating)}
+            pressScale={0.8}
+            hoverScale={1.15}
+            accessibilityRole="button"
+            accessibilityLabel={`${rating} star${rating === 1 ? "" : "s"}`}
+          >
+            {star}
+          </PressableScale>
+        ) : (
+          <View key={rating}>{star}</View>
+        );
+      })}
     </View>
   );
 }
 
-function EmptyState({ title, message }: { title: string; message: string }) {
+/** Heart button that pops when a recipe is liked. */
+function LikeButton({ liked, likes, loading, onPress }: { liked: boolean; likes: number; loading: boolean; onPress: () => void }) {
+  const pop = useSharedValue(1);
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+
   return (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyMessage}>{message}</Text>
+    <PressableScale
+      onPress={() => {
+        if (!liked) pop.value = withSequence(withSpring(1.45, { damping: 6, stiffness: 400 }), withSpring(1, { damping: 10, stiffness: 300 }));
+        onPress();
+      }}
+      disabled={loading}
+      pressScale={0.92}
+      style={[styles.likeButton, liked && styles.likeButtonActive]}
+      hoverStyle={liked ? styles.likeButtonActiveHover : styles.likeButtonHover}
+      accessibilityRole="button"
+      accessibilityLabel={liked ? `Unlike post, ${likes} likes` : `Like post, ${likes} likes`}
+      accessibilityState={{ disabled: loading }}
+    >
+      <Animated.View style={popStyle}>
+        <AppIcon name={liked ? "heartFill" : "heart"} size={16} color="#fff" weight="semibold" />
+      </Animated.View>
+      <Text style={styles.likeCount}>{likes.toLocaleString()}</Text>
+    </PressableScale>
+  );
+}
+
+function SectionTitle({ icon, children }: { icon: IconName; children: string }) {
+  return (
+    <View style={styles.detailSectionHeader}>
+      <AppIcon name={icon} size={13} color={colors.sage} weight="bold" />
+      <Text style={styles.detailSectionTitle}>{children}</Text>
     </View>
   );
 }
@@ -109,7 +149,7 @@ export function RecipeDetailsModal({
   onLike,
   onAuthorPress,
 }: RecipeDetailsModalProps) {
-  const { currentUser } = useAuthContext();
+  const { currentUser, refreshCurrentUser } = useAuthContext();
   const { dietaryOptions, cuisineOptions } = useRecipeOptions();
   const [communityTab, setCommunityTab] = useState<CommunityTab>("cooks");
   const [reviews, setReviews] = useState<PostReviewWithAuthor[]>([]);
@@ -166,7 +206,16 @@ export function RecipeDetailsModal({
   const inferredTagNames = [recipeData.tags, recipeData.dietary, recipeData.dietaryRestrictions, recipeData.cuisine, recipeData.cuisines]
     .flatMap((value) => asTextList(Array.isArray(value) ? value : [value]))
     .filter((name) => name.trim().length > 0);
-  const displayTags = [...new Set([...dietaryNames, ...cuisineNames, ...inferredTagNames])];
+  const displayTags: { name: string; kind?: TagKind }[] = [];
+  const seenTags = new Set<string>();
+  const tagGroups: [string[], TagKind | undefined][] = [[dietaryNames, "dietary"], [cuisineNames, "cuisine"], [inferredTagNames, undefined]];
+  for (const [names, kind] of tagGroups) {
+    for (const name of names) {
+      if (seenTags.has(name)) continue;
+      seenTags.add(name);
+      displayTags.push({ name, kind });
+    }
+  }
   const authorName = post.author_username || "BetterBite member";
   const hasCooked = Boolean(currentUser && cookedPhotos.some((photo) => photo.profile_id === currentUser.id));
   const cookPhotoCount = cookedPhotos.length;
@@ -238,6 +287,7 @@ export function RecipeDetailsModal({
       }
 
       setActionMessage(successMessage);
+      void refreshCurrentUser().catch((error) => console.error("Unable to refresh streak after cooking:", error));
       if (followUpError) {
         setActionError(`Your cook photo was shared, but follow-up details could not be loaded: ${followUpError}`);
       }
@@ -291,40 +341,31 @@ export function RecipeDetailsModal({
           accessibilityLabel="Close recipe details"
         />
         <KeyboardAvoidingView style={styles.sheetFrame} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <View style={[styles.detailCard, shadowSm]}>
-            <View style={styles.dragHandle} />
+          <Animated.View entering={FadeInDown.duration(240)} style={[styles.detailCard, shadowLg]}>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View style={styles.detailHero}>
                 {post.image_url && !imageFailed ? (
                   <Image source={{ uri: post.image_url }} style={styles.fill} resizeMode="cover" onError={() => setImageFailed(true)} />
                 ) : (
                   <View style={[styles.fill, styles.heroFallback]}>
-                    <Text style={styles.heroFallbackText}>Image unavailable</Text>
+                    <AppIcon name="forkKnife" size={36} color={colors.sageMid} />
+                    <Text style={styles.heroFallbackText}>No photo yet</Text>
                   </View>
                 )}
                 <View style={styles.heroShade} />
-                <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close recipe details">
-                  <Text style={styles.closeText}>×</Text>
-                </Pressable>
+                <PressableScale onPress={onClose} style={styles.closeButton} hoverStyle={styles.closeButtonHover} pressScale={0.88} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close recipe details">
+                  <AppIcon name="close" size={15} color="#fff" weight="bold" />
+                </PressableScale>
                 <View style={styles.difficultyBadge}>
-                  <Text style={styles.difficultyBadgeText}>{difficulty}</Text>
+                  <AppIcon name="chart" size={11} color={colors.sage} weight="semibold" />
+                  <Text numberOfLines={1} style={styles.difficultyBadgeText}>{difficulty}</Text>
                 </View>
-                <Pressable
-                  onPress={() => void handleLike()}
-                  disabled={likeLoading}
-                  style={[styles.likeButton, liked && styles.likeButtonActive]}
-                  accessibilityRole="button"
-                  accessibilityLabel={liked ? `Unlike post, ${likes} likes` : `Like post, ${likes} likes`}
-                  accessibilityState={{ disabled: likeLoading }}
-                >
-                  <Text style={styles.likeIcon}>{liked ? "♥" : "♡"}</Text>
-                  <Text style={styles.likeCount}>{likes.toLocaleString()}</Text>
-                </Pressable>
+                <LikeButton liked={liked} likes={likes} loading={likeLoading} onPress={() => void handleLike()} />
               </View>
 
               <View style={styles.detailContent}>
                 <Text style={styles.detailTitle}>{post.title || "Untitled recipe"}</Text>
-                <Pressable onPress={onAuthorPress} disabled={!onAuthorPress} style={styles.authorRow} accessibilityRole={onAuthorPress ? "button" : undefined}>
+                <PressableScale onPress={onAuthorPress} disabled={!onAuthorPress} pressScale={0.98} style={styles.authorRow} hoverStyle={styles.authorRowHover} accessibilityRole={onAuthorPress ? "button" : undefined}>
                   {post.author_pfp_url ? (
                     <Image source={{ uri: post.author_pfp_url }} style={styles.authorAvatar} />
                   ) : (
@@ -332,28 +373,35 @@ export function RecipeDetailsModal({
                       <Text style={styles.authorInitialsText}>{authorName.slice(0, 1).toUpperCase()}</Text>
                     </View>
                   )}
-                  <Text style={styles.authorName}>by {authorName}</Text>
+                  <Text style={styles.authorName}>by <Text style={styles.authorNameStrong}>{authorName}</Text></Text>
+                  {onAuthorPress ? <AppIcon name="chevronRight" size={11} color={colors.faint} weight="semibold" /> : null}
+                </PressableScale>
+                <View style={styles.metaRow}>
                   {averageRating !== null ? (
-                    <>
-                      <Text style={styles.metaDivider}>·</Text>
-                      <Text style={styles.averageRating}>★ {averageRating.toFixed(1)} ({reviews.length})</Text>
-                    </>
+                    <View style={[styles.metaPill, styles.ratingPill]}>
+                      <AppIcon name="star" size={11} color={colors.gold} />
+                      <Text style={[styles.metaText, { color: colors.ink }]}>{averageRating.toFixed(1)} ({reviews.length})</Text>
+                    </View>
                   ) : null}
-                  <Text style={styles.metaDivider}>·</Text>
-                  {cookingTime ? <Text style={styles.authorName}>{cookingTime}</Text> : null}
-                  <Text style={styles.metaDivider}>·</Text>
-                  <Text style={styles.authorName}>{views.toLocaleString()} views</Text>
-                </Pressable>
+                  {cookingTime ? (
+                    <View style={styles.metaPill}>
+                      <AppIcon name="clock" size={11} color={colors.sage} />
+                      <Text style={styles.metaText}>{cookingTime}</Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.metaPill}>
+                    <AppIcon name="eye" size={11} color={colors.sage} />
+                    <Text style={styles.metaText}>{views.toLocaleString()} views</Text>
+                  </View>
+                </View>
                 {post.description?.trim() ? <Text style={styles.description}>{post.description.trim()}</Text> : null}
 
                 {displayTags.length > 0 ? (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>Tags</Text>
+                    <SectionTitle icon="tag">Tags</SectionTitle>
                     <View style={styles.tagRow}>
                       {displayTags.map((tag) => (
-                        <View key={tag} style={styles.tagChip}>
-                          <Text style={styles.tagText}>{tag}</Text>
-                        </View>
+                        <TagChip key={tag.name} label={tag.name} kind={tag.kind} icon={tag.kind ? undefined : "tag"} size="sm" />
                       ))}
                     </View>
                   </View>
@@ -361,7 +409,7 @@ export function RecipeDetailsModal({
 
                 {ingredients.length > 0 ? (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>Ingredients</Text>
+                    <SectionTitle icon="list">Ingredients</SectionTitle>
                     {ingredients.map((ingredient, index) => (
                       <View key={`${index}-${ingredient}`} style={styles.listRow}>
                         <View style={styles.listBullet} />
@@ -373,7 +421,7 @@ export function RecipeDetailsModal({
 
                 {steps.length > 0 ? (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>Method</Text>
+                    <SectionTitle icon="numberedList">Method</SectionTitle>
                     {steps.map((step, index) => (
                       <View key={`${index}-${step}`} style={styles.stepRow}>
                         <View style={styles.stepNumber}><Text style={styles.stepNumberText}>{index + 1}</Text></View>
@@ -389,35 +437,50 @@ export function RecipeDetailsModal({
                       const active = communityTab === tab;
                       const count = tab === "cooks" ? cookPhotoCount : reviews.length;
                       return (
-                        <Pressable key={tab} onPress={() => setCommunityTab(tab)} style={[styles.communityTab, active && styles.communityTabActive]} accessibilityRole="tab" accessibilityState={{ selected: active }}>
+                        <PressableScale key={tab} onPress={() => setCommunityTab(tab)} pressScale={0.97} style={[styles.communityTab, active && styles.communityTabActive]} hoverStyle={active ? null : styles.communityTabHover} accessibilityRole="tab" accessibilityState={{ selected: active }}>
+                          <AppIcon name={tab === "cooks" ? "camera" : "star"} size={13} color={active ? colors.sage : colors.faint} />
                           <Text style={[styles.communityTabText, active && styles.communityTabTextActive]}>
-                            {tab === "cooks" ? "Cooked photos" : "Reviews"}{count > 0 ? `  ${count}` : ""}
+                            {tab === "cooks" ? "Cooked photos" : "Reviews"}
                           </Text>
-                        </Pressable>
+                          {count > 0 ? (
+                            <View style={[styles.countBubble, active && styles.countBubbleActive]}>
+                              <Text style={[styles.countBubbleText, active && styles.countBubbleTextActive]}>{count}</Text>
+                            </View>
+                          ) : null}
+                        </PressableScale>
                       );
                     })}
                   </View>
 
-                  {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
-                  {actionMessage ? <Text style={styles.actionMessage}>{actionMessage}</Text> : null}
+                  {actionError ? (
+                    <Animated.View entering={FadeInDown.duration(200)} style={[styles.banner, styles.errorBanner]}>
+                      <AppIcon name="close" size={12} color={colors.danger} weight="bold" />
+                      <Text style={styles.actionError}>{actionError}</Text>
+                    </Animated.View>
+                  ) : null}
+                  {actionMessage ? (
+                    <Animated.View entering={FadeInDown.duration(200)} style={[styles.banner, styles.successBanner]}>
+                      <AppIcon name="checkCircle" size={14} color={colors.sage} />
+                      <Text style={styles.actionMessage}>{actionMessage}</Text>
+                    </Animated.View>
+                  ) : null}
 
                   {communityTab === "cooks" ? (
-                    <View>
+                    <Animated.View key="cooks" entering={FadeInDown.duration(220)}>
                       {currentUser ? (
                         <View style={styles.cookPanel}>
-                          <Text style={styles.cookPanelTitle}>Cook & share</Text>
+                          <View style={styles.cookPanelHeader}>
+                            <AppIcon name="pan" size={16} color={colors.terracotta} />
+                            <Text style={styles.cookPanelTitle}>Cook & share</Text>
+                          </View>
                           <Text style={styles.cookPanelSub}>Add a photo of your version to the community.</Text>
                           {cookImageUri ? (
                             <Image source={{ uri: cookImageUri }} style={styles.cookPreview} resizeMode="cover" />
                           ) : null}
                           <View style={styles.cookActions}>
-                            <Pressable onPress={() => void chooseCookPhoto()} style={styles.secondaryButton} accessibilityRole="button">
-                              <Text style={styles.secondaryButtonText}>{cookImageUri ? "Choose another photo" : "Choose photo"}</Text>
-                            </Pressable>
+                            <Button title={cookImageUri ? "Choose another" : "Choose photo"} icon="addPhoto" variant="outline" size="sm" onPress={() => void chooseCookPhoto()} />
                             {cookImageUri ? (
-                              <Pressable onPress={() => void shareCook()} disabled={cookSaving} style={[styles.primaryButton, cookSaving && styles.buttonDisabled]} accessibilityRole="button" accessibilityState={{ disabled: cookSaving }}>
-                                {cookSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.primaryButtonText}>Share cook</Text>}
-                              </Pressable>
+                              <Button title="Share cook" icon="forward" size="sm" loading={cookSaving} onPress={() => void shareCook()} />
                             ) : null}
                           </View>
                         </View>
@@ -426,23 +489,23 @@ export function RecipeDetailsModal({
                       {engagementLoading ? <ActivityIndicator color={colors.sage} style={{ marginVertical: 24 }} /> : cookedPhotos.length ? (
                         <View style={styles.photoGrid}>
                           {cookedPhotos.map((photo, index) => (
-                            <View key={photo.id || `${photo.profile_id}-${photo.post_id}-${photo.created_at}-${index}`} style={styles.cookedPhotoItem}>
+                            <Animated.View key={photo.id || `${photo.profile_id}-${photo.post_id}-${photo.created_at}-${index}`} entering={FadeInDown.delay(Math.min(index, 8) * 40).duration(240)} style={styles.cookedPhotoItem}>
                               <Image source={{ uri: photo.image_url }} style={styles.cookedPhoto} resizeMode="cover" />
                               <Text numberOfLines={1} style={styles.photoAuthor}>{photo.author_username}</Text>
-                            </View>
+                            </Animated.View>
                           ))}
                         </View>
                       ) : (
-                        <EmptyState title="No cook photos yet" message="Share your version of this recipe to start the gallery." />
+                        <EmptyState icon="camera" title="No cook photos yet" message="Share your version of this recipe to start the gallery." />
                       )}
-                    </View>
+                    </Animated.View>
                   ) : (
-                    <View>
+                    <Animated.View key="reviews" entering={FadeInDown.duration(220)}>
                       {currentUser && hasCooked ? (
                         <View style={styles.reviewForm}>
                           <Text style={styles.reviewFormTitle}>Leave a review</Text>
                           <View style={styles.ratingRow}>
-                            <StarRating value={reviewRating} onChange={setReviewRating} />
+                            <StarRating value={reviewRating} onChange={setReviewRating} size={24} />
                             <Text style={styles.ratingLabel}>{reviewRating ? `${reviewRating} / 5` : "Tap to rate"}</Text>
                           </View>
                           <TextInput
@@ -455,24 +518,23 @@ export function RecipeDetailsModal({
                             textAlignVertical="top"
                             style={styles.reviewInput}
                           />
-                          <Pressable onPress={() => void submitReview()} disabled={!canSubmitReview} style={[styles.primaryButton, !canSubmitReview && styles.buttonDisabled]} accessibilityRole="button" accessibilityState={{ disabled: !canSubmitReview }}>
-                            {reviewSaving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.primaryButtonText}>Post review</Text>}
-                          </Pressable>
+                          <Button title="Post review" icon="check" size="sm" loading={reviewSaving} disabled={!canSubmitReview} onPress={() => void submitReview()} style={{ alignSelf: "flex-start", marginTop: 10 }} />
                         </View>
                       ) : currentUser ? (
                         <View style={styles.reviewGate}>
-                          <Text style={styles.reviewGateTitle}>Cook this recipe to leave a review.</Text>
+                          <View style={styles.cookPanelHeader}>
+                            <AppIcon name="lock" size={14} color={colors.sage} />
+                            <Text style={styles.reviewGateTitle}>Cook this recipe to leave a review.</Text>
+                          </View>
                           <Text style={styles.reviewGateSub}>Share a cook photo first, then tell the community how it went.</Text>
-                          <Pressable onPress={() => setCommunityTab("cooks")} style={styles.secondaryButton} accessibilityRole="button">
-                            <Text style={styles.secondaryButtonText}>Share a cook photo</Text>
-                          </Pressable>
+                          <Button title="Share a cook photo" icon="camera" variant="outline" size="sm" onPress={() => setCommunityTab("cooks")} style={{ alignSelf: "flex-start" }} />
                         </View>
                       ) : null}
 
                       {engagementLoading ? <ActivityIndicator color={colors.sage} style={{ marginVertical: 24 }} /> : reviews.length ? (
                         <View style={styles.reviewList}>
                           {reviews.map((review, index) => (
-                            <View key={review.id || `${review.profile_id}-${review.created_at}-${index}`} style={styles.reviewItem}>
+                            <Animated.View key={review.id || `${review.profile_id}-${review.created_at}-${index}`} entering={FadeInDown.delay(Math.min(index, 8) * 40).duration(240)} style={styles.reviewItem}>
                               <View style={styles.reviewHeader}>
                                 {review.author_pfp_url ? (
                                   <Image source={{ uri: review.author_pfp_url }} style={styles.reviewAvatar} />
@@ -483,7 +545,7 @@ export function RecipeDetailsModal({
                                 )}
                                 <View style={{ flex: 1 }}>
                                   <Text style={styles.reviewAuthor}>{review.author_username}</Text>
-                                  <StarRating value={review.rating} />
+                                  <StarRating value={review.rating} size={13} />
                                 </View>
                                 <Text style={styles.reviewDate}>{formatDate(review.created_at)}</Text>
                               </View>
@@ -493,22 +555,25 @@ export function RecipeDetailsModal({
                                 return cookedPhoto?.image_url ? (
                                   <View style={styles.reviewCook}>
                                     <Image source={{ uri: cookedPhoto.image_url }} style={styles.reviewCookImage} resizeMode="cover" />
-                                    <Text style={styles.reviewCookCaption}>Cooked by {review.author_username}</Text>
+                                    <View style={styles.reviewCookCaptionRow}>
+                                      <AppIcon name="camera" size={10} color={colors.muted} />
+                                      <Text style={styles.reviewCookCaption}>Cooked by {review.author_username}</Text>
+                                    </View>
                                   </View>
                                 ) : null;
                               })()}
-                            </View>
+                            </Animated.View>
                           ))}
                         </View>
                       ) : (
-                        <EmptyState title="No reviews yet" message="Cook this recipe and share what you think." />
+                        <EmptyState icon="star" title="No reviews yet" message="Cook this recipe and share what you think." />
                       )}
-                    </View>
+                    </Animated.View>
                   )}
                 </View>
               </View>
             </ScrollView>
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -519,87 +584,88 @@ const styles = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
   modalRoot: { flex: 1, justifyContent: "center", alignItems: "center", padding: 16, backgroundColor: "rgba(0,0,0,0.5)" },
   sheetFrame: { width: "100%", maxWidth: 430, maxHeight: "94%" },
-  detailCard: { maxHeight: "100%", overflow: "hidden", borderRadius: 20, backgroundColor: colors.bg },
-  dragHandle: { alignSelf: "center", width: 40, height: 4, marginTop: 8, marginBottom: 4, borderRadius: 2, backgroundColor: colors.border },
-  detailHero: { height: 220, backgroundColor: colors.sageLight, overflow: "hidden" },
+  detailCard: { maxHeight: "100%", overflow: "hidden", borderRadius: radii.xl, backgroundColor: colors.bg },
+  detailHero: { height: 240, backgroundColor: colors.sageLight, overflow: "hidden" },
   heroShade: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.12)" },
-  heroFallback: { alignItems: "center", justifyContent: "center" },
+  heroFallback: { alignItems: "center", justifyContent: "center", gap: 8 },
   heroFallbackText: { color: colors.muted, fontSize: 12, fontWeight: "600" },
-  closeButton: { position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.48)" },
-  closeText: { color: "#fff", fontSize: 24, lineHeight: 27 },
-  difficultyBadge: { position: "absolute", top: 12, left: 12, maxWidth: 200, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.94)" },
-  difficultyBadgeText: { color: colors.sage, fontSize: 10, fontWeight: "800" },
-  likeButton: { position: "absolute", right: 12, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.52)" },
+  closeButton: { position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.45)" },
+  closeButtonHover: { backgroundColor: "rgba(0,0,0,0.65)" },
+  difficultyBadge: { position: "absolute", top: 12, left: 12, maxWidth: 220, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radii.pill, backgroundColor: "rgba(255,255,255,0.94)" },
+  difficultyBadgeText: { flexShrink: 1, color: colors.sage, fontSize: 10, fontWeight: "800" },
+  likeButton: { position: "absolute", right: 12, bottom: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.pill, backgroundColor: "rgba(0,0,0,0.5)" },
+  likeButtonHover: { backgroundColor: "rgba(0,0,0,0.68)" },
   likeButtonActive: { backgroundColor: colors.terracotta },
-  likeIcon: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  likeButtonActiveHover: { backgroundColor: "#B5734E" },
   likeCount: { color: "#fff", fontSize: 12, fontWeight: "800" },
   detailContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28 },
   detailTitle: { fontFamily: fonts.heading, fontSize: 24, lineHeight: 30, color: colors.ink },
-  authorRow: { flexDirection: "row", alignItems: "center", gap: 7, flexWrap: "wrap", marginTop: 8 },
+  authorRow: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 7, marginTop: 8, marginLeft: -6, paddingHorizontal: 6, paddingVertical: 4, borderRadius: radii.pill },
+  authorRowHover: { backgroundColor: colors.sageLight },
   authorAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.sageLight },
   authorInitials: { alignItems: "center", justifyContent: "center", backgroundColor: colors.sage },
   authorInitialsText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  authorName: { color: colors.muted, fontSize: 11, fontWeight: "500" },
-  averageRating: { color: colors.terracotta, fontSize: 11, fontWeight: "700" },
-  metaDivider: { color: colors.border, fontSize: 14 },
+  authorName: { color: colors.muted, fontSize: 12, fontWeight: "500" },
+  authorNameStrong: { color: colors.ink, fontWeight: "700" },
+  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
+  metaPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: radii.pill, backgroundColor: colors.sageLight },
+  ratingPill: { backgroundColor: "#F8EED6" },
+  metaText: { color: colors.sage, fontSize: 11, fontWeight: "700" },
   description: { marginTop: 16, color: colors.ink, fontSize: 13, lineHeight: 20 },
-  tagRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
-  tagChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.sageLight },
-  tagText: { color: colors.sage, fontSize: 10, fontWeight: "800" },
+  tagRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
   detailSection: { marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.divider },
-  detailSectionTitle: { marginBottom: 12, color: colors.muted, fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
+  detailSectionHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
+  detailSectionTitle: { color: colors.sage, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 1.5 },
   listRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 9 },
   listBullet: { width: 6, height: 6, marginTop: 6, borderRadius: 3, backgroundColor: colors.clay },
-  listText: { flex: 1, color: colors.ink, fontSize: 12, lineHeight: 18 },
+  listText: { flex: 1, color: colors.ink, fontSize: 13, lineHeight: 19 },
   stepRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 12 },
   stepNumber: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: colors.sage },
   stepNumberText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   communitySection: { marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.divider },
-  communityTabs: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.divider, marginBottom: 14 },
-  communityTab: { flex: 1, alignItems: "center", paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
-  communityTabActive: { borderBottomColor: colors.sage },
-  communityTabText: { color: colors.faint, fontSize: 12, fontWeight: "700" },
+  communityTabs: { flexDirection: "row", gap: 6, padding: 4, marginBottom: 14, borderRadius: radii.md, backgroundColor: colors.divider },
+  communityTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 9, borderRadius: radii.sm },
+  communityTabHover: { backgroundColor: "rgba(255,255,255,0.5)" },
+  communityTabActive: { backgroundColor: colors.card, shadowColor: colors.ink, shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  communityTabText: { color: colors.muted, fontSize: 12, fontWeight: "700" },
   communityTabTextActive: { color: colors.ink },
-  cookPanel: { padding: 14, borderWidth: 1, borderColor: "#EDD5C4", borderRadius: 14, backgroundColor: "#FDF0EA" },
+  countBubble: { minWidth: 18, alignItems: "center", paddingHorizontal: 5, paddingVertical: 1, borderRadius: radii.pill, backgroundColor: colors.card },
+  countBubbleActive: { backgroundColor: colors.sageLight },
+  countBubbleText: { fontSize: 9, fontWeight: "800", color: colors.faint },
+  countBubbleTextActive: { color: colors.sage },
+  banner: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, paddingHorizontal: 10, paddingVertical: 8, borderRadius: radii.sm },
+  errorBanner: { backgroundColor: colors.dangerBg },
+  successBanner: { backgroundColor: colors.sageLight },
+  cookPanel: { padding: 14, borderWidth: 1, borderColor: "#EDD5C4", borderRadius: radii.lg, backgroundColor: colors.terraBg },
+  cookPanelHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   cookPanelTitle: { color: colors.ink, fontSize: 13, fontWeight: "800" },
-  cookPanelSub: { marginTop: 3, marginBottom: 12, color: colors.muted, fontSize: 10, lineHeight: 15 },
-  cookPreview: { width: "100%", height: 132, marginBottom: 10, borderRadius: 10, backgroundColor: colors.cream },
+  cookPanelSub: { marginTop: 3, marginBottom: 12, color: colors.muted, fontSize: 11, lineHeight: 16 },
+  cookPreview: { width: "100%", height: 140, marginBottom: 10, borderRadius: radii.md, backgroundColor: colors.cream },
   cookActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  primaryButton: { minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, backgroundColor: colors.sage },
-  primaryButtonText: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  secondaryButton: { minHeight: 38, alignItems: "center", justifyContent: "center", paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderStyle: "dashed", borderColor: colors.clay, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.5)" },
-  secondaryButtonText: { color: colors.terracotta, fontSize: 11, fontWeight: "800" },
-  buttonDisabled: { backgroundColor: colors.ghost },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 },
   cookedPhotoItem: { width: "31%", minWidth: 88 },
-  cookedPhoto: { width: "100%", aspectRatio: 1, borderRadius: 10, backgroundColor: colors.sageLight },
-  photoAuthor: { marginTop: 4, color: colors.muted, fontSize: 9, fontWeight: "600" },
-  reviewForm: { padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: "#fff" },
-  reviewFormTitle: { marginBottom: 10, color: colors.ink, fontSize: 12, fontWeight: "800" },
-  ratingRow: { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 10 },
+  cookedPhoto: { width: "100%", aspectRatio: 1, borderRadius: radii.sm, backgroundColor: colors.sageLight },
+  photoAuthor: { marginTop: 4, color: colors.muted, fontSize: 10, fontWeight: "600" },
+  reviewForm: { padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.card },
+  reviewFormTitle: { marginBottom: 10, color: colors.ink, fontSize: 13, fontWeight: "800" },
+  ratingRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
   stars: { flexDirection: "row", alignItems: "center", gap: 2 },
-  star: { fontSize: 19, lineHeight: 22 },
-  starSelected: { color: colors.clay },
-  starMuted: { color: colors.border },
-  starPressed: { transform: [{ scale: 1.15 }] },
-  ratingLabel: { color: colors.muted, fontSize: 10, fontWeight: "600" },
-  reviewInput: { minHeight: 88, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.bg, color: colors.ink, fontSize: 12, lineHeight: 18 },
-  reviewGate: { gap: 8, padding: 14, borderRadius: 12, backgroundColor: colors.sageLight },
-  reviewGateTitle: { color: colors.ink, fontSize: 12, fontWeight: "800" },
-  reviewGateSub: { color: colors.muted, fontSize: 10, lineHeight: 15 },
+  ratingLabel: { color: colors.muted, fontSize: 11, fontWeight: "600" },
+  reviewInput: { minHeight: 88, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.bg, color: colors.ink, fontSize: 13, lineHeight: 19 },
+  reviewGate: { gap: 8, padding: 14, borderRadius: radii.lg, backgroundColor: colors.sageLight },
+  reviewGateTitle: { flex: 1, color: colors.ink, fontSize: 12, fontWeight: "800" },
+  reviewGateSub: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   reviewList: { gap: 10, marginTop: 14 },
-  reviewItem: { padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: "#fff" },
+  reviewItem: { padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.card },
   reviewHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  reviewAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.sageLight },
-  reviewAuthor: { marginBottom: 2, color: colors.ink, fontSize: 11, fontWeight: "700" },
-  reviewDate: { color: colors.faint, fontSize: 9 },
-  reviewDescription: { marginTop: 8, color: colors.ink, fontSize: 11, lineHeight: 17 },
-  reviewCook: { marginTop: 10, overflow: "hidden", borderRadius: 10, backgroundColor: colors.sageLight },
+  reviewAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.sageLight },
+  reviewAuthor: { marginBottom: 2, color: colors.ink, fontSize: 12, fontWeight: "700" },
+  reviewDate: { color: colors.faint, fontSize: 10 },
+  reviewDescription: { marginTop: 8, color: colors.ink, fontSize: 12, lineHeight: 18 },
+  reviewCook: { marginTop: 10, overflow: "hidden", borderRadius: radii.sm, backgroundColor: colors.sageLight },
   reviewCookImage: { width: "100%", height: 120, backgroundColor: colors.sageLight },
-  reviewCookCaption: { paddingHorizontal: 8, paddingVertical: 5, color: colors.muted, fontSize: 9, fontWeight: "600" },
-  emptyState: { alignItems: "center", paddingVertical: 24, paddingHorizontal: 16 },
-  emptyTitle: { color: colors.ink, fontFamily: fonts.heading, fontSize: 16, fontWeight: "600", textAlign: "center" },
-  emptyMessage: { marginTop: 5, color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: "center" },
-  actionError: { marginBottom: 10, color: "#B42318", fontSize: 11, lineHeight: 16 },
-  actionMessage: { marginBottom: 10, color: colors.sage, fontSize: 11, fontWeight: "700" },
+  reviewCookCaptionRow: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 5 },
+  reviewCookCaption: { color: colors.muted, fontSize: 10, fontWeight: "600" },
+  actionError: { flex: 1, color: colors.danger, fontSize: 11, lineHeight: 16 },
+  actionMessage: { flex: 1, color: colors.sage, fontSize: 11, fontWeight: "700" },
 });
