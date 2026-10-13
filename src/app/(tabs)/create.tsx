@@ -9,8 +9,10 @@ import { createPost, uploadPostImage } from "@/services/api/posts";
 import Slider from "@expo/ui/community/slider";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+    Alert,
+    Animated,
     Image,
     KeyboardAvoidingView, Platform,
     Pressable,
@@ -20,12 +22,63 @@ import {
     TextInput,
     View,
 } from "react-native";
+import type { PressableProps } from "react-native";
 import Svg, { Circle, Ellipse, G, Line, Rect } from "react-native-svg";
 import { colors, fonts, shadowSm } from "./theme";
 
 // ─── Types & constants ───────────────────────────────────────────────────────
 
 type Difficulty = (typeof EXPERIENCE_LEVEL_NAMES)[number];
+
+function InteractivePressable({
+  children,
+  disabled = false,
+  onPressIn,
+  onPressOut,
+  onHoverIn,
+  onHoverOut,
+  style,
+  ...props
+}: PressableProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateScale = (toValue: number) => {
+    Animated.spring(scale, {
+      toValue,
+      useNativeDriver: true,
+      speed: 24,
+      bounciness: 5,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale }], opacity: disabled ? 0.65 : 1 }}>
+      <Pressable
+        {...props}
+        disabled={disabled}
+        onPressIn={(event) => {
+          animateScale(0.97);
+          onPressIn?.(event);
+        }}
+        onPressOut={(event) => {
+          animateScale(1);
+          onPressOut?.(event);
+        }}
+        onHoverIn={(event) => {
+          animateScale(1.015);
+          onHoverIn?.(event);
+        }}
+        onHoverOut={(event) => {
+          animateScale(1);
+          onHoverOut?.(event);
+        }}
+        style={style}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}
 
 const DIFFICULTY_LEVELS: Record<number, { name: Difficulty; meaning: string; examples: string }> = {
   1: { name: EXPERIENCE_LEVEL_NAMES[0], meaning: "No heat or single-step prep.", examples: "Sandwiches, cereal, basic salads" },
@@ -113,9 +166,9 @@ function ListRow({
         onBlur={() => setFocused(false)}
         style={[styles.input, { flex: 1, paddingVertical: 8, paddingHorizontal: 12 }, focused && styles.inputFocused]}
       />
-      <Pressable onPress={onRemove} hitSlop={6} style={styles.removeBtn}>
+      <InteractivePressable onPress={onRemove} hitSlop={6} style={styles.removeBtn}>
         <Text style={{ color: colors.ghost, fontSize: 12, fontWeight: "700" }}>✕</Text>
-      </Pressable>
+      </InteractivePressable>
     </View>
   );
 }
@@ -215,7 +268,7 @@ function TagChips({
         const active = selected.has(t.id);
         const emoji = OPTION_EMOJIS[t.name.trim().toLowerCase().replace(/\s+/g, "-")] ?? (kind === "dietary" ? "🥗" : "🍽️");
         return (
-          <Pressable
+          <InteractivePressable
             key={t.id}
             onPress={() => onToggle(t.id)}
             style={({ pressed }) => [
@@ -226,7 +279,7 @@ function TagChips({
           >
             <Text style={{ fontSize: 14 }}>{emoji}</Text>
             <Text style={{ fontSize: 12, fontWeight: "700", color: active ? "#fff" : colors.ink }}>{t.name}</Text>
-          </Pressable>
+          </InteractivePressable>
         );
       })}
     </View>
@@ -236,8 +289,8 @@ function TagChips({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function CreateScreen() {
-  const { currentUser } = useAuthContext();
-  const { dietaryOptions, cuisineOptions, loading: optionsLoading } = useRecipeOptions();
+  const { currentUser, refreshCurrentUser } = useAuthContext();
+  const { dietaryOptions, cuisineOptions, loading: optionsLoading, error: optionsError } = useRecipeOptions();
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const [recipeName, setRecipeName] = useState("");
   const [description, setDescription] = useState("");
@@ -266,12 +319,23 @@ export default function CreateScreen() {
   const cookingTime = Number(timeMinutes);
   const canPublish = doneFlags.every(Boolean) && Number.isInteger(cookingTime) && cookingTime > 0;
 
+  useEffect(() => {
+    if (optionsError) {
+      Alert.alert("Unable to load recipe options", optionsError);
+    }
+  }, [optionsError]);
+
   const handlePhoto = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"], // on older expo-image-picker use ImagePicker.MediaTypeOptions.Images
-      quality: 0.8,
-    });
-    if (!res.canceled && res.assets[0]) setPhotoSrc(res.assets[0].uri);
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"], // on older expo-image-picker use ImagePicker.MediaTypeOptions.Images
+        quality: 0.8,
+      });
+      if (!res.canceled && res.assets[0]) setPhotoSrc(res.assets[0].uri);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not open your photo library.";
+      Alert.alert("Photo selection failed", message);
+    }
   };
 
   const toggleTag = (set: Set<number>, id: number): Set<number> => {
@@ -284,34 +348,56 @@ export default function CreateScreen() {
   const handlePublish = async () => {
     setPublishError(null);
     if (!currentUser) {
-      setPublishError("Please sign in before publishing a recipe.");
+      const message = "Please sign in before publishing a recipe.";
+      setPublishError(message);
+      Alert.alert("Unable to publish recipe", message);
       return;
     }
     if (!canPublish) {
-      setPublishError("Add a photo, recipe name, at least one ingredient and step, and a valid cooking time.");
+      const message = "Add a photo, recipe name, at least one ingredient and step, and a valid cooking time.";
+      setPublishError(message);
+      Alert.alert("Recipe is incomplete", message);
       return;
     }
 
     setIsPublishing(true);
     try {
-      const imageUrl = await uploadPostImage(photoSrc!, currentUser.id);
-      await createPost({
-        title: recipeName.trim(),
-        description: description.trim(),
-        difficulty: difficultyVal,
-        imageUrl,
-        authorUsername: currentUser.username || currentUser.email.split("@")[0] || "BetterBite member",
-        recipeJson: {
-          ingredients: ingredients.map((ingredient) => ingredient.trim()).filter(Boolean),
-          steps: steps.map((step) => step.trim()).filter(Boolean),
-        },
-        restrictionIds: [...dietary],
-        cuisineIds: [...cuisines],
-        time: cookingTime,
-      });
+      let imageUrl: string;
+      try {
+        imageUrl = await uploadPostImage(photoSrc!, currentUser.id);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "The photo could not be uploaded.";
+        throw new Error(`Failed to upload the recipe photo: ${detail}`);
+      }
+
+      try {
+        await createPost({
+          title: recipeName.trim(),
+          description: description.trim(),
+          difficulty: difficultyVal,
+          imageUrl,
+          authorUsername: currentUser.username || currentUser.email.split("@")[0] || "BetterBite member",
+          recipeJson: {
+            ingredients: ingredients.map((ingredient) => ingredient.trim()).filter(Boolean),
+            steps: steps.map((step) => step.trim()).filter(Boolean),
+          },
+          restrictionIds: [...dietary],
+          cuisineIds: [...cuisines],
+          time: cookingTime,
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "The recipe could not be saved.";
+        throw new Error(`Failed to publish the recipe: ${detail}`);
+      }
+
       setPublished(true);
+      void refreshCurrentUser().catch((error) => {
+        console.error("Unable to refresh streak after publishing:", error);
+      });
     } catch (error) {
-      setPublishError(error instanceof Error ? error.message : "Unable to publish this recipe. Please try again.");
+      const message = error instanceof Error ? error.message : "Unable to publish this recipe. Please try again.";
+      setPublishError(message);
+      Alert.alert("Unable to publish recipe", message);
     } finally {
       setIsPublishing(false);
     }
@@ -327,7 +413,7 @@ export default function CreateScreen() {
         <Text style={{ fontSize: 14, fontWeight: "500", color: colors.muted, lineHeight: 22, textAlign: "center", marginBottom: 24 }}>
           <Text style={{ fontWeight: "700", color: colors.ink }}>{recipeName || "Your recipe"}</Text> is now live on the community table.
         </Text>
-        <Pressable
+        <InteractivePressable
           onPress={() => {
             setPublished(false);
             setRecipeName(""); setDescription(""); setPhotoSrc(null);
@@ -338,7 +424,7 @@ export default function CreateScreen() {
           style={({ pressed }) => [styles.primaryBtn, pressed && { transform: [{ scale: 0.95 }] }]}
         >
           <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Create another recipe</Text>
-        </Pressable>
+        </InteractivePressable>
       </View>
     );
   }
@@ -356,7 +442,7 @@ export default function CreateScreen() {
           {/* PHOTO UPLOAD */}
           <View style={{ marginBottom: 20 }}>
             <SectionLabel>Recipe photo</SectionLabel>
-            <Pressable
+            <InteractivePressable
               onPress={handlePhoto}
               style={({ pressed }) => [
                 styles.photoBtn,
@@ -381,7 +467,7 @@ export default function CreateScreen() {
                   </View>
                 </>
               )}
-            </Pressable>
+            </InteractivePressable>
           </View>
 
           {/* NAME & DESC */}
@@ -451,10 +537,10 @@ export default function CreateScreen() {
                 placeholder={`e.g. ${["2 cloves garlic", "1 cup flour", "3 tbsp olive oil", "Salt to taste"][i % 4]}`}
               />
             ))}
-            <Pressable onPress={() => ingredientsEditor.add()} style={styles.addRow}>
+            <InteractivePressable onPress={() => ingredientsEditor.add()} style={styles.addRow}>
               <View style={styles.addCircle}><Text style={{ color: colors.sage, fontSize: 12 }}>+</Text></View>
               <Text style={styles.addText}>Add ingredient</Text>
-            </Pressable>
+            </InteractivePressable>
           </View>
 
           {/* STEPS */}
@@ -470,10 +556,10 @@ export default function CreateScreen() {
                 placeholder={`Step ${i + 1}…`}
               />
             ))}
-            <Pressable onPress={() => stepsEditor.add()} style={styles.addRow}>
+            <InteractivePressable onPress={() => stepsEditor.add()} style={styles.addRow}>
               <View style={styles.addCircle}><Text style={{ color: colors.sage, fontSize: 12 }}>+</Text></View>
               <Text style={styles.addText}>Add step</Text>
-            </Pressable>
+            </InteractivePressable>
           </View>
 
           {/* DIETARY */}
@@ -541,7 +627,7 @@ export default function CreateScreen() {
         style={styles.publishWrap}
       >
         {publishError ? <Text style={styles.publishError}>{publishError}</Text> : null}
-        <Pressable
+        <InteractivePressable
           disabled={isPublishing}
           accessibilityRole="button"
           accessibilityState={{ disabled: isPublishing }}
@@ -557,7 +643,7 @@ export default function CreateScreen() {
           <Text style={{ color: isPublishing ? colors.sage : "#fff", fontSize: 14, fontWeight: "800" }}>
             {isPublishing ? "Publishing…" : pct === 100 ? "🎉 Publish recipe" : "Publish recipe →"}
           </Text>
-        </Pressable>
+        </InteractivePressable>
       </LinearGradient>
     </KeyboardAvoidingView>
   );

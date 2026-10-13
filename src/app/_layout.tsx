@@ -2,7 +2,12 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
-import { AuthProvider } from "@/lib/auth/auth-context";
+import { AuthProvider, useAuthContext } from "@/lib/auth/auth-context";
+import {
+	subscribeToFriendPostNotifications,
+	syncStreakReminder,
+} from "@/services/notifications";
+import { useEffect } from "react";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -10,6 +15,7 @@ export default function RootLayout() {
 	return (
 		<AuthProvider>
 			<>
+				<NotificationLifecycle />
 				<AnimatedSplashOverlay />
 
 				<Stack screenOptions={{ headerShown: false }}>
@@ -20,4 +26,27 @@ export default function RootLayout() {
 			</>
 		</AuthProvider>
 	);
+}
+
+function NotificationLifecycle() {
+	const { currentUser } = useAuthContext();
+
+	useEffect(() => {
+		void syncStreakReminder(currentUser).catch((error) => {
+			console.error("Unable to schedule streak reminder:", error);
+		});
+
+		let unsubscribe: (() => void) | undefined;
+		void subscribeToFriendPostNotifications(currentUser)
+			.then((cleanup) => {
+				unsubscribe = cleanup;
+			})
+			.catch((error) => {
+				console.error("Unable to subscribe to friend notifications:", error);
+			});
+
+		return () => unsubscribe?.();
+	}, [currentUser]);
+
+	return null;
 }
