@@ -147,7 +147,7 @@ function HomeScreen() {
                 ) : (
                   <View style={[styles.dayDot, isToday && styles.dayDotToday, i > todayIndex && styles.dayDotFuture]} />
                 )}
-                <Text style={[styles.dayLabel, active && styles.dayLabelActive, isToday && styles.dayLabelToday]}>{day}</Text>
+                <Text style={[styles.dayLabel, active && styles.dayLabelActive, isToday && styles.dayLabelToday]}>{isToday ? "Today" : day}</Text>
               </View>
             );
           })}
@@ -190,20 +190,20 @@ const styles = StyleSheet.create({
   avatarBadgeText: { color: colors.sage, fontSize: 8, fontWeight: "800", textAlign: "center" },
 
   // Streak
-  streakCard: { marginHorizontal: layout.gutter, marginBottom: layout.sectionGap, backgroundColor: colors.card, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, padding: 18 },
-  streakContent: { alignItems: "stretch", gap: 18 },
-  streakHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  streakCard: { marginHorizontal: layout.gutter, marginBottom: layout.sectionGap, backgroundColor: "#FFFCF8", borderRadius: radii.xl, borderWidth: 1, borderColor: "#F0DED2", padding: 18 },
+  streakContent: { alignItems: "stretch", gap: 16 },
+  streakHeader: { flexDirection: "row", alignItems: "center", gap: 13 },
   streakCopy: { flex: 1 },
-  streakTitle: { fontFamily: fonts.heading, fontSize: 26, color: colors.ink },
-  streakDays: { fontFamily: fonts.heading, fontSize: 19, color: colors.muted },
-  streakSubtitle: { marginTop: 2, fontSize: 12, fontWeight: "500", color: colors.muted },
-  streakDaysRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "center", gap: 4 },
-  dayColumn: { flex: 1, maxWidth: 42, alignItems: "center", gap: 6 },
-  dayDot: { width: "100%", aspectRatio: 1, borderRadius: radii.pill, alignItems: "center", justifyContent: "center", backgroundColor: colors.divider },
-  dayDotActive: { backgroundColor: colors.flame, shadowColor: colors.flame, shadowOpacity: 0.35, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  dayLabel: { fontSize: 10, fontWeight: "700", color: colors.faint, textTransform: "uppercase" },
+  streakTitle: { fontFamily: fonts.heading, fontSize: 28, color: colors.ink, lineHeight: 32 },
+  streakDays: { fontFamily: fonts.heading, fontSize: 17, color: colors.muted },
+  streakSubtitle: { marginTop: 3, fontSize: 12, fontWeight: "600", color: colors.muted },
+  streakDaysRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 4, paddingTop: 2 },
+  dayColumn: { flex: 1, maxWidth: 42, alignItems: "center", gap: 7 },
+  dayDot: { width: 34, height: 34, borderRadius: radii.pill, alignItems: "center", justifyContent: "center", backgroundColor: "#F1EDE7", borderWidth: 1, borderColor: "#E9E2DA" },
+  dayDotActive: { backgroundColor: colors.flame, borderColor: colors.flame, shadowColor: colors.flame, shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  dayLabel: { fontSize: 10, fontWeight: "700", color: colors.faint },
   dayLabelActive: { color: colors.flame },
-  dayDotToday: { borderWidth: 2, borderStyle: "dashed", borderColor: colors.clay, backgroundColor: colors.terraBg },
+  dayDotToday: { borderWidth: 2, borderColor: colors.terracotta, backgroundColor: colors.terraBg },
   dayDotFuture: { opacity: 0.55 },
-  dayLabelToday: { color: colors.ink, fontWeight: "800" },
+  dayLabelToday: { color: colors.terracotta, fontWeight: "800", fontSize: 9 },
 });
