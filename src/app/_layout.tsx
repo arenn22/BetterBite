@@ -49,15 +49,20 @@ function NotificationLifecycle() {
 		});
 
 		let unsubscribe: (() => void) | undefined;
+		let cancelled = false;
 		void subscribeToFriendPostNotifications(currentUser)
 			.then((cleanup) => {
-				unsubscribe = cleanup;
+				if (cancelled) cleanup();
+				else unsubscribe = cleanup;
 			})
 			.catch((error) => {
 				console.error("Unable to subscribe to friend notifications:", error);
 			});
 
-		return () => unsubscribe?.();
+		return () => {
+			cancelled = true;
+			unsubscribe?.();
+		};
 	}, [currentUser]);
 
 	return null;

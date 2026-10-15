@@ -11,7 +11,23 @@ const FRIEND_NOTIFICATION_TYPE = "friend-post";
 const STREAK_REMINDER_HOUR = 20;
 
 let friendPostChannel: ReturnType<typeof supabase.channel> | null = null;
+let friendPostChannelRemoval: Promise<unknown> | null = null;
+let friendPostSubscriptionId = 0;
 let permissionRequest: Promise<boolean> | null = null;
+
+function removeFriendPostChannel(channel: ReturnType<typeof supabase.channel>) {
+  const removal = supabase.removeChannel(channel);
+  friendPostChannelRemoval = removal;
+  void removal.then(
+    () => {
+      if (friendPostChannelRemoval === removal) friendPostChannelRemoval = null;
+    },
+    () => {
+      if (friendPostChannelRemoval === removal) friendPostChannelRemoval = null;
+    },
+  );
+  return removal;
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -111,11 +127,23 @@ export async function subscribeToFriendPostNotifications(
 ) {
   if (!isNative() || !profile || profile.notify_friend_activity === false) return () => {};
 
+  const subscriptionId = ++friendPostSubscriptionId;
   const friends = await fetchFriends();
+  if (subscriptionId !== friendPostSubscriptionId) return () => {};
+
   const friendIds = new Set(
     friends.map(getFriendId).filter((id): id is string => id !== null && id !== profile.id),
   );
   if (!friendIds.size) return () => {};
+
+  if (friendPostChannel) {
+    const previousChannel = friendPostChannel;
+    friendPostChannel = null;
+    await removeFriendPostChannel(previousChannel);
+  } else if (friendPostChannelRemoval) {
+    await friendPostChannelRemoval;
+  }
+  if (subscriptionId !== friendPostSubscriptionId) return () => {};
 
   let active = true;
   const channel = supabase
@@ -139,7 +167,12 @@ export async function subscribeToFriendPostNotifications(
 
   return () => {
     active = false;
-    void supabase.removeChannel(channel);
-    if (friendPostChannel === channel) friendPostChannel = null;
+    if (friendPostSubscriptionId === subscriptionId) {
+      friendPostSubscriptionId += 1;
+    }
+    if (friendPostChannel === channel) {
+      friendPostChannel = null;
+      void removeFriendPostChannel(channel);
+    }
   };
 }
