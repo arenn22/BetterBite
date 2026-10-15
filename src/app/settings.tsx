@@ -174,7 +174,7 @@ export default function SettingsScreen() {
 
         <Section title="Notifications" icon="bell" delay={160}>
           <View style={styles.settingRow}>
-            <IconBadge name="flame" size={34} color={colors.flame} backgroundColor={colors.terraBg} />
+            <IconBadge name="flame" size={34} color={colors.sage} backgroundColor={colors.sageLight} />
             <View style={styles.rowCopy}><Text style={styles.rowLabel}>Streak reminders</Text><Text style={styles.rowValue}>Get updates about your daily streak.</Text></View>
             <Switch value={notifyStreaks} onValueChange={(value) => { setNotifyStreaks(value); void runSave("notifications", () => updateNotificationPreferences(value, notifyFriends), "Notification preferences updated."); }} trackColor={{ false: colors.border, true: colors.sageMid }} thumbColor={notifyStreaks ? colors.sage : "#fff"} />
           </View>

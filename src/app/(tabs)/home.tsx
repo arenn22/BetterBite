@@ -122,7 +122,7 @@ function HomeScreen() {
       <FadeIn delay={80} style={[styles.streakCard, shadowSm]}>
         <View style={styles.streakContent}>
           <View style={styles.streakHeader}>
-            <IconBadge name="flame" size={44} color={colors.flame} backgroundColor={colors.terraBg} />
+            <IconBadge name="flame" size={44} color={colors.sage} backgroundColor={colors.sageLight} />
             <View style={styles.streakCopy}>
               <Text style={styles.streakTitle}>{streakCount} <Text style={styles.streakDays}>day streak</Text></Text>
               <Text style={styles.streakSubtitle}>
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   avatarBadgeText: { color: colors.sage, fontSize: 8, fontWeight: "800", textAlign: "center" },
 
   // Streak
-  streakCard: { marginHorizontal: layout.gutter, marginBottom: layout.sectionGap, backgroundColor: "#FFFCF8", borderRadius: radii.xl, borderWidth: 1, borderColor: "#F0DED2", padding: 18 },
+  streakCard: { marginHorizontal: layout.gutter, marginBottom: layout.sectionGap, backgroundColor: colors.card, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border, padding: 18 },
   streakContent: { alignItems: "stretch", gap: 16 },
   streakHeader: { flexDirection: "row", alignItems: "center", gap: 13 },
   streakCopy: { flex: 1 },
@@ -200,10 +200,10 @@ const styles = StyleSheet.create({
   streakDaysRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 4, paddingTop: 2 },
   dayColumn: { flex: 1, maxWidth: 42, alignItems: "center", gap: 7 },
   dayDot: { width: 34, height: 34, borderRadius: radii.pill, alignItems: "center", justifyContent: "center", backgroundColor: "#F1EDE7", borderWidth: 1, borderColor: "#E9E2DA" },
-  dayDotActive: { backgroundColor: colors.flame, borderColor: colors.flame, shadowColor: colors.flame, shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  dayDotActive: { backgroundColor: colors.sage, borderColor: colors.sage, shadowColor: colors.sage, shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   dayLabel: { fontSize: 10, fontWeight: "700", color: colors.faint },
-  dayLabelActive: { color: colors.flame },
-  dayDotToday: { borderWidth: 2, borderColor: colors.terracotta, backgroundColor: colors.terraBg },
+  dayLabelActive: { color: colors.sage },
+  dayDotToday: { borderWidth: 2, borderColor: colors.sageMid, backgroundColor: colors.sageLight },
   dayDotFuture: { opacity: 0.55 },
-  dayLabelToday: { color: colors.terracotta, fontWeight: "800", fontSize: 9 },
+  dayLabelToday: { color: colors.sage, fontWeight: "800", fontSize: 9 },
 });

@@ -469,7 +469,7 @@ export default function SocialScreen() {
 								<View style={styles.userInfo}>
 									<View style={styles.nameTierRow}><Text style={styles.userName}>{friend.name}</Text><TierBadge tier={friend.tier} /></View>
 									<View style={styles.streakRow}>
-										<AppIcon name="flame" size={11} color={friend.streak > 0 ? colors.flame : colors.ghost} />
+										<AppIcon name="flame" size={11} color={friend.streak > 0 ? colors.sage : colors.ghost} />
 										<Text style={styles.mutuals}>{friend.streak} day streak</Text>
 									</View>
 								</View>

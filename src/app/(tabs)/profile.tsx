@@ -234,7 +234,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
   const stats: { label: string; value: string; icon: IconName; color: string }[] = [
     { label: "Recipes", value: String(createdRecipes.length), icon: "book", color: colors.sage },
     { label: "Friends", value: isOwner ? String(friends.length) : "--", icon: "social", color: "#4A7A99" },
-    { label: "Streak", value: String(getActiveStreak(profile?.streakCount ?? profile?.streakcount, profile?.last_streak_post ?? profile?.last_post_at)), icon: "flame", color: colors.flame },
+    { label: "Streak", value: String(getActiveStreak(profile?.streakCount ?? profile?.streakcount, profile?.last_streak_post ?? profile?.last_post_at)), icon: "flame", color: colors.sage },
   ];
   const selectedAuthorId = selectedRecipe?.post?.profile_id;
   const activeTabIndex = TABS.findIndex((tab) => tab.id === activeTab);
@@ -373,7 +373,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
                 </View>
                 {f.streak > 0 && (
                   <View style={styles.flameBadge}>
-                    <AppIcon name="flame" size={11} color={colors.flame} />
+                    <AppIcon name="flame" size={11} color={colors.sage} />
                   </View>
                 )}
               </View>
