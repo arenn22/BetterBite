@@ -8,6 +8,7 @@ import {
   updateProfilePhoto,
   updateProfileUsername,
 } from "@/services/api/profiles";
+import { seedVideoDemo } from "@/services/api/demo";
 import { colors, fonts, layout, radii, shadowSm } from "@/app/(tabs)/theme";
 import { Button } from "@/components/ui/button";
 import { FadeIn } from "@/components/ui/fade-in";
@@ -125,7 +126,10 @@ export default function SettingsScreen() {
       <View style={styles.page}>
         <ScreenHeader
           title="Settings"
-          action={<Button title="Back" icon="back" variant="outline" size="sm" onPress={() => router.back()} accessibilityLabel="Go back" />}
+          action={<Button title="Back" icon="back" variant="outline" size="sm" onPress={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace("/home");
+          }} accessibilityLabel="Go back" />}
         />
 
         <Section title="Profile" icon="profile" delay={40}>
@@ -186,6 +190,20 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <Section title="Sample data" icon="people" delay={180}>
+          <Text style={styles.helper}>Add the sample users and video demo data to your BetterBite account.</Text>
+          <View style={styles.sectionAction}>
+            <Button
+              title={saving === "demo" ? "Adding sample users..." : "Add sample users"}
+              icon="people"
+              variant="outline"
+              loading={saving === "demo"}
+              onPress={() => void runSave("demo", () => seedVideoDemo(), "Sample users added.")}
+              fullWidth
+            />
+          </View>
+        </Section>
+
         {message ? (
           <Animated.View entering={FadeInDown.duration(220)} style={[styles.banner, styles.successBanner]}>
             <AppIcon name="checkCircle" size={15} color={colors.sage} />
@@ -198,7 +216,7 @@ export default function SettingsScreen() {
             <Text style={styles.error}>{error}</Text>
           </Animated.View>
         ) : null}
-        <Section title="Session" icon="logout" delay={200}>
+        <Section title="Session" icon="logout" delay={220}>
           <View style={styles.sectionAction}>
             <Button title={saving === "signout" ? "Signing out..." : "Sign out"} icon="logout" variant="danger" size="lg" loading={saving === "signout"} onPress={() => void runSave("signout", async () => { await signOut(); router.replace("/login" as Href); }, "Signed out.")} fullWidth />
           </View>

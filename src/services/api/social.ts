@@ -67,6 +67,17 @@ export async function fetchFriends() {
   }
 }
 
+export async function removeFriend(friendId: string): Promise<void> {
+  const { error } = await supabase.rpc("remove_friend", {
+    p_friend_id: friendId,
+  });
+
+  if (error) {
+    console.error("Error removing friend:", error.message);
+    throw new Error(error.message);
+  }
+}
+
 export async function fetchFriendRequests(): Promise<PendingFriendRequest[]> {
   const { data, error } = await supabase.rpc('get_pending_friend_requests')
 

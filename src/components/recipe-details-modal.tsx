@@ -50,6 +50,7 @@ type RecipeDetailsModalProps = {
   onClose: () => void;
   onLike: (currentlyLiked: boolean) => Promise<void>;
   onAuthorPress?: () => void;
+  onDelete?: () => void;
 };
 
 function asTextList(value: unknown): string[] {
@@ -148,6 +149,7 @@ export function RecipeDetailsModal({
   onClose,
   onLike,
   onAuthorPress,
+  onDelete,
 }: RecipeDetailsModalProps) {
   const { currentUser, refreshCurrentUser } = useAuthContext();
   const { dietaryOptions, cuisineOptions } = useRecipeOptions();
@@ -365,6 +367,7 @@ export function RecipeDetailsModal({
 
               <View style={styles.detailContent}>
                 <Text style={styles.detailTitle}>{post.title || "Untitled recipe"}</Text>
+                {onDelete ? <Button title="Delete recipe" icon="trash" variant="danger" size="sm" onPress={onDelete} style={styles.deleteButton} /> : null}
                 <PressableScale onPress={onAuthorPress} disabled={!onAuthorPress} pressScale={0.98} style={styles.authorRow} hoverStyle={styles.authorRowHover} accessibilityRole={onAuthorPress ? "button" : undefined}>
                   {post.author_pfp_url ? (
                     <Image source={{ uri: post.author_pfp_url }} style={styles.authorAvatar} />
@@ -600,6 +603,7 @@ const styles = StyleSheet.create({
   likeCount: { color: "#fff", fontSize: 12, fontWeight: "800" },
   detailContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28 },
   detailTitle: { fontFamily: fonts.heading, fontSize: 24, lineHeight: 30, color: colors.ink },
+  deleteButton: { alignSelf: "flex-start", marginTop: 10 },
   authorRow: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 7, marginTop: 8, marginLeft: -6, paddingHorizontal: 6, paddingVertical: 4, borderRadius: radii.pill },
   authorRowHover: { backgroundColor: colors.sageLight },
   authorAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.sageLight },

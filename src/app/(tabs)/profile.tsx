@@ -14,14 +14,14 @@ import { useAuthContext } from "@/lib/auth/auth-context";
 import { getActiveStreak } from "@/lib/streak";
 import { toRecipeCardData, updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { getCookedPostsByUser } from "@/services/api/cooked-posts";
-import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
+import { deletePost, fetchPosts, getLikedPostsByUser, incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
 import { fetchUserProfile, getXpPercentageLeftToNextLevel } from "@/services/api/profiles";
 import { fetchFriends } from "@/services/api/social";
 import type { Profile } from "@/types/auth";
 import { router, type Href } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator, Image, Platform,
+  ActivityIndicator, Alert, Image, Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -223,6 +223,41 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
     void incrementPostViews(recipe.id).then(() => {
       setSelectedRecipe((current) => current?.id === recipe.id ? updateRecipeCardData(current, { views: current.views + 1 }) : current);
     }).catch((error) => console.error("Unable to increment views for post:", error));
+  };
+
+  const handleDeleteRecipe = () => {
+    if (!selectedRecipe || !isOwner || activeTab !== "created") return;
+    const recipeToDelete = selectedRecipe;
+    const deleteRecipe = () => {
+      void deletePost(recipeToDelete.id)
+        .then(() => {
+          setCreatedRecipes((current) => current.filter((recipe) => recipe.id !== recipeToDelete.id));
+          setSelectedRecipe(null);
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : "Please try again.";
+          if (Platform.OS === "web") globalThis.alert(`Unable to delete recipe: ${message}`);
+          else Alert.alert("Unable to delete recipe", message);
+        });
+    };
+
+    if (Platform.OS === "web") {
+      if (globalThis.confirm(`Delete "${recipeToDelete.title}" permanently?`)) deleteRecipe();
+      return;
+    }
+
+    Alert.alert(
+      "Delete recipe?",
+      `This will permanently delete "${recipeToDelete.title}".`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: deleteRecipe,
+        },
+      ],
+    );
   };
 
   const profile = isOwner ? currentUser : viewedProfile;
@@ -465,6 +500,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
       onClose={() => setSelectedRecipe(null)}
       onLike={handleLikeRecipe}
       onAuthorPress={selectedAuthorId ? () => openUserProfile(selectedAuthorId) : undefined}
+      onDelete={isOwner && activeTab === "created" ? handleDeleteRecipe : undefined}
     />
     </>
   );

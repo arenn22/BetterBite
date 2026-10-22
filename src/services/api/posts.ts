@@ -436,6 +436,17 @@ export async function unlikePost(postId: string): Promise<void> {
   }
 }
 
+export async function deletePost(postId: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_post", {
+    p_post_id: postId,
+  });
+
+  if (error) {
+    console.error("Error deleting post:", error.message);
+    throw new Error(error.message);
+  }
+}
+
 export async function incrementPostViews(postId: string): Promise<void> {
   const { error } = await supabase.rpc("increment_post_views", {
     p_post_id: postId,
@@ -509,7 +520,7 @@ export async function get_posts_by_profile_experience() {
   }
 }
 
-const posts_per_section = 5;
+const posts_per_section = 15;
 const offset = 0;
 
 export async function get_recommended_posts() {
@@ -567,7 +578,27 @@ export async function fetchHomePostSections(): Promise<HomePostSections> {
   const uniquePosts = [...new Map(
     Object.values(sourceSections).flat().map((post) => [post.id, post]),
   ).values()];
-  if (!uniquePosts.length) return sourceSections;
+  if (!uniquePosts.length) {
+    try {
+      const fallbackPosts = await fetchPosts({ limit: posts_per_section * 4 });
+      const fallbackEasyWins = fallbackPosts.filter((post) => {
+        const time = Number(post.time);
+        return Number.isFinite(time) && time <= 20;
+      });
+
+      return {
+        recommended: fallbackPosts.slice(0, posts_per_section),
+        easyWins: (fallbackEasyWins.length ? fallbackEasyWins : fallbackPosts).slice(0, posts_per_section),
+        challenge: [...fallbackPosts]
+          .sort((left, right) => Number(right.difficulty) - Number(left.difficulty))
+          .slice(0, posts_per_section),
+        friends: [],
+      };
+    } catch (error) {
+      console.error("Unable to load fallback home posts:", error);
+      return sourceSections;
+    }
+  }
 
   const { data: postRows, error } = await supabase
     .from("posts")

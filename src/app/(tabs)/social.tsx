@@ -20,6 +20,7 @@ import {
 	getStreakLeaderboardFromEveryone,
 	getStreakLeaderboardFromFriends,
 	respondToFriendRequest,
+	removeFriend,
 	searchUsers,
 	sendFriendRequest,
 } from "@/services/api/social";
@@ -31,6 +32,7 @@ import {
     ActivityIndicator,
     Image,
     Platform,
+    Alert,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -264,6 +266,36 @@ export default function SocialScreen() {
 		}
 	};
 
+	const handleRemoveFriend = (friend: Friend) => {
+		const removeSelectedFriend = () => {
+			void removeFriend(friend.id)
+				.then(() => setFriends((current) => current.filter((item) => item.id !== friend.id)))
+				.catch((error) => {
+					const message = error instanceof Error ? error.message : "Unable to unfriend this person.";
+					if (Platform.OS === "web") globalThis.alert(message);
+					else setActionError(message);
+				});
+		};
+
+		if (Platform.OS === "web") {
+			if (globalThis.confirm(`Unfriend ${friend.name}?`)) removeSelectedFriend();
+			return;
+		}
+
+		Alert.alert(
+			"Unfriend this person?",
+			`You and ${friend.name} will no longer be friends.`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Unfriend",
+					style: "destructive",
+					onPress: removeSelectedFriend,
+				},
+			],
+		);
+	};
+
 	const selectedMetric = LEADERBOARD_METRICS.find((item) => item.value === leaderboardMetric) ?? LEADERBOARD_METRICS[0];
 	const podiumEntries = [leaderboardEntries[1], leaderboardEntries[0], leaderboardEntries[2]]
 		.filter((entry): entry is LeaderboardEntry => entry !== undefined);
@@ -473,7 +505,9 @@ export default function SocialScreen() {
 										<Text style={styles.mutuals}>{friend.streak} day streak</Text>
 									</View>
 								</View>
-								<AppIcon name="chevronRight" size={14} color={colors.ghost} weight="semibold" />
+								<PressableScale onPress={() => handleRemoveFriend(friend)} pressScale={0.9} style={[styles.iconAction, styles.rejectButton]} hoverStyle={styles.rejectButtonHover} accessibilityRole="button" accessibilityLabel={`Unfriend ${friend.name}`}>
+									<AppIcon name="personRemove" size={14} color={colors.terracotta} weight="bold" />
+								</PressableScale>
 							</PressableScale>
 						))}
 					</View>

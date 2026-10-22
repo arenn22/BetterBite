@@ -42,6 +42,7 @@ export const ICONS = {
   bell: { ios: "bell.fill", md: "notifications" },
   mail: { ios: "envelope.fill", md: "mail" },
   personAdd: { ios: "person.badge.plus", md: "person_add" },
+  personRemove: { ios: "person.badge.minus", md: "person_remove" },
   personCheck: { ios: "person.fill.checkmark", md: "how_to_reg" },
   refresh: { ios: "arrow.clockwise", md: "refresh" },
 
