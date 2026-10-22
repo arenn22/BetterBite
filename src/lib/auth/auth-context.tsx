@@ -3,6 +3,7 @@ import {
     handleSignInEmail,
     handleSignInUsername,
     handleSignUp,
+    isEmailVerified,
     signOut as signOutFromSupabase,
     subscribeToAuthStateChanges,
 } from "@/services/api/auth";
@@ -41,7 +42,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		let isActive = true;
 
 		async function restoreProfile(session: Awaited<ReturnType<typeof getCurrentSession>>) {
-			if (!session) {
+			if (!session || !isEmailVerified(session.user)) {
+				if (session) {
+					try {
+						await signOutFromSupabase();
+					} catch (signOutError) {
+						if (isActive) {
+							setError(
+								signOutError instanceof Error
+									? signOutError.message
+									: "Unable to clear the unverified session.",
+							);
+						}
+					}
+				}
+
 				if (isActive) {
 					setCurrentUser(null);
 				}

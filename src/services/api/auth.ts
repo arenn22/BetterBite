@@ -1,8 +1,14 @@
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 import type { AuthResult, Profile } from "../../types/auth";
 import { resolveProfileImageUrl } from "./posts";
-import { DEFAULT_PROFILE_IMAGE } from "./profiles";
+
+export const EMAIL_VERIFICATION_REQUIRED_MESSAGE =
+  "Please verify your email address before accessing the app.";
+
+export function isEmailVerified(user: User): boolean {
+  return Boolean(user.email_confirmed_at);
+}
 
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
@@ -34,6 +40,13 @@ export async function handleSignUp(
     return {profile: null, error: "Failed to create user"};
   }
 
+  if (!authData.session || !isEmailVerified(authData.user)) {
+    return {
+      profile: null,
+      error: EMAIL_VERIFICATION_REQUIRED_MESSAGE,
+    };
+  }
+
   const dateJoined = new Date().toISOString().slice(0, 10);
 
   const profile: Profile = {
@@ -41,7 +54,7 @@ export async function handleSignUp(
     username,
     email,
     date_joined: new Date(dateJoined),
-    pfp_url: DEFAULT_PROFILE_IMAGE,
+    pfp_url: null,
   };
 
   const { error: profileError } = await supabase.from("profiles").insert({
@@ -70,6 +83,13 @@ export async function handleSignInEmail(
     return { profile: null, error: error?.message ?? "Failed to sign in" };
   }
 
+  if (!data.session || !isEmailVerified(data.user)) {
+    return {
+      profile: null,
+      error: EMAIL_VERIFICATION_REQUIRED_MESSAGE,
+    };
+  }
+
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select("*")
@@ -90,7 +110,7 @@ export async function handleSignInEmail(
       username: profileData?.username || data.user.user_metadata?.username || "",
       email: data.user.email || email,
       date_joined: date,
-      pfp_url: (await resolveProfileImageUrl(profileData?.pfp_url)) || DEFAULT_PROFILE_IMAGE,
+      pfp_url: await resolveProfileImageUrl(profileData?.pfp_url),
       experience_level: (profileData as any)?.experience_level ?? (profileData as any)?.experienceLevel ?? null,
       experienceLevel: (profileData as any)?.experience_level ?? (profileData as any)?.experienceLevel ?? null,
       streakCount: streakValue,

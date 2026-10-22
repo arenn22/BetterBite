@@ -11,7 +11,6 @@ import { useListEditor } from "@/hooks/use-list-editor";
 import { useRecipeOptions } from "@/hooks/use-recipe-options";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { createPost, uploadPostImage } from "@/services/api/posts";
-import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
 import Slider from "@expo/ui/community/slider";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -163,7 +162,7 @@ function UploadPlaceholder() {
 
 function PreviewCard({
   name, difficulty, photoSrc, authorName, authorImage,
-}: { name: string; difficulty: Difficulty; photoSrc: string | null; authorName: string; authorImage: string }) {
+}: { name: string; difficulty: Difficulty; photoSrc: string | null; authorName: string; authorImage: string | null }) {
   const diff = DIFF_COLOR[difficulty];
   return (
     <View style={[styles.previewCard, shadowSm]}>
@@ -187,7 +186,13 @@ function PreviewCard({
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
           <View style={{ width: 16, height: 16, borderRadius: 8, overflow: "hidden", backgroundColor: colors.clay }}>
-            <Image source={{ uri: authorImage }} style={styles.fill} />
+            {authorImage ? (
+              <Image source={{ uri: authorImage }} style={styles.fill} />
+            ) : (
+              <Text style={{ color: "#FFFFFF", fontSize: 9, fontWeight: "800", textAlign: "center", lineHeight: 16 }}>
+                {(authorName[0] ?? "B").toUpperCase()}
+              </Text>
+            )}
           </View>
           <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 9, fontWeight: "500", color: colors.muted }}>by {authorName}</Text>
         </View>
@@ -548,7 +553,7 @@ export default function CreateScreen() {
             <SectionLabel icon="eye">Feed preview</SectionLabel>
             <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
               <View style={{ width: 160 }}>
-                <PreviewCard name={recipeName} difficulty={difficulty} photoSrc={photoSrc} authorName={currentUser?.username || "you"} authorImage={currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE} />
+                <PreviewCard name={recipeName} difficulty={difficulty} photoSrc={photoSrc} authorName={currentUser?.username || "you"} authorImage={currentUser?.pfp_url ?? null} />
               </View>
               <View style={{ flex: 1, paddingTop: 4 }}>
                 <Text style={{ fontSize: 11, fontWeight: "500", color: colors.muted, lineHeight: 17 }}>

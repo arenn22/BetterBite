@@ -15,7 +15,7 @@ import { getActiveStreak } from "@/lib/streak";
 import { toRecipeCardData, updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { getCookedPostsByUser } from "@/services/api/cooked-posts";
 import { fetchPosts, getLikedPostsByUser, incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
-import { DEFAULT_PROFILE_IMAGE, fetchUserProfile, getXpPercentageLeftToNextLevel } from "@/services/api/profiles";
+import { fetchUserProfile, getXpPercentageLeftToNextLevel } from "@/services/api/profiles";
 import { fetchFriends } from "@/services/api/social";
 import type { Profile } from "@/types/auth";
 import { router, type Href } from "expo-router";
@@ -301,7 +301,15 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
             {/* ring with gap, replaces CSS outline + outline-offset */}
             <View style={[styles.avatarRing, shadowMd]}>
               <View style={styles.avatarInner}>
-                <Image source={{ uri: profile.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} resizeMode="cover" />
+                {profile.pfp_url ? (
+                  <Image source={{ uri: profile.pfp_url }} style={styles.fill} resizeMode="cover" />
+                ) : (
+                  <View style={styles.avatarFallback}>
+                    <Text style={styles.avatarInitial}>
+                      {(profile.username?.[0] ?? "B").toUpperCase()}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -492,6 +500,8 @@ const styles = StyleSheet.create({
 
   avatarRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 3, borderColor: colors.clay, backgroundColor: colors.card, padding: 2 },
   avatarInner: { flex: 1, borderRadius: radii.pill, overflow: "hidden" },
+  avatarFallback: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.sageLight },
+  avatarInitial: { color: colors.sage, fontSize: 28, fontWeight: "800" },
   name: { fontFamily: fonts.heading, fontSize: 22, color: colors.ink, lineHeight: 26 },
   tierBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.sageLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.pill },
   tierText: { fontSize: 12, fontWeight: "800", color: colors.sage },

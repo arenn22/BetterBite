@@ -195,4 +195,3 @@ export async function updateNotificationPreferences(
   });
   if (error) throw new Error(error.message);
 }
-

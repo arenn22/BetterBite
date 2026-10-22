@@ -6,7 +6,6 @@ import { useHomeFeeds } from "@/hooks/use-home-feeds";
 import { useAuthContext } from "@/lib/auth/auth-context";
 import { updateRecipeCardData, type RecipeCardData } from "@/lib/recipes";
 import { incrementPostViews, likePost, unlikePost } from "@/services/api/posts";
-import { DEFAULT_PROFILE_IMAGE } from "@/services/api/profiles";
 import { getActiveStreak, getStreakWeekDays, getTodayWeekIndex } from "@/lib/streak";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -109,7 +108,13 @@ function HomeScreen() {
         action={(
           <View style={styles.profileAction}>
             <View style={styles.avatar}>
-              <Image source={{ uri: currentUser?.pfp_url || DEFAULT_PROFILE_IMAGE }} style={styles.fill} />
+              {currentUser?.pfp_url ? (
+                <Image source={{ uri: currentUser.pfp_url }} style={styles.fill} />
+              ) : (
+                <Text style={styles.avatarInitial}>
+                  {(currentUser?.username?.[0] ?? "B").toUpperCase()}
+                </Text>
+              )}
             </View>
             <View style={styles.avatarBadge}>
               <Text numberOfLines={1} style={styles.avatarBadgeText}>{experienceLevel}</Text>
@@ -186,6 +191,7 @@ const styles = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
   profileAction: { position: "relative", width: 54, height: 54, alignItems: "center", justifyContent: "center" },
   avatar: { width: 48, height: 48, borderRadius: 16, overflow: "hidden", backgroundColor: colors.sageLight, borderWidth: 2, borderColor: colors.card },
+  avatarInitial: { color: colors.sage, fontSize: 20, fontWeight: "800" },
   avatarBadge: { position: "absolute", right: -2, bottom: -2, maxWidth: 88, backgroundColor: colors.sageLight, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.card },
   avatarBadgeText: { color: colors.sage, fontSize: 8, fontWeight: "800", textAlign: "center" },
 
