@@ -17,7 +17,40 @@ export type FilteredPostsOptions = {
   friendsOnly?: boolean;
 };
 
+async function ensureCurrentUserProfile(authorUsername: string): Promise<void> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw new Error(`Unable to verify the signed-in user: ${authError.message}`);
+
+  const user = authData.user;
+  if (!user) throw new Error("Please sign in before publishing a recipe.");
+
+  const { data: profile, error: profileLookupError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileLookupError) {
+    throw new Error(`Unable to verify your profile before publishing: ${profileLookupError.message}`);
+  }
+
+  if (profile) return;
+
+  const { error: profileInsertError } = await supabase.from("profiles").insert({
+    id: user.id,
+    username: authorUsername,
+    email: user.email ?? "",
+    date_joined: new Date(user.created_at).toISOString().slice(0, 10),
+  });
+
+  if (profileInsertError) {
+    throw new Error(`Unable to create your profile before publishing: ${profileInsertError.message}`);
+  }
+}
+
 export async function createPost(payload: CreatePostPayload): Promise<string> {
+  await ensureCurrentUserProfile(payload.authorUsername);
+
   const { data: newPostId, error } = await supabase.rpc('create_post', {
     p_title: payload.title,
     p_description: payload.description,
