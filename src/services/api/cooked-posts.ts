@@ -240,7 +240,7 @@ export async function fetchPostEngagement(postId: string): Promise<{
       const profile = profiles.get(review.profile_id);
       return {
         ...review,
-        author_username: profile?.username || "BetterBite member",
+        author_username: profile?.username || "BetterByte member",
         author_pfp_url: profile?.pfp_url || null,
       };
     }),
@@ -249,7 +249,7 @@ export async function fetchPostEngagement(postId: string): Promise<{
       return {
         ...post,
         image_url: await resolvePostImageUrl(post.image_url, "cooked_posts-images"),
-        author_username: profile?.username || "BetterBite member",
+        author_username: profile?.username || "BetterByte member",
         author_pfp_url: profile?.pfp_url || null,
       };
     })),

@@ -120,7 +120,6 @@ export async function handleSignInEmail(
     },
     error: null,
   };
-  console.log("Signed in user profile:", authProfile);
   return authProfile;
 }
 
@@ -147,7 +146,6 @@ async function getEmailWithUsername(username: string) {
     }
 
     if(data && data.length > 0) {
-        console.log('Fetched email:', data[0].email);
         return data[0].email;
     }
     return null;

@@ -53,7 +53,7 @@ async function requestPermission() {
   permissionRequest = (async () => {
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
-        name: "BetterBite notifications",
+        name: "BetterByte notifications",
         importance: Notifications.AndroidImportance.DEFAULT,
       });
     }
@@ -91,7 +91,7 @@ export async function syncStreakReminder(profile: Profile | null) {
   await Notifications.scheduleNotificationAsync({
     content: {
       title: "Keep your streak going",
-      body: "Share a recipe today to keep your BetterBite streak alive.",
+      body: "Share a recipe today to keep your BetterByte streak alive.",
       data: { type: STREAK_NOTIFICATION_TYPE },
     },
     trigger: {
@@ -108,7 +108,7 @@ async function notifyAboutFriendPost(username: string, title: string) {
   await Notifications.scheduleNotificationAsync({
     content: {
       title: `${username} shared a new recipe`,
-      body: title || "See what your friend cooked up on BetterBite.",
+      body: title || "See what your friend cooked up on BetterByte.",
       data: { type: FRIEND_NOTIFICATION_TYPE },
     },
     trigger: null,

@@ -218,7 +218,7 @@ export function RecipeDetailsModal({
       displayTags.push({ name, kind });
     }
   }
-  const authorName = post.author_username || "BetterBite member";
+  const authorName = post.author_username || "BetterByte member";
   const hasCooked = Boolean(currentUser && cookedPhotos.some((photo) => photo.profile_id === currentUser.id));
   const cookPhotoCount = cookedPhotos.length;
   const canSubmitReview = hasCooked && reviewRating > 0 && reviewText.trim().length > 2 && !reviewSaving;

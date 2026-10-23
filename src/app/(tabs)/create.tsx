@@ -314,7 +314,7 @@ export default function CreateScreen() {
           description: description.trim(),
           difficulty: difficultyVal,
           imageUrl,
-          authorUsername: currentUser.username || currentUser.email.split("@")[0] || "BetterBite member",
+          authorUsername: currentUser.username || currentUser.email.split("@")[0] || "BetterByte member",
           recipeJson: {
             ingredients: ingredients.map((ingredient) => ingredient.trim()).filter(Boolean),
             steps: steps.map((step) => step.trim()).filter(Boolean),

@@ -1,16 +1,16 @@
-# BetterBite 🍳
+# BetterByte 🍳
 
 ## Mission
 
-BetterBite makes cooking accessible, rewarding, and social for everyone. We believe that cooking shouldn't require culinary expertise or hours of free time—it should be something you *want* to come back to.
+BetterByte makes cooking accessible, rewarding, and social for everyone. We believe that cooking shouldn't require culinary expertise or hours of free time—it should be something you *want* to come back to.
 
 ## The Problem We're Solving
 
 In modern American society, packed schedules from work, school, and other responsibilities leave many people without the time or motivation to cook. This pushes people toward fast food that is quick and cheap but often loaded with additives, oversized portions, and excess calories that hurt health.
 
-Other cooking apps cater to home chefs and people already enthusiastic about cooking. **BetterBite is different.** We reward the *act* of cooking itself, not just picture-perfect results.
+Other cooking apps cater to home chefs and people already enthusiastic about cooking. **BetterByte is different.** We reward the *act* of cooking itself, not just picture-perfect results.
 
-## How BetterBite Works
+## How BetterByte Works
 
 ### Core Features
 - **Weekly Themed Challenges** – Participate in community cooking challenges and build streaks
@@ -20,7 +20,7 @@ Other cooking apps cater to home chefs and people already enthusiastic about coo
 - **AI-Powered Recommendations** – Get personalized suggestions based on your preferences and what friends are making
 - **Review Summaries** – AI summarizes food reviews to help you decide what to cook
 
-## Why BetterBite?
+## Why BetterByte?
 
 ✨ **Achievable Progress** – See your cooking journey tracked and celebrated, even if you're just starting out  
 👥 **Social & Community-Driven** – Cook with friends, share wins, and inspire each other  

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "BetterBite",
-    "slug": "BetterBite",
+    "name": "BetterByte",
+    "slug": "BetterByte",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "betterbite",
+    "scheme": "betterbyte",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"

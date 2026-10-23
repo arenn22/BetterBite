@@ -7,6 +7,7 @@ import { AppIcon, type IconName } from "@/components/ui/icon";
 import { IconBadge } from "@/components/ui/icon-badge";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { TagChip } from "@/components/ui/tag-chip";
+import { getExperienceLevelName } from "@/constants/experience-levels";
 import { getActiveStreak } from "@/lib/streak";
 import {
 	fetchFriendRequests,
@@ -119,15 +120,20 @@ function initialsFor(name: string) {
 
 function normalizeFriend(value: Record<string, unknown>, index: number): Friend {
 	const name = String(value.username ?? value.friend_username ?? value.display_name ?? value.name ?? "Friend");
+	const experienceLevel = Number(value.experience_level ?? value.experienceLevel ?? value.level);
+	const experienceLevelName = getExperienceLevelName(experienceLevel);
 	return {
 		id: String(value.id ?? value.profile_id ?? value.friend_id ?? index),
 		name,
 		initials: initialsFor(name),
 		color: FRIEND_COLORS[index % FRIEND_COLORS.length],
-		tier: String(value.tier ?? value.experience_level_name ?? "Member"),
-		streak: getActiveStreak(value.streakCount ?? value.streakcount ?? value.streak_count ?? value.streak, (value.last_streak_post ?? value.last_post_at) as string | null | undefined),
+		tier: String(value.tier ?? value.experience_level_name ?? experienceLevelName ?? "Home Cook"),
+		streak: getActiveStreak(
+			value.streakCount ?? value.streakcount ?? value.streak_count ?? value.current_streak ?? value.currentStreak ?? value.streak,
+			(value.last_streak_post ?? value.last_post_at ?? value.last_streak_date ?? value.lastStreakPost) as string | null | undefined,
+		),
 		recipes: Number(value.recipe_count ?? value.recipes ?? 0) || 0,
-		level: Number(value.experience_level ?? value.level ?? 0) || 0,
+		level: experienceLevel || 0,
 		recentImgs: Array.isArray(value.recent_images) ? value.recent_images.filter((image): image is string => typeof image === "string") : [],
 		img: typeof value.pfp_url === "string" ? value.pfp_url : typeof value.friend_pfp_url === "string" ? value.friend_pfp_url : undefined,
 	};
@@ -334,7 +340,7 @@ export default function SocialScreen() {
 						<IconBadge name="trophy" size={34} color={colors.gold} backgroundColor="#F8EED6" />
 						<View style={{ flexShrink: 1 }}>
 							<Text style={styles.heading}>Top {selectedMetric.label}</Text>
-							<Text style={styles.headingSub}>{leaderboardAudience === "friends" ? "Among your friends" : "Across BetterBite"}</Text>
+							<Text style={styles.headingSub}>{leaderboardAudience === "friends" ? "Among your friends" : "Across BetterByte"}</Text>
 						</View>
 					</View>
 					<PressableScale onPress={() => setShowLeaderboard((value) => !value)} style={styles.linkButton} hoverStyle={styles.linkButtonHover} accessibilityRole="button">
