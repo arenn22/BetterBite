@@ -49,9 +49,6 @@ export default function AppTabs() {
               <TabTrigger name="profile" href="/profile" asChild>
                 <Pressable />
               </TabTrigger>
-              <TabTrigger name="settings" href="/settings" asChild>
-                <Pressable />
-              </TabTrigger>
             </View>
           </TabList>
         </Tabs>
