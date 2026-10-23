@@ -570,35 +570,46 @@ export async function get_friend_posts() {
 export async function fetchHomePostSections(): Promise<HomePostSections> {
   const [recommended, easyWins, challenge, friends] = await Promise.all([
     get_recommended_posts(),
-    get_easy_posts(),
+    get_posts_by_profile_experience(),
     get_challenge_posts(),
     get_friend_posts(),
   ]);
-  const sourceSections = { recommended, easyWins, challenge, friends };
-  const uniquePosts = [...new Map(
+  let sourceSections = {
+    recommended: recommended.length ? recommended : easyWins,
+    easyWins,
+    challenge,
+    friends,
+  };
+  let uniquePosts = [...new Map(
     Object.values(sourceSections).flat().map((post) => [post.id, post]),
   ).values()];
-  if (!uniquePosts.length) {
+  if (!recommended.length || !easyWins.length || !uniquePosts.length) {
     try {
       const fallbackPosts = await fetchPosts({ limit: posts_per_section * 4 });
-      const fallbackEasyWins = fallbackPosts.filter((post) => {
-        const time = Number(post.time);
-        return Number.isFinite(time) && time <= 20;
-      });
+      const easiestPosts = [...fallbackPosts]
+        .sort((left, right) => Number(left.difficulty) - Number(right.difficulty))
+        .slice(0, posts_per_section);
 
-      return {
-        recommended: fallbackPosts.slice(0, posts_per_section),
-        easyWins: (fallbackEasyWins.length ? fallbackEasyWins : fallbackPosts).slice(0, posts_per_section),
-        challenge: [...fallbackPosts]
-          .sort((left, right) => Number(right.difficulty) - Number(left.difficulty))
-          .slice(0, posts_per_section),
-        friends: [],
+      sourceSections = {
+        recommended: recommended.length
+          ? recommended
+          : fallbackPosts.slice(0, posts_per_section),
+        easyWins: easyWins.length ? easyWins : easiestPosts,
+        challenge: challenge.length
+          ? challenge
+          : [...fallbackPosts]
+            .sort((left, right) => Number(right.difficulty) - Number(left.difficulty))
+            .slice(0, posts_per_section),
+        friends,
       };
+      uniquePosts = [...new Map(
+        Object.values(sourceSections).flat().map((post) => [post.id, post]),
+      ).values()];
     } catch (error) {
       console.error("Unable to load fallback home posts:", error);
-      return sourceSections;
     }
   }
+  if (!uniquePosts.length) return sourceSections;
 
   const { data: postRows, error } = await supabase
     .from("posts")
@@ -637,10 +648,10 @@ export async function fetchHomePostSections(): Promise<HomePostSections> {
   });
 
   return {
-    recommended: hydrateSection(recommended),
-    easyWins: hydrateSection(easyWins),
-    challenge: hydrateSection(challenge),
-    friends: hydrateSection(friends),
+    recommended: hydrateSection(sourceSections.recommended),
+    easyWins: hydrateSection(sourceSections.easyWins),
+    challenge: hydrateSection(sourceSections.challenge),
+    friends: hydrateSection(sourceSections.friends),
   };
 }
 

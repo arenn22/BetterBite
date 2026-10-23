@@ -161,10 +161,10 @@ function HomeScreen() {
       </FadeIn>
 
       {/* RECIPE SECTIONS */}
-      <RecipeSection icon="sparkles" title="Recommended for you" subtitle="Hand-picked matches for your level" recipes={homeFeeds.recommended} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
-      <RecipeSection icon="bolt" iconColor={colors.gold} iconBackground="#F8EED6" title="Easy wins" subtitle="Under 20 minutes, no fuss" recipes={homeFeeds.easyWins} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
-      <RecipeSection icon="trophy" iconColor={colors.terracotta} iconBackground={colors.terraBg} title="Challenge yourself" subtitle="Push your skills further" recipes={homeFeeds.challenge} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
-      <RecipeSection icon="social" iconColor="#4A7A99" iconBackground="#E3EEF4" title="From your friends" subtitle="What the community cooked this week" recipes={homeFeeds.friends} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
+      <RecipeSection icon="sparkles" title="Recommended for you" recipes={homeFeeds.recommended} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
+      <RecipeSection icon="bolt" iconColor={colors.gold} iconBackground="#F8EED6" title="Easy wins" recipes={homeFeeds.easyWins} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
+      <RecipeSection icon="trophy" iconColor={colors.terracotta} iconBackground={colors.terraBg} title="Challenge yourself" recipes={homeFeeds.challenge} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
+      <RecipeSection icon="social" iconColor="#4A7A99" iconBackground="#E3EEF4" title="From your friends" recipes={homeFeeds.friends} loading={feedsLoading} onOpen={handleOpenRecipe} onAuthorPress={openAuthor} />
     </ScrollView>
     <RecipeDetailsModal
       post={openRecipe?.post ?? null}

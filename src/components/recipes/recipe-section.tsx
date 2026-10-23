@@ -12,7 +12,6 @@ export function RecipeSection({
   iconColor = colors.sage,
   iconBackground = colors.sageLight,
   title,
-  subtitle,
   recipes,
   loading,
   onOpen,
@@ -22,7 +21,6 @@ export function RecipeSection({
   iconColor?: string;
   iconBackground?: string;
   title: string;
-  subtitle: string;
   recipes: RecipeCardData[];
   loading: boolean;
   onOpen: (recipe: RecipeCardData) => void;
@@ -34,7 +32,6 @@ export function RecipeSection({
         <IconBadge name={icon} size={34} color={iconColor} backgroundColor={iconBackground} />
         <View style={styles.headingCopy}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
       </View>
       {loading ? (
@@ -61,7 +58,6 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: layout.gutter, marginBottom: 12 },
   headingCopy: { flex: 1 },
   title: { fontSize: 15, fontWeight: "800", color: colors.ink },
-  subtitle: { fontSize: 12, fontWeight: "500", color: colors.muted, marginTop: 2 },
   loading: { height: 150 },
   // Vertical padding leaves room for the card hover lift and shadow.
   cards: { paddingHorizontal: layout.gutter, paddingTop: 6, paddingBottom: 10, gap: 12 },
