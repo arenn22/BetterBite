@@ -29,7 +29,6 @@ export async function sendFriendRequest(receiverId: string): Promise<void> {
     throw new Error('Failed to send friend request.');
   }
   else {
-    console.log('Friend request sent successfully:', data);
     return data;
   }
 }
@@ -45,7 +44,6 @@ export async function respondToFriendRequest(requestId: number, accept: boolean)
     throw new Error('Failed to respond to friend request.');
   }
   else {
-    console.log('Friend request response processed successfully:', data);
     return data;
   }
 }
@@ -59,11 +57,34 @@ export async function fetchFriends() {
     return [];
   }
   else {
-    return Promise.all(((data || []) as Record<string, unknown>[]).map(async (friend) => ({
-      ...friend,
-      pfp_url: await resolveProfileImageUrl(typeof friend.pfp_url === "string" ? friend.pfp_url : null),
-      friend_pfp_url: await resolveProfileImageUrl(typeof friend.friend_pfp_url === "string" ? friend.friend_pfp_url : null),
-    })));
+    const friends = (data || []) as Record<string, unknown>[];
+    const friendIds = [...new Set(
+      friends
+        .map((friend) => friend.friend_id ?? friend.friend_profile_id ?? friend.profile_id ?? friend.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    )];
+    const { data: profileRows, error: profileError } = friendIds.length
+      ? await supabase.from("profiles").select("*").in("id", friendIds)
+      : { data: [], error: null };
+
+    if (profileError) {
+      console.error("Error fetching friend profiles:", profileError.message);
+    }
+
+    const profilesById = new Map(
+      ((profileRows || []) as Record<string, unknown>[]).map((profile) => [String(profile.id), profile]),
+    );
+
+    return Promise.all(friends.map(async (friend) => {
+      const friendId = friend.friend_id ?? friend.friend_profile_id ?? friend.profile_id ?? friend.id;
+      const profile = typeof friendId === "string" ? profilesById.get(friendId) : undefined;
+      const mergedFriend = profile ? { ...friend, ...profile } : friend;
+      return {
+        ...mergedFriend,
+        pfp_url: await resolveProfileImageUrl(typeof mergedFriend.pfp_url === "string" ? mergedFriend.pfp_url : null),
+        friend_pfp_url: await resolveProfileImageUrl(typeof mergedFriend.friend_pfp_url === "string" ? mergedFriend.friend_pfp_url : null),
+      };
+    }));
   }
 }
 

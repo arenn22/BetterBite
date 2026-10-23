@@ -8,7 +8,6 @@ import {
   updateProfilePhoto,
   updateProfileUsername,
 } from "@/services/api/profiles";
-import { seedVideoDemo } from "@/services/api/demo";
 import { colors, fonts, layout, radii, shadowSm } from "@/app/(tabs)/theme";
 import { Button } from "@/components/ui/button";
 import { FadeIn } from "@/components/ui/fade-in";
@@ -135,7 +134,7 @@ export default function SettingsScreen() {
         <Section title="Profile" icon="profile" delay={40}>
           <View style={styles.profileRow}>
             {currentUser?.pfp_url ? <Image source={{ uri: currentUser.pfp_url }} style={styles.avatar} /> : <View style={styles.avatarFallback}><Text style={styles.avatarText}>{(username[0] ?? "B").toUpperCase()}</Text></View>}
-            <View style={styles.profileCopy}><Text style={styles.profileName}>{username || "BetterBite member"}</Text><Text style={styles.rowValue}>{currentUser?.email || "Email unavailable"}</Text></View>
+            <View style={styles.profileCopy}><Text style={styles.profileName}>{username || "BetterByte member"}</Text><Text style={styles.rowValue}>{currentUser?.email || "Email unavailable"}</Text></View>
             <Button title="Change" icon="camera" variant="outline" size="sm" loading={saving === "photo"} onPress={() => void choosePhoto()} />
           </View>
           <Divider />
@@ -152,7 +151,7 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Password" icon="lock" delay={80}>
-          <Text style={styles.helper}>Choose a new password for your BetterBite account.</Text>
+          <Text style={styles.helper}>Choose a new password for your BetterByte account.</Text>
           <FieldRow icon="lock">
             <TextInput value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} style={styles.input} placeholder="New password" placeholderTextColor={colors.faint} accessibilityLabel="New password" />
             <Button title={saving === "password" ? "Updating..." : "Update"} variant="ghost" size="sm" disabled={passwordSaveDisabled} onPress={() => void runSave("password", async () => { await updatePassword(password); setPassword(""); }, "Password updated.")} />
@@ -187,20 +186,6 @@ export default function SettingsScreen() {
             <IconBadge name="social" size={34} color="#4A7A99" backgroundColor="#E3EEF4" />
             <View style={styles.rowCopy}><Text style={styles.rowLabel}>Friend activity</Text><Text style={styles.rowValue}>Know when friends share and cook.</Text></View>
             <Switch value={notifyFriends} onValueChange={(value) => { setNotifyFriends(value); void runSave("notifications", () => updateNotificationPreferences(notifyStreaks, value), "Notification preferences updated."); }} trackColor={{ false: colors.border, true: colors.sageMid }} thumbColor={notifyFriends ? colors.sage : "#fff"} />
-          </View>
-        </Section>
-
-        <Section title="Sample data" icon="people" delay={180}>
-          <Text style={styles.helper}>Add the sample users and video demo data to your BetterBite account.</Text>
-          <View style={styles.sectionAction}>
-            <Button
-              title={saving === "demo" ? "Adding sample users..." : "Add sample users"}
-              icon="people"
-              variant="outline"
-              loading={saving === "demo"}
-              onPress={() => void runSave("demo", () => seedVideoDemo(), "Sample users added.")}
-              fullWidth
-            />
           </View>
         </Section>
 

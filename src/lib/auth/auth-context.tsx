@@ -184,11 +184,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		if (!currentUser) return;
 
 		const refreshedProfile = await fetchUserProfile(currentUser.id);
-		console.log("DEBUG refreshCurrentUser", {
-			userId: currentUser.id,
-			refreshedProfile,
-			streakCount: refreshedProfile?.streakCount ?? refreshedProfile?.streakcount ?? null,
-		});
 		if (refreshedProfile) {
 			setCurrentUser(refreshedProfile);
 		}

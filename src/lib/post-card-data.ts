@@ -16,7 +16,7 @@ function formatPostTime(value: Date | string | undefined) {
 }
 
 export function toPostCardProps(post: Post): PostCardProps {
-	const username = post.author_username || "BetterBite member";
+	const username = post.author_username || "BetterByte member";
 	return {
 		postId: post.id,
 		likeCount: post.likes || 0,
@@ -26,7 +26,7 @@ export function toPostCardProps(post: Post): PostCardProps {
 		meal: post.title || "Untitled recipe",
 		description:
 			post.description ||
-			"A recipe shared with the BetterBite community.",
+			"A recipe shared with the BetterByte community.",
 		imageUrl: post.image_url,
 		timeAgo: formatPostTime(post.date_created),
 		tag: `Level ${post.difficulty || 1}`,

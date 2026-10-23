@@ -1,43 +1,43 @@
 {
-  "expo": {
-    "name": "BetterBite",
-    "slug": "BetterBite",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/betterbite-icon-square.svg",
-    "scheme": "betterbite",
-    "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/images/betterbite-icon-square.svg"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#55684B",
-        "foregroundImage": "./assets/images/betterbite-icon-square.svg",
-        "monochromeImage": "./assets/images/betterbite-icon-square.svg"
-      },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/betterbite-icon-square.svg"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#F7F7F4",
-          "image": "./assets/images/betterbite-icon-square.svg",
-          "imageWidth": 128
-        }
-      ],
-      "expo-notifications",
-      "expo-sqlite"
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
-  }
+	"expo": {
+		"name": "BetterByte",
+		"slug": "BetterByte",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"icon": "./assets/images/betterbite-icon-square.svg",
+		"scheme": "betterbite",
+		"userInterfaceStyle": "automatic",
+		"ios": {
+			"icon": "./assets/images/betterbite-icon-square.svg"
+		},
+		"android": {
+			"adaptiveIcon": {
+				"backgroundColor": "#55684B",
+				"foregroundImage": "./assets/images/betterbite-icon-square.svg",
+				"monochromeImage": "./assets/images/betterbite-icon-square.svg"
+			},
+			"predictiveBackGestureEnabled": false
+		},
+		"web": {
+			"output": "static",
+			"favicon": "./assets/images/betterbite-icon-square.svg"
+		},
+		"plugins": [
+			"expo-router",
+			[
+				"expo-splash-screen",
+				{
+					"backgroundColor": "#F7F7F4",
+					"image": "./assets/images/betterbite-icon-square.svg",
+					"imageWidth": 128
+				}
+			],
+			"expo-notifications",
+			"expo-sqlite"
+		],
+		"experiments": {
+			"typedRoutes": true,
+			"reactCompiler": true
+		}
+	}
 }

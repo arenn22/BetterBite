@@ -22,7 +22,7 @@ export default function AppTabs() {
             />
           </View>
           <View>
-            <Text style={styles.brandName}>BetterBite</Text>
+            <Text style={styles.brandName}>BetterByte</Text>
             <Text style={styles.brandTagline}>Cook smarter</Text>
           </View>
         </View>

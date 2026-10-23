@@ -15,7 +15,7 @@ export default function AuthHeader() {
 				/>
 			</Animated.View>
 			<Animated.View entering={FadeInDown.delay(120).duration(380)} style={styles.copy}>
-				<Text style={styles.title}>BetterBite</Text>
+				<Text style={styles.title}>BetterByte</Text>
 				<Text style={styles.subtitle}>Cook smarter. Waste less.</Text>
 			</Animated.View>
 		</View>

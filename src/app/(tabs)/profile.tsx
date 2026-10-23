@@ -44,7 +44,10 @@ function normalizeFriend(value: Record<string, unknown>, index: number): Profile
     name,
     initials,
     color: FRIEND_COLORS[index % FRIEND_COLORS.length],
-    streak: getActiveStreak(value.streakCount ?? value.streakcount ?? value.streak_count ?? value.streak, (value.last_streak_post ?? value.last_post_at) as string | null | undefined),
+    streak: getActiveStreak(
+      value.streakCount ?? value.streakcount ?? value.streak_count ?? value.current_streak ?? value.currentStreak ?? value.streak,
+      (value.last_streak_post ?? value.last_post_at ?? value.last_streak_date ?? value.lastStreakPost) as string | null | undefined,
+    ),
     img: typeof value.pfp_url === "string" ? value.pfp_url : typeof value.friend_pfp_url === "string" ? value.friend_pfp_url : undefined,
   };
 }
@@ -351,7 +354,7 @@ export function ProfileScreenContent({ onOpenRecipe, userId }: { onOpenRecipe?: 
 
           {/* Name & handle */}
           <View style={{ marginBottom: 12 }}>
-            <Text style={styles.name}>{profile.username || "BetterBite member"}</Text>
+            <Text style={styles.name}>{profile.username || "BetterByte member"}</Text>
             <Text style={{ fontSize: 12, fontWeight: "500", color: colors.faint }}>@{profile.username || "member"}</Text>
           </View>
 
