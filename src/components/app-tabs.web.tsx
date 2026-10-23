@@ -1,5 +1,6 @@
 import { TabList, Tabs, TabSlot, TabTrigger } from "expo-router/ui";
 import { router, usePathname } from "expo-router";
+import { Image } from "expo-image";
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -14,7 +15,11 @@ export default function AppTabs() {
       <View style={styles.sidebar}>
         <View style={styles.brand}>
           <View style={styles.brandMark}>
-            <AppIcon name="forkKnife" size={18} color="#FFFFFF" weight="semibold" />
+            <Image
+              source={require("@/assets/images/betterbite-icon.svg")}
+              style={styles.brandMarkImage}
+              contentFit="contain"
+            />
           </View>
           <View>
             <Text style={styles.brandName}>BetterBite</Text>
@@ -187,6 +192,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
+  },
+  brandMarkImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: radii.sm,
   },
   brandName: {
     color: colors.ink,

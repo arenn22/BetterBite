@@ -4,33 +4,32 @@
     "slug": "BetterBite",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/betterbite-icon-square.svg",
     "scheme": "betterbite",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/betterbite-icon-square.svg"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#55684B",
+        "foregroundImage": "./assets/images/betterbite-icon-square.svg",
+        "monochromeImage": "./assets/images/betterbite-icon-square.svg"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/betterbite-icon-square.svg"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#F7F7F4",
+          "image": "./assets/images/betterbite-icon-square.svg",
+          "imageWidth": 128
         }
       ],
       "expo-notifications",
